@@ -27,14 +27,16 @@ Sicherheitsnetzen, um falsche Tags zu vermeiden:
 * Intelligentes Matching (Levenshtein): Das Tool prüft die prozentuale 
   Ähnlichkeit der Suchergebnisse. So wird verhindert, dass die API für 
   "Duran Duran" versehentlich den Breakcore-Artist "Duran Duran Duran" zuordnet.
-* Ausreißer-Filter (Median & Lücken-Logik): APIs enthalten oft fehlerhafte User-Einträge. 
-  Das Skript berechnet den Mittelwert aller gefundenen Release-Jahre und 
-  ignoriert absurde Ausreißer (z. B. ein Release-Jahr 1945 für einen 2004er Track).
+* Ausreißer-Filter (Median & Lücken-Logik): APIs enthalten oft fehlerhafte User-
+  Einträge. Das Skript berechnet den Mittelwert aller gefundenen Release-Jahre 
+  und ignoriert absurde Ausreißer (z. B. ein Release-Jahr 1945 für einen 2004er 
+  Track).
 * OAD-Schutz: Virtuelle und physische Ordner, die "OAD" (On Air Design) heißen, 
   werden konsequent ignoriert. Jingle-Pakete bleiben also unangetastet.
 * Maskierte Konfiguration: Deine API-Keys werden lokal mit Base64 maskiert 
   abgespeichert, damit sie nicht direkt im Klartext in der config.json stehen.
-  Hinweis: Base64 ist KEINE Verschlüsselung, sondern nur eine Kodierung – sie
+  
+  HINWEIS: Base64 ist KEINE Verschlüsselung, sondern nur eine Kodierung – sie
   lässt sich mit jedem Online-Tool in Sekunden zurückrechnen. Der Schutz gilt
   nur vor versehentlichem Draufschauen, nicht vor absichtlichem Auslesen.
   Gib deine config.json daher nicht weiter (z. B. nicht mit hochladen, wenn du
@@ -46,8 +48,9 @@ Sicherheitsnetzen, um falsche Tags zu vermeiden:
 Da es sich um ein Python-Skript handelt, musst du einmalig Python und drei 
 Zusatzpakete installieren:
 
-1. Lade dir Python (https://www.python.org/downloads/) herunter und installiere es (WICHTIG: Setze bei der 
-   Installation unbedingt den Haken bei "Add Python to PATH"!).
+1. Lade dir Python (https://www.python.org/downloads/) herunter und installiere 
+   es (WICHTIG: Setze bei der Installation unbedingt den Haken bei 
+   "Add Python to PATH"!).
 2. Öffne die Windows-Eingabeaufforderung. 
    (Tipp: Drücke die Windows-Taste + R, tippe "cmd" ein und drücke Enter).
    Installiere dann die benötigten Bibliotheken mit folgendem Befehl:
@@ -144,7 +147,8 @@ incorrect tags:
   are strictly ignored. Jingle packages thus remain untouched.
 * Masked Configuration: Your API keys are stored locally masked with Base64 
   so they are not directly readable in plain text in the config.json.
-  Note: Base64 is NOT encryption, just encoding – it can be decoded in 
+  
+  NOTE: Base64 is NOT encryption, just encoding - it can be decoded in 
   seconds with any online tool. The protection only applies to accidental 
   glances, not intentional reading. Therefore, do not share your config.json 
   (e.g., do not upload it when asking for support or sharing the tool).
@@ -155,8 +159,9 @@ incorrect tags:
 Since this is a Python script, you need to install Python and three 
 additional packages once:
 
-1. Download and install Python (https://www.python.org/downloads/) (IMPORTANT: Make sure to 
-   check the box "Add Python to PATH" during installation!).
+1. Download and install Python (https://www.python.org/downloads/) 
+   (IMPORTANT: Make sure to check the box "Add Python to PATH" during 
+   installation!).
 2. Open the Windows Command Prompt. 
    (Tip: Press Windows Key + R, type "cmd", and press Enter).
    Then install the required libraries with the following command:
