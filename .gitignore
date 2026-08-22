@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+.env
+.vscode/
+
+# Virtualenv
+venv/
+env/
+
+# Distribution artifacts
+dist/
+build/
+*.spec
+
+# Logs
+*.log
+restorer.log
+
+# mAirList DB copies and other DB files
+*.mldb
+*.db
+
+# Config that contains API keys (created at first run)
+config.json
+
+# OS files
+.DS_Store
+Thumbs.db
