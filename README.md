@@ -1,6 +1,6 @@
-=mAirList DB Restorer v0.4.5 Beta
+==mAirList DB Restorer v0.4.5 Beta
  
- Ein Metadaten-Reparatur-Tool für die mAirList-Community=
+ Ein Metadaten-Reparatur-Tool für die mAirList-Community
 
 --- DEUTSCH --------------------------------------------------------------------
 
