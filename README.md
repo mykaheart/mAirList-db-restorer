@@ -1,8 +1,12 @@
-==mAirList DB Restorer v0.4.5 Beta
- 
- Ein Metadaten-Reparatur-Tool für die mAirList-Community
+================================================================================
+                       mAirList DB Restorer v0.4.5 Beta
+       Ein Metadaten-Reparatur-Tool / Metadata Repair Tool for mAirList
+================================================================================
 
---- DEUTSCH --------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+ >>> DEUTSCH
+--------------------------------------------------------------------------------
 
 Jeder, der eine Musikdatenbank pflegt, kennt das Problem: Fehlende Jahreszahlen, 
 leere Genre-Felder, unvollständige Labelcodes oder fehlende Alben. Der mAirList 
@@ -109,9 +113,10 @@ bei diesem Track. Beim nächsten Skript-Lauf erkennt das Tool, dass der Track
 "freigegeben" wurde und ruft ihn komplett neu ab!
 
 
-================================================================================
---- ENGLISH --------------------------------------------------------------------
-================================================================================
+
+--------------------------------------------------------------------------------
+ >>> ENGLISH
+--------------------------------------------------------------------------------
 
 Anyone who maintains a music database knows the problem: missing release years, 
 empty genre fields, incomplete label codes, or missing album titles. The mAirList 
