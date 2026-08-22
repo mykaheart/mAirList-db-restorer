@@ -1,6 +1,6 @@
 [project]
 name = "mairlists-db-restorer"
-version = "0.4.4"
+version = "0.4.5"
 description = "Script to clean and update a mAirList database (fetch metadata from MusicBrainz & Discogs)."
 readme = "README.md"
 requires-python = ">=3.9"
