@@ -1,0 +1,888 @@
+"""
+==============================================================================
+ mAirList DB Restorer - PRO GLAM VERSION (rich CLI + Logging)
+==============================================================================
+ Basis           : restore.py von Myka (RainbowRadio), mit Google Gemini
+ Patch           : Claude (Anthropic) & Kyra - Rich UI, Progress-Bar & Logging
+ Zweck           : Automatische Ergänzung & Reparatur von mAirList CSV-Datenbanken
+ Lizenz          : Freie Nutzung für die mAirList-Community
+==============================================================================
+"""
+
+import pandas as pd
+import requests
+import time
+import re
+import json
+import os
+import sys
+import csv
+import sqlite3
+import shutil
+import argparse
+import base64
+import difflib
+import statistics
+import logging
+from datetime import datetime
+from collections import Counter
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich import box
+
+console = Console()
+
+CONFIG_FILE = 'config.json'
+LOG_FILE = 'restorer.log'
+
+# --- Single Source of Truth für die Version ---
+APP_VERSION = "0.4.4 Beta"
+
+# ---------------------------------------------------------------------------
+# Logging Setup
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    encoding='utf-8'
+)
+
+def log_change(action, details):
+    logging.info(f"{action.upper()}: {details}")
+
+
+# Felder für item_attributes
+MLDB_ATTRIBUTE_FIELDS = [
+    'Jahr', 'Genre', 'Album', 'STYLE', 'DISCOGS_RELEASE_ID',
+    'Label', 'Labelcode', 'ISRC', 'RESTAURIERT'
+]
+
+MB_MIN_INTERVAL = 1.05
+DISCOGS_MIN_INTERVAL = 1.0
+CURRENT_YEAR = datetime.now().year
+
+
+# ---------------------------------------------------------------------------
+# Security & Helpers
+# ---------------------------------------------------------------------------
+def encode_b64(text):
+    return base64.b64encode(text.encode('utf-8')).decode('utf-8') if text else ""
+
+def decode_b64(text):
+    try:
+        return base64.b64decode(text.encode('utf-8')).decode('utf-8') if text else ""
+    except Exception:
+        return text
+
+def _is_valid_email(text):
+    return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', text.strip()))
+
+def string_similarity(a, b):
+    if not a or not b: return 0.0
+    return difflib.SequenceMatcher(None, str(a).lower(), str(b).lower()).ratio()
+
+def filter_valid_years(years_list):
+    """Filtert absurde Ausreißer (z.B. 1945) aus, behält aber echte alte Jahre (z.B. 1980 bei AC/DC)."""
+    valid = sorted([int(y) for y in years_list if str(y).isdigit() and 1900 <= int(y) <= CURRENT_YEAR])
+    if not valid:
+        return ""
+    
+    counts = Counter(valid)
+    unique_years = sorted(list(set(valid)))
+    
+    # Lücken-Filter: Wenn das älteste Jahr mehr als 8 Jahre vom zweitältesten entfernt ist 
+    # UND dieses alte Jahr extrem selten vorkommt (<2), ist es ein Discogs-Tippfehler.
+    while len(unique_years) > 1:
+        if unique_years[1] - unique_years[0] > 8 and counts[unique_years[0]] < 2:
+            unique_years.pop(0)
+        else:
+            break
+            
+    return str(unique_years[0])
+
+
+def get_credentials():
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception:
+            config = {}
+
+    key = decode_b64(config.get('DISCOGS_KEY', '').strip())
+    secret = decode_b64(config.get('DISCOGS_SECRET', '').strip())
+    mb_contact = decode_b64(config.get('MB_CONTACT', '').strip())
+
+    if key and secret and mb_contact:
+        return key, secret, mb_contact
+
+    console.print(Panel("[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden lokal maskiert in 'config.json' gespeichert.", box=box.ROUNDED))
+
+    if not key or not secret:
+        console.print("[bold yellow]-- Discogs API --[/bold yellow]")
+        key = input("  Discogs KEY: ").strip()
+        secret = input("  Discogs SECRET: ").strip()
+
+    if not mb_contact:
+        console.print("\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]")
+        while True:
+            mb_contact = input("  Deine Kontakt-E-Mail: ").strip()
+            if _is_valid_email(mb_contact):
+                break
+            console.print("[red]Ungültige E-Mail-Adresse, bitte erneut eingeben.[/red]")
+
+    config_data = {
+        'DISCOGS_KEY': encode_b64(key),
+        'DISCOGS_SECRET': encode_b64(secret),
+        'MB_CONTACT': encode_b64(mb_contact)
+    }
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config_data, f, indent=4)
+
+    console.print(f"[green]✓ Zugangsdaten sicher gespeichert in '{CONFIG_FILE}'.[/green]\n")
+    return key, secret, mb_contact
+
+
+DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT = get_credentials()
+HEADERS = {'User-Agent': f'mAirListDBRestorer/{APP_VERSION} ( {MB_CONTACT} )'}
+
+
+# ---------------------------------------------------------------------------
+# Rate-Limiter & HTTP
+# ---------------------------------------------------------------------------
+_last_mb_request = 0.0
+_last_discogs_request = 0.0
+
+def _wait(min_interval, last_time):
+    elapsed = time.time() - last_time
+    if elapsed < min_interval:
+        time.sleep(min_interval - elapsed)
+    return time.time()
+
+def mb_get(url, params, timeout=5):
+    global _last_mb_request
+    _last_mb_request = _wait(MB_MIN_INTERVAL, _last_mb_request)
+    res = requests.get(url, headers=HEADERS, params=params, timeout=timeout)
+    _last_mb_request = time.time()
+    return res
+
+def discogs_get(url, params, timeout=5):
+    global _last_discogs_request
+    _last_discogs_request = _wait(DISCOGS_MIN_INTERVAL, _last_discogs_request)
+    res = requests.get(url, headers=HEADERS, params=params, timeout=timeout)
+    _last_discogs_request = time.time()
+    return res
+
+
+# ---------------------------------------------------------------------------
+# Genre-Normalisierung & Cleaning
+# ---------------------------------------------------------------------------
+ALLOWED_GENRES = [
+    "Big Room", "Blues", "Classic Rock", "Country", "Dance", "Dancehall", "Dance-Pop",
+    "Deep House", "Deutsch-Hiphop", "Deutsch-Pop", "Deutsch-Rock", "Dubstep", "EDM",
+    "Eurodance", "Funk", "Future House", "Gothic Rock", "Hard Rock", "Hardstyle",
+    "Hiphop", "House", "Indie Rock", "Industrial", "Jazz", "Metal", "Oldies",
+    "Pop", "Pop-Rock", "Progressive House", "Psytrance", "Punk Rock", "R and B",
+    "Rap", "Reggae", "Rock", "Rock n Roll", "Schlager", "Slap House", "Soul",
+    "Synth-Pop", "Tech House", "Techno", "Trance", "Trap", "Tropical House"
+]
+
+GENRE_SYNONYMS = {
+    "euro house": "Eurodance", "synth-pop": "Synth-Pop", "synthpop": "Synth-Pop",
+    "hip hop": "Hiphop", "hip-hop": "Hiphop", "r&b": "R and B", "r&b / soul": "R and B",
+    "rock & roll": "Rock n Roll", "rock 'n' roll": "Rock n Roll", "pop rock": "Pop-Rock",
+    "indie": "Indie Rock", "edm": "EDM", "electronic": "Dance"
+}
+
+COMPILATION_KEYWORDS = [
+    'compilation', 'best of', 'greatest hits', 'essential', 'collection',
+    'various', 'remix', 'live', 'anthology', 'singles', 'ultimate', 'hit mix', 'bravo',
+    'soundtrack', 'o.s.t.', 'ost', 'the dome', 'now that'
+]
+
+LABEL_CODE_CACHE = {}
+
+ARTIST_FIXES = {
+    "ac, dc": "AC/DC", "ac dc": "AC/DC", "ac-dc": "AC/DC", "acdc": "AC/DC",
+    "a-ha": "a-ha", "a ha": "a-ha", "aha": "a-ha",
+    "b-52s": "The B-52's", "b 52s": "The B-52's", "b-52's": "The B-52's", "the b-52s": "The B-52's"
+}
+
+def contains_non_latin(text):
+    if not text: return False
+    return bool(re.search(r'[\u0400-\u04FF\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\u0600-\u06FF]', text))
+
+def capitalize_smart(text):
+    if text.lower() in ARTIST_FIXES:
+        return ARTIST_FIXES[text.lower()]
+        
+    words = text.split(' ')
+    cap_words = []
+    for w in words:
+        wl = w.lower()
+        if wl in ['feat.', 'ft.', 'featuring']: cap_words.append('feat.')
+        elif wl in ['and', '&']: cap_words.append('&')
+        elif w == '': cap_words.append(w)
+        elif w == w.lower() and not any(ch.isdigit() for ch in w): 
+            # Ersten Buchstaben groß, Rest bleibt wie er ist (z.B. für "mAirList")
+            cap_words.append(w[0].upper() + w[1:])
+        else: cap_words.append(w)
+    return " ".join(cap_words)
+
+def clean_artist_base(artist_raw):
+    if pd.isna(artist_raw) or not str(artist_raw).strip(): return ""
+    text = str(artist_raw).strip()
+    
+    # Bekannte Filename-Fails sofort abfangen
+    if text.lower() in ARTIST_FIXES:
+        return ARTIST_FIXES[text.lower()]
+        
+    text = re.sub(r'\b(featuring|feat\.|feat|ft\.|ft)\b', 'feat.', text, flags=re.IGNORECASE)
+    text = re.sub(r'feat\.\.', 'feat.', text)
+    return capitalize_smart(re.sub(r'\s+', ' ', text))
+
+def clean_title_base(title_raw):
+    if pd.isna(title_raw) or not str(title_raw).strip(): return ""
+    text = str(title_raw).strip()
+    text = re.sub(r'\b(featuring|feat\.|feat|ft\.|ft)\b', 'feat.', text, flags=re.IGNORECASE)
+    text = re.sub(r'feat\.\.', 'feat.', text)
+    return capitalize_smart(re.sub(r'\s+', ' ', text))
+
+def get_pure_search_title(title):
+    return re.sub(r'[\(\[\{].*?[\)\]\}]', '', title).strip()
+
+def is_valid_album(album_name):
+    if not album_name or contains_non_latin(album_name): return False
+    return not any(kw in album_name.lower() for kw in COMPILATION_KEYWORDS)
+
+def extract_label_code_from_string(text):
+    if not text or pd.isna(text): return ""
+    match = re.search(r'LC[- ]?(\d{4,5})', str(text), flags=re.IGNORECASE)
+    return f"LC{match.group(1).zfill(5)}" if match else ""
+
+def fetch_label_code_from_musicbrainz(label_name):
+    if not label_name: return ""
+    clean_label = label_name.split('/')[0].strip()
+    if clean_label in LABEL_CODE_CACHE: return LABEL_CODE_CACHE[clean_label]
+    try:
+        res = mb_get("https://musicbrainz.org/ws/2/label/", {'query': f'label:"{clean_label}"', 'fmt': 'json', 'limit': 3})
+        if res.status_code == 200:
+            for l in res.json().get('labels', []):
+                code = l.get('label-code')
+                if code:
+                    flc = f"LC{str(code).zfill(5)}"
+                    LABEL_CODE_CACHE[clean_label] = flc
+                    return flc
+    except Exception:
+        pass
+    return ""
+
+def fetch_label_code_from_discogs_release(release_id):
+    if not release_id: return ""
+    try:
+        res = discogs_get(f"https://api.discogs.com/releases/{release_id}", {'key': DISCOGS_KEY, 'secret': DISCOGS_SECRET})
+        if res.status_code == 200:
+            for l in res.json().get('labels', []):
+                lc = extract_label_code_from_string(l.get('catno', '')) or extract_label_code_from_string(l.get('name', ''))
+                if lc: return lc
+    except Exception:
+        pass
+    return ""
+
+def suggest_artist_spelling(artist):
+    if not artist: return None
+    main_artist = artist.split('feat.')[0].strip() if 'feat.' in artist else artist
+    try:
+        res = mb_get("https://musicbrainz.org/ws/2/artist/", {'query': main_artist, 'fmt': 'json', 'limit': 5})
+        if res.status_code == 200:
+            for top_match in res.json().get('artists', []):
+                score = int(top_match.get('score', 0))
+                official_name = top_match.get('name', '')
+                if score >= 90 and official_name and string_similarity(main_artist, official_name) >= 0.7:
+                    if official_name.lower() != main_artist.lower():
+                        if 'feat.' in artist:
+                            return f"{official_name} feat.{artist.split('feat.')[1]}"
+                        return official_name
+    except Exception:
+        pass
+    return None
+
+def suggest_title_spelling(artist, title):
+    if not title or not artist: return None
+    try:
+        search_title = get_pure_search_title(title)
+        res = mb_get("https://musicbrainz.org/ws/2/recording/",
+                      {'query': f'artist:"{artist}" AND recording:"{search_title}"', 'fmt': 'json', 'limit': 3})
+        if res.status_code == 200:
+            recordings = res.json().get('recordings', [])
+            if recordings:
+                official_title = recordings[0].get('title', '')
+                if official_title and official_title.lower() != title.lower():
+                    return official_title
+    except Exception:
+        pass
+    return None
+
+def fetch_musicbrainz_details(artist, title):
+    years, isrc, orig_album, fallback_album = [], None, None, None
+    best_score = 0
+    try:
+        res = mb_get("https://musicbrainz.org/ws/2/recording/",
+                      {'query': f'artist:"{artist}" AND recording:"{get_pure_search_title(title)}"',
+                       'fmt': 'json', 'limit': 10, 'inc': 'isrcs+releases'})
+        if res.status_code == 200:
+            recordings = res.json().get('recordings', [])
+            if recordings:
+                best_score = int(recordings[0].get('score', 0))
+            relevant = [r for r in recordings if int(r.get('score', 0)) >= max(best_score - 10, 50)]
+            for rec in relevant:
+                if not isrc and rec.get('isrcs'): isrc = rec.get('isrcs')[0]
+                if rec.get('first-release-date', '')[:4]: years.append(rec.get('first-release-date')[:4])
+                for rel in sorted(rec.get('releases', []), key=lambda x: x.get('date', '9999') if x.get('date') else '9999'):
+                    if rel.get('date', '')[:4]: years.append(rel.get('date')[:4])
+                    rel_title = rel.get('title', '')
+                    if rel_title and not contains_non_latin(rel_title):
+                        if not fallback_album: fallback_album = rel_title
+                        if not orig_album and is_valid_album(rel_title): orig_album = rel_title
+    except Exception:
+        pass
+
+    confidence = "hoch" if best_score >= 90 else ("mittel" if best_score >= 70 else "niedrig")
+    year = filter_valid_years(years)
+    return year, confidence, isrc, (orig_album or fallback_album or "")
+
+def map_to_allowed_genre(discogs_genres, discogs_styles):
+    candidates = (discogs_styles or []) + (discogs_genres or [])
+    for item in candidates:
+        i_low = item.strip().lower()
+        for allowed in ALLOWED_GENRES:
+            if allowed.lower() == i_low: return allowed
+        if i_low in GENRE_SYNONYMS and GENRE_SYNONYMS[i_low] in ALLOWED_GENRES: return GENRE_SYNONYMS[i_low]
+    for item in candidates:
+        for allowed in ALLOWED_GENRES:
+            if allowed.lower() in item.lower(): return allowed
+    return None
+
+def fetch_discogs_details(artist, title):
+    years, mapped_genre, discogs_id, styles_list = [], None, "", []
+    label, label_code, orig_album, fallback_album = "", "", "", ""
+    confidence = "niedrig"
+    try:
+        pure_title = get_pure_search_title(title)
+        res = discogs_get("https://api.discogs.com/database/search",
+                           {'artist': artist, 'track': pure_title, 'key': DISCOGS_KEY, 'secret': DISCOGS_SECRET, 'per_page': 15}, timeout=8)
+        results = res.json().get('results', []) if res.status_code == 200 else []
+
+        if not results:
+            res_fb = discogs_get("https://api.discogs.com/database/search",
+                                 {'q': f"{artist} {pure_title}", 'key': DISCOGS_KEY, 'secret': DISCOGS_SECRET, 'per_page': 15}, timeout=8)
+            results = res_fb.json().get('results', []) if res_fb.status_code == 200 else []
+
+        if results:
+            search_list = sorted([r for r in results if str(r.get('year', '')).isdigit()], key=lambda x: int(x.get('year'))) or results
+            for r in search_list:
+                if str(r.get('year', '')).isdigit() and int(r.get('year')) > 1900:
+                    years.append(str(r.get('year')))
+                rel_title = r.get('title', '').split(' - ', 1)[1] if ' - ' in r.get('title', '') else r.get('title', '')
+                if rel_title and not contains_non_latin(rel_title):
+                    if not fallback_album: fallback_album = rel_title
+                    if not orig_album and is_valid_album(rel_title): orig_album = rel_title
+            
+            best = search_list[0]
+            discogs_id = str(best.get('id', ''))
+            styles_list = best.get('style', [])
+            mapped_genre = map_to_allowed_genre(best.get('genre', []), styles_list)
+            labels = best.get('label', [])
+            label = labels[0] if labels else ""
+            label_code = extract_label_code_from_string(label) or extract_label_code_from_string(best.get('catno', ''))
+            
+            if not label_code and label: label_code = fetch_label_code_from_musicbrainz(label)
+            if not label_code and discogs_id: label_code = fetch_label_code_from_discogs_release(discogs_id)
+            
+            best_title = best.get('title', '').lower()
+            sim_score = string_similarity(pure_title, best_title)
+            if pure_title.lower() in best_title or sim_score >= 0.8:
+                confidence = "hoch"
+            elif results and sim_score >= 0.5:
+                confidence = "mittel"
+    except Exception:
+        pass
+    return {
+        'years': years, 'genre': mapped_genre, 'discogs_id': discogs_id,
+        'style': ", ".join(styles_list) if styles_list else "", 'label': label,
+        'label_code': label_code, 'album': orig_album or fallback_album or "",
+        'confidence': confidence,
+    }
+
+
+def save_safe_csv(df, filepath):
+    if 'LYRICS' in df.columns:
+        df['LYRICS'] = df['LYRICS'].fillna('').astype(str)
+        df['LYRICS'] = df['LYRICS'].str.replace(r'[\r\n]+', ' ', regex=True)
+        df['LYRICS'] = df['LYRICS'].str.replace(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', regex=True)
+    df.to_csv(filepath, index=False, encoding='utf-8-sig', quoting=csv.QUOTE_ALL)
+
+PROPOSAL_COLUMNS = [
+    'Artist_Vorschlag', 'Title_Vorschlag', 'Jahr_Vorschlag', 'Jahr_Konfidenz',
+    'Genre_Vorschlag', 'Album_Vorschlag', 'STYLE_Vorschlag', 'DISCOGS_RELEASE_ID_Vorschlag',
+    'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'VORSCHLAG_STATUS',
+]
+
+# ---------------------------------------------------------------------------
+# MLDB SQLite Logic
+# ---------------------------------------------------------------------------
+def load_dataframe_from_mldb(db_path):
+    if not os.path.exists(db_path): raise FileNotFoundError(f"'{db_path}' nicht gefunden.")
+    uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    try:
+        try: items = pd.read_sql_query("SELECT idx AS ID, title AS Title, artist AS Artist, filename AS Filename FROM items", conn)
+        except Exception:
+            items = pd.read_sql_query("SELECT idx AS ID, title AS Title, artist AS Artist FROM items", conn)
+            items['Filename'] = ''
+        oad_item_ids = set()
+        try:
+            folder_df = pd.read_sql_query("SELECT idx, name FROM folders", conn)
+            oad_folder_ids = folder_df[folder_df['name'].astype(str).str.upper() == 'OAD']['idx'].tolist()
+            if oad_folder_ids:
+                folder_ids_str = ",".join(map(str, oad_folder_ids))
+                oad_items_df = pd.read_sql_query(f"SELECT item FROM folder_items WHERE folder IN ({folder_ids_str})", conn)
+                oad_item_ids = set(oad_items_df['item'].astype(str))
+        except Exception: pass
+        attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
+    finally:
+        conn.close()
+
+    items['ID'] = items['ID'].astype(str)
+    def is_oad(row):
+        if str(row.get('ID', '')) in oad_item_ids: return True
+        fn = str(row.get('Filename', ''))
+        if fn and re.search(r'(?:^|[\/\\])OAD(?:[\/\\]|$)', fn, flags=re.IGNORECASE): return True
+        return False
+
+    before_count = len(items)
+    items = items[~items.apply(is_oad, axis=1)].copy()
+    skipped_oad = before_count - len(items)
+    if skipped_oad > 0: console.print(f"[dim]-> {skipped_oad} OAD-Elemente übersprungen.[/dim]")
+
+    if not attrs.empty:
+        attrs['ID'] = attrs['ID'].astype(str)
+        pivot = attrs.pivot_table(index='ID', columns='name', values='value', aggfunc='first').reset_index()
+        df = items.merge(pivot, on='ID', how='left')
+    else:
+        df = items.copy()
+    for col in MLDB_ATTRIBUTE_FIELDS:
+        if col not in df.columns: df[col] = ''
+    return df
+
+def is_db_locked(db_path, timeout=1.0):
+    """Prüft aktiv per Testtransaktion, ob die Datenbank gerade von einem anderen
+    Prozess (z.B. laufendem mAirList) gesperrt ist, statt erst beim eigentlichen
+    Schreibvorgang mit einer OperationalError zu scheitern."""
+    try:
+        conn = sqlite3.connect(db_path, timeout=timeout)
+        conn.execute("BEGIN IMMEDIATE")
+        conn.rollback()
+        conn.close()
+        return False
+    except sqlite3.OperationalError:
+        return True
+    except Exception:
+        return False
+
+
+def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    updated = 0
+    try:
+        for _, row in df.iterrows():
+            item_id = row.get('ID')
+            if pd.isna(item_id) or not str(item_id).strip(): continue
+            item_id = int(item_id)
+            
+            cur.execute("SELECT 1 FROM items WHERE idx = ?", (item_id,))
+            if not cur.fetchone():
+                continue 
+            
+            title, artist = row.get('Title', ''), row.get('Artist', '')
+            if pd.notna(title) or pd.notna(artist):
+                cur.execute("UPDATE items SET title = COALESCE(?, title), artist = COALESCE(?, artist) WHERE idx = ?",
+                            (title if pd.notna(title) and str(title).strip() else None,
+                             artist if pd.notna(artist) and str(artist).strip() else None, item_id))
+            for field in MLDB_ATTRIBUTE_FIELDS:
+                value = row.get(field, '')
+                if pd.notna(value) and str(value).strip():
+                    cur.execute("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, ?, ?)",
+                                (item_id, field, str(value).strip()))
+            if mark_restauriert:
+                cur.execute("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, 'RESTAURIERT', 'JA')", (item_id,))
+            
+            log_change("APPLY", f"ID {item_id}: {artist} - {title} (Jahr: {row.get('Jahr')}, Genre: {row.get('Genre')})")
+            updated += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return updated
+
+
+# ---------------------------------------------------------------------------
+# PHASE 1: fetch
+# ---------------------------------------------------------------------------
+def phase_fetch(db_path, fetch_csv, full=False):
+    input_df = load_dataframe_from_mldb(db_path)
+    
+    if os.path.exists(fetch_csv):
+        df = pd.read_csv(fetch_csv, dtype=str)
+        console.print(f"[cyan]Fortschritt geladen aus '{fetch_csv}' ({len(df)} Zeilen).[/cyan]")
+        
+        # Master-Sync: Gelöschte Tracks aus CSV werfen
+        if 'ID' in df.columns and 'ID' in input_df.columns:
+            db_ids = set(input_df['ID'].dropna().astype(str))
+            csv_ids = set(df['ID'].dropna().astype(str))
+            deleted_ids = csv_ids - db_ids
+            if deleted_ids:
+                console.print(f"[yellow]-> {len(deleted_ids)} Track(s) wurden in mAirList gelöscht und aus CSV entfernt.[/yellow]")
+                df = df[~df['ID'].astype(str).isin(deleted_ids)].copy()
+        
+        # Neue Tracks finden
+        key = 'ID'
+        if key in df.columns and key in input_df.columns:
+            existing_keys = set(df[key].dropna().astype(str))
+            new_rows = input_df[~input_df[key].astype(str).isin(existing_keys)].copy()
+        else:
+            df_key = (df.get('Artist', '').fillna('') + '||' + df.get('Title', '').fillna(''))
+            input_key = (input_df.get('Artist', '').fillna('') + '||' + input_df.get('Title', '').fillna(''))
+            new_rows = input_df[~input_key.isin(set(df_key))].copy()
+
+        if len(new_rows) > 0:
+            console.print(f"[green]-> {len(new_rows)} neue Track(s) aus '{db_path}' ergänzt.[/green]")
+            df = pd.concat([df, new_rows], ignore_index=True, sort=False)
+            
+        # Re-Fetch bei gelöschtem RESTAURIERT-Flag (NUR wenn vorher komplett fertig!)
+        db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
+        db_artists = input_df.set_index('ID')['Artist'].to_dict()
+        db_titles = input_df.set_index('ID')['Title'].to_dict()
+        
+        reset_count = 0
+        for idx, row in df.iterrows():
+            item_id = str(row.get('ID'))
+            if item_id in db_restauriert:
+                db_status = str(db_restauriert[item_id]).strip().upper()
+                csv_review = str(row.get('REVIEW_STATUS', '')).strip().upper()
+                
+                # Reset nur, wenn der Track schon mal komplett durch den Review-Prozess war!
+                if db_status != 'JA' and csv_review == 'JA':
+                    df.at[idx, 'VORSCHLAG_STATUS'] = ''
+                    df.at[idx, 'REVIEW_STATUS'] = ''
+                    df.at[idx, 'Artist'] = db_artists.get(item_id, row.get('Artist'))
+                    df.at[idx, 'Title'] = db_titles.get(item_id, row.get('Title'))
+                    reset_count += 1
+                    
+        if reset_count > 0:
+            console.print(f"[yellow]-> {reset_count} Track(s) in mAirList zurückgesetzt – werden neu gefetcht![/yellow]")
+
+    else:
+        console.print(f"[cyan]Erster Lauf: Lese direkt aus SQLite-Kopie '{db_path}'.[/cyan]")
+        df = input_df.copy()
+
+    for col in PROPOSAL_COLUMNS + MLDB_ATTRIBUTE_FIELDS:
+        if col not in df.columns: df[col] = ''
+
+    if 'RESTAURIERT' in df.columns:
+        already_done = df['RESTAURIERT'].astype(str).str.upper() == 'JA'
+        df.loc[already_done & (df['VORSCHLAG_STATUS'] != 'FERTIG'), 'VORSCHLAG_STATUS'] = 'FERTIG'
+
+    if full:
+        console.print("[bold yellow]Vollständige Neuprüfung angefordert (--full)[/bold yellow]")
+        df['VORSCHLAG_STATUS'] = ''
+        if 'REVIEW_STATUS' in df.columns: df['REVIEW_STATUS'] = ''
+
+    todo_mask = (df['VORSCHLAG_STATUS'] != 'FERTIG')
+    offen = todo_mask.sum()
+    total = len(df)
+    
+    console.print(Panel(f"[bold green]Starte automatischen Fetch[/bold green]\nOffene Tracks: [bold yellow]{offen}[/bold yellow] von [bold]{total}[/bold] Gesamt", box=box.ROUNDED))
+    log_change("FETCH_START", f"Offen: {offen}, Gesamt: {total}")
+
+    if offen == 0:
+        console.print("[bold green]✓ Alle Tracks sind bereits auf dem neuesten Stand![/bold green]")
+        return
+
+    processed_counter = 0
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=40, complete_style="green", finished_style="bold green"),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("•"),
+        TextColumn("[cyan]{task.completed}/{task.total} Tracks[/cyan]"),
+        TimeRemainingColumn(),
+        console=console
+    ) as progress:
+        
+        task = progress.add_task("[bold magenta]Fetching Metadaten...", total=offen)
+
+        try:
+            for idx, row in df.iterrows():
+                if str(row.get('VORSCHLAG_STATUS', '')).strip().upper() == 'FERTIG':
+                    continue
+
+                raw_artist, raw_title = row.get('Artist', ''), row.get('Title', '')
+                c_art, c_tit = clean_artist_base(raw_artist), clean_title_base(raw_title)
+
+                art_sugg = suggest_artist_spelling(c_art) or c_art
+                tit_sugg = suggest_title_spelling(art_sugg, c_tit) or c_tit
+
+                mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(art_sugg, tit_sugg)
+                discogs_res = fetch_discogs_details(art_sugg, tit_sugg)
+
+                all_years = [mb_year] if mb_year else []
+                all_years += [y for y in discogs_res['years']]
+                oldest_year = filter_valid_years(all_years)
+
+                conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
+                rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
+                best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
+                combined_conf = rank_to_conf[best_rank] if oldest_year else 'niedrig'
+
+                df.at[idx, 'Artist_Vorschlag'] = suggest_artist_spelling(c_art) or ''
+                df.at[idx, 'Title_Vorschlag'] = suggest_title_spelling(art_sugg, c_tit) or ''
+                df.at[idx, 'Jahr_Vorschlag'] = oldest_year
+                df.at[idx, 'Jahr_Konfidenz'] = combined_conf
+                df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
+                df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style']
+                df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id']
+                df.at[idx, 'Label_Vorschlag'] = discogs_res['label']
+                df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
+                df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
+                df.at[idx, 'VORSCHLAG_STATUS'] = 'FERTIG'
+
+                conf_color = "green" if combined_conf == "hoch" else ("yellow" if combined_conf == "mittel" else "red")
+                progress.console.print(f"  [dim]ID {row.get('ID')}:[/dim] [bold]{art_sugg} - {tit_sugg}[/bold] (Jahr: [bold cyan]{oldest_year or '?'}[/bold cyan], Konfidenz: [{conf_color}]{combined_conf}[/{conf_color}])")
+
+                processed_counter += 1
+                progress.update(task, advance=1)
+
+                if processed_counter % 20 == 0:
+                    save_safe_csv(df, fetch_csv)
+
+        except KeyboardInterrupt:
+            console.print("\n[bold yellow]Abruf unterbrochen. Fortschritt sicher gespeichert.[/bold yellow]")
+            save_safe_csv(df, fetch_csv)
+            sys.exit(0)
+
+    save_safe_csv(df, fetch_csv)
+    console.print("\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]py restore.py review[/bold cyan]")
+
+
+# ---------------------------------------------------------------------------
+# PHASE 2: review
+# ---------------------------------------------------------------------------
+def phase_review(fetch_csv, final_csv, auto_hoch=False):
+    try: df = pd.read_csv(fetch_csv, dtype=str)
+    except FileNotFoundError:
+        console.print(f"[red]'{fetch_csv}' nicht gefunden. Erst 'fetch' ausführen.[/red]")
+        sys.exit(1)
+
+    if 'REVIEW_STATUS' not in df.columns: df['REVIEW_STATUS'] = ''
+    for col in MLDB_ATTRIBUTE_FIELDS:
+        if col not in df.columns: df[col] = ''
+
+    todo = df[(df['VORSCHLAG_STATUS'] == 'FERTIG') & (df['REVIEW_STATUS'] != 'JA')]
+    console.print(Panel(f"[bold cyan]Review Modus[/bold cyan]\nOffene Prüfungen: [bold yellow]{len(todo)}[/bold yellow]" + ("\n[green]--auto-hoch aktiv[/green]" if auto_hoch else ""), box=box.ROUNDED))
+
+    reviewed_counter = 0
+    try:
+        for idx in todo.index:
+            row = df.loc[idx]
+            artist, title = row.get('Artist', ''), row.get('Title', '')
+
+            console.print(f"\n[bold blue]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold blue]")
+            console.print(f"[bold white on blue] Zeile {idx + 1} (ID: {row.get('ID')}) [/bold white on blue] [bold]{artist} - {title}[/bold]")
+
+            custom_text_entered = False
+
+            # 1. Artist
+            art_sugg = row.get('Artist_Vorschlag', '')
+            if pd.notna(art_sugg) and str(art_sugg).strip():
+                inp = console.input(f"  [cyan]Artist[/cyan] -> Vorschlag: '[bold green]{art_sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ").strip()
+                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                    df.at[idx, 'Artist'] = art_sugg
+                elif inp and inp.lower() not in ['n', 'nein']:
+                    df.at[idx, 'Artist'] = inp
+                    custom_text_entered = True
+
+            # 2. Title
+            tit_sugg = row.get('Title_Vorschlag', '')
+            if pd.notna(tit_sugg) and str(tit_sugg).strip():
+                inp = console.input(f"  [cyan]Title[/cyan]  -> Vorschlag: '[bold green]{tit_sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ").strip()
+                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                    df.at[idx, 'Title'] = tit_sugg
+                elif inp and inp.lower() not in ['n', 'nein']:
+                    df.at[idx, 'Title'] = inp
+                    custom_text_entered = True
+
+            # Re-Fetch bei Änderung
+            if custom_text_entered:
+                updated_art, updated_tit = df.at[idx, 'Artist'], df.at[idx, 'Title']
+                console.print(f"  [magenta]⚡ Freitext erkannt! Live Re-Fetch für '{updated_art} - {updated_tit}'...[/magenta]")
+                
+                c_art, c_tit = clean_artist_base(updated_art), clean_title_base(updated_tit)
+                mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(c_art, c_tit)
+                discogs_res = fetch_discogs_details(c_art, c_tit)
+
+                all_years = [mb_year] if mb_year else []
+                all_years += [y for y in discogs_res['years']]
+                oldest_year = filter_valid_years(all_years)
+
+                conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
+                rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
+                best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
+                
+                df.at[idx, 'Jahr_Vorschlag'] = oldest_year
+                df.at[idx, 'Jahr_Konfidenz'] = rank_to_conf[best_rank] if oldest_year else 'niedrig'
+                df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
+                df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style'] or ''
+                df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
+                df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
+                df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
+                df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
+
+            # 3. Jahr
+            jahr_sugg = df.at[idx, 'Jahr_Vorschlag']
+            konf = df.at[idx, 'Jahr_Konfidenz'] if pd.notna(df.at[idx, 'Jahr_Konfidenz']) else 'niedrig'
+            conf_badge = f"[green]hoch[/green]" if konf == "hoch" else (f"[yellow]mittel[/yellow]" if konf == "mittel" else f"[red]niedrig[/red]")
+            
+            if pd.notna(jahr_sugg) and str(jahr_sugg).strip():
+                if auto_hoch and konf == 'hoch':
+                    df.at[idx, 'Jahr'] = jahr_sugg
+                    console.print(f"  [cyan]Jahr[/cyan]   -> [bold green]{jahr_sugg}[/bold green] [dim](auto, Konfidenz hoch)[/dim]")
+                else:
+                    inp = console.input(f"  [cyan]Jahr[/cyan]   -> Vorschlag: '[bold green]{jahr_sugg}[/bold green]' ({conf_badge}) [dim]\\[j/Enter/Jahr][/dim]: ").strip()
+                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Jahr'] = jahr_sugg
+                    elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Jahr'] = inp
+
+            # 4. Genre
+            genre_sugg = df.at[idx, 'Genre_Vorschlag']
+            if pd.notna(genre_sugg) and str(genre_sugg).strip():
+                if auto_hoch and konf == 'hoch':
+                    df.at[idx, 'Genre'] = genre_sugg
+                    console.print(f"  [cyan]Genre[/cyan]  -> [bold green]{genre_sugg}[/bold green] [dim](auto, Konfidenz hoch)[/dim]")
+                else:
+                    inp = console.input(f"  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{genre_sugg}[/bold green]' [dim]\\[j/Enter/Genre][/dim]: ").strip()
+                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
+                    elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
+
+            # 5. Album & Label
+            album_sugg = df.at[idx, 'Album_Vorschlag']
+            if pd.notna(album_sugg) and str(album_sugg).strip():
+                inp = console.input(f"  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{album_sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ").strip()
+                if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Album'] = album_sugg
+                elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
+
+            label_sugg = df.at[idx, 'Label_Vorschlag']
+            if pd.notna(label_sugg) and str(label_sugg).strip():
+                inp = console.input(f"  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{label_sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ").strip()
+                if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Label'] = label_sugg
+                elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
+
+            for target_col, sugg_col in [
+                ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
+                ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
+            ]:
+                s_val = df.at[idx, sugg_col]
+                if pd.notna(s_val) and str(s_val).strip():
+                    df.at[idx, target_col] = str(s_val).strip()
+
+            df.at[idx, 'REVIEW_STATUS'] = 'JA'
+            log_change("REVIEW_OK", f"ID {row.get('ID')}: {df.at[idx, 'Artist']} - {df.at[idx, 'Title']}")
+            reviewed_counter += 1
+            
+            if reviewed_counter % 10 == 0:
+                save_safe_csv(df, fetch_csv)
+                console.print("[dim]  (Zwischenstand gespeichert)[/dim]")
+
+    except KeyboardInterrupt:
+        console.print("\n\n[bold yellow]Review unterbrochen. Bisherige Entscheidungen sind gespeichert.[/bold yellow]")
+        save_safe_csv(df, fetch_csv)
+        sys.exit(0)
+
+    save_safe_csv(df, fetch_csv)
+    save_safe_csv(df, final_csv)
+    console.print(f"\n[bold green]✓ Review abgeschlossen![/bold green] Finales Ergebnis in [bold cyan]'{final_csv}'[/bold cyan].")
+
+
+# ---------------------------------------------------------------------------
+# PHASE 3: apply
+# ---------------------------------------------------------------------------
+def phase_apply(db_path, final_csv):
+    if not os.path.exists(db_path):
+        console.print(f"[bold red][Fehler][/bold red] '{db_path}' nicht gefunden.")
+        sys.exit(1)
+    if not os.path.exists(final_csv):
+        console.print(f"[bold red][Fehler][/bold red] '{final_csv}' nicht gefunden. Erst 'fetch' und 'review' durchführen.")
+        sys.exit(1)
+
+    console.print(Panel("[bold red]ACHTUNG: Schreibvorgang in .mldb-Datei[/bold red]\nNiemals auf eine aktiv von mAirList geöffnete Datei anwenden!", box=box.HEAVY))
+
+    if is_db_locked(db_path):
+        console.print(Panel(
+            "[bold red]Datenbank ist aktuell gesperrt![/bold red]\n"
+            "Vermutlich hat mAirList (oder ein anderes Programm) diese Datei\n"
+            "gerade geöffnet. Schließe das Programm bzw. wähle eine echte\n"
+            "Kopie der Datei aus und versuche es erneut.",
+            box=box.HEAVY, style="red"
+        ))
+        sys.exit(1)
+
+    confirm = console.input("Ist dies definitiv eine KOPIE? Zum Fortfahren '[bold green]JA[/bold green]' eintippen: ").strip()
+    if confirm != 'JA':
+        console.print("[yellow]Abgebrochen.[/yellow]")
+        sys.exit(0)
+
+    backup_path = f"{db_path}.backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    shutil.copy2(db_path, backup_path)
+    console.print(f"[green]✓ Backup angelegt: {backup_path}[/green]")
+
+    df = pd.read_csv(final_csv, dtype=str)
+    if 'REVIEW_STATUS' in df.columns:
+        df = df[df['REVIEW_STATUS'] == 'JA']
+
+    try:
+        updated = apply_dataframe_to_mldb(df, db_path)
+    except sqlite3.OperationalError as e:
+        console.print(f"\n[bold red][Fehler] Datenbank gelockt / Zugriff verweigert:[/bold red] {e}")
+        sys.exit(1)
+
+    console.print(f"\n[bold green]✓ Fertig! {updated} Zeile(n) in '{db_path}' erfolgreich aktualisiert.[/bold green]")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{APP_VERSION}")
+    parser.add_argument('phase', choices=['fetch', 'review', 'apply'])
+    parser.add_argument('--auto-hoch', action='store_true')
+    parser.add_argument('--full', action='store_true')
+    parser.add_argument('--db', required=True, help="Pfad zur mAirList .mldb-Datei")
+    args = parser.parse_args()
+
+    # Dynamische Dateinamen anhand der Datenbank generieren
+    base_name = os.path.splitext(os.path.basename(args.db))[0]
+    fetch_csv = f"{base_name}_vorschlaege.csv"
+    final_csv = f"{base_name}_restauriert.csv"
+
+    if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full)
+    elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
+    else: phase_apply(args.db, final_csv)
+
+if __name__ == '__main__':
+    main()
