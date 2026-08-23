@@ -111,6 +111,28 @@ Tags hat? Kein Problem: Lösche in mAirList einfach das "RESTAURIERT"-Attribut
 bei diesem Track. Beim nächsten Skript-Lauf erkennt das Tool, dass der Track 
 "freigegeben" wurde und ruft ihn komplett neu ab!
 
+--------------------------------------------------------------------------------
+ 5. TRANSPARENZ, KI-NUTZUNG & SUPPORT
+--------------------------------------------------------------------------------
+Ein offenes Wort zur Entstehung: Dieses Skript wurde maßgeblich mit der 
+Unterstützung von Künstlicher Intelligenz (Google Gemini) entwickelt. Mir ist 
+Transparenz hier sehr wichtig. Ich bitte darum, von Kritik an der Entstehungsweise 
+abzusehen. Im Fokus sollte stehen, was dieses Tool für die mAirList-Community 
+leistet und wie viele Stunden mühsamer Handarbeit es euch ersparen kann.
+
+WICHTIGER DISCLAIMER: Weder die KI noch die Datenbanken von MusicBrainz oder 
+Discogs sind unfehlbar. Aufgrund der gigantischen Menge an unterschiedlichen 
+Schreibweisen, Remixes, Re-Releases und Namensgleichheiten (bei Artist, Titel 
+oder Label) können gelegentlich falsche Metadaten geliefert werden. Das Skript 
+fängt durch interne Filter und Logiken sehr viel ab – aber restlos ALLES 
+abzufangen, ist schlicht unmöglich.
+Es ist daher zu 100 % ratsam und notwendig, die Ergebnisse im Review-Schritt 
+oder später in mAirList kritisch zu hinterfragen und zu prüfen!
+
+SUPPORT: 
+Technischen Support (soweit es mir möglich ist) leiste ich ausschließlich über 
+die Issue-Funktion hier auf GitHub. Bitte keine Support-Anfragen über andere 
+Kanäle oder Foren.
 
 
 --------------------------------------------------------------------------------
@@ -220,3 +242,25 @@ If you notice later during live radio operation that a track still has wrong
 tags? No problem: Simply delete the "RESTAURIERT" attribute for this track in 
 mAirList. On the next script run, the tool will recognize that the track has 
 been "released" and will re-fetch it completely!
+
+--------------------------------------------------------------------------------
+ 5. TRANSPARENCY, AI USAGE & SUPPORT
+--------------------------------------------------------------------------------
+A candid word about the development: This script was largely developed with the 
+assistance of Artificial Intelligence (Google Gemini). Transparency is very 
+important to me here. I kindly ask you to refrain from criticizing how the code 
+was created. The focus should remain on the utility this tool provides to the 
+mAirList community and the countless hours of manual labor it saves you.
+
+IMPORTANT DISCLAIMER: Neither the AI nor the databases of MusicBrainz or Discogs 
+are flawless. Due to the massive amount of different spellings, remixes, 
+re-releases, and identical names (for artists, titles, or labels), incorrect 
+metadata can occasionally be returned. The script catches a lot through internal 
+filters and logic – but catching absolutely EVERYTHING is simply impossible.
+Therefore, it is 100% recommended and necessary to critically review and verify 
+the results during the review step or later in mAirList!
+
+SUPPORT: 
+Technical support (as far as I am able to provide it) is handled exclusively via 
+the issue tracker here on GitHub. Please do not send support requests through 
+other channels or forums.
