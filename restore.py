@@ -1,11 +1,10 @@
 """
 ==============================================================================
- mAirList DB Restorer - PRO GLAM VERSION (rich CLI + Logging)
+                        mAirList DB Restorer
 ==============================================================================
- Basis           : restore.py von Myka (RainbowRadio), mit Google Gemini
- Patch           : Claude (Anthropic) & Kyra - Rich UI, Progress-Bar & Logging
- Zweck           : Automatische Ergänzung & Reparatur von mAirList CSV-Datenbanken
- Lizenz          : Freie Nutzung für die mAirList-Community
+ Author          : Myka Vormeng, with Google Gemini
+ Purpose         : Automatic completion & repair of local mAirList databases
+ License         : Free use for the mAirList community
 ==============================================================================
 """
 
@@ -36,7 +35,7 @@ console = Console()
 
 CONFIG_FILE = 'config.json'
 LOG_FILE = 'restorer.log'
-APP_VERSION = "0.4.5 Beta"
+APP_VERSION = "0.4.7 Beta"
 
 # ---------------------------------------------------------------------------
 # Language Dictionary
@@ -78,6 +77,8 @@ T = {
         'rev_genre': "  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Genre][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
+        'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
+        'no_sugg': "- (Kein Vorschlag) -",
         'rev_interim': "[dim]  (Zwischenstand gespeichert)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review unterbrochen. Bisherige Entscheidungen sind gespeichert.[/bold yellow]",
         'rev_success': "\n[bold green]✓ Review abgeschlossen![/bold green] Finales Ergebnis in [bold cyan]'{csv}'[/bold cyan].",
@@ -126,6 +127,8 @@ T = {
         'rev_genre': "  [cyan]Genre[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Genre][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
+        'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
+        'no_sugg': "- (No suggestion) -",
         'rev_interim': "[dim]  (Intermediate progress saved)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review interrupted. Previous decisions are saved.[/bold yellow]",
         'rev_success': "\n[bold green]✓ Review completed![/bold green] Final result in [bold cyan]'{csv}'[/bold cyan].",
@@ -162,7 +165,7 @@ def log_change(action, details):
 # Felder für item_attributes
 MLDB_ATTRIBUTE_FIELDS = [
     'Jahr', 'Genre', 'Album', 'STYLE', 'DISCOGS_RELEASE_ID',
-    'Label', 'Labelcode', 'ISRC', 'RESTAURIERT'
+    'Label', 'Labelcode', 'ISRC', 'Sprache', 'RESTAURIERT'
 ]
 
 MB_MIN_INTERVAL = 1.05
@@ -204,6 +207,11 @@ def filter_valid_years(years_list):
             unique_years.pop(0)
         else: break
     return str(unique_years[0])
+
+def clean_nan(val):
+    if pd.isna(val) or str(val).strip().lower() == 'nan':
+        return ""
+    return str(val).strip()
 
 def init_credentials():
     global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS
@@ -507,7 +515,7 @@ def save_safe_csv(df, filepath):
 PROPOSAL_COLUMNS = [
     'Artist_Vorschlag', 'Title_Vorschlag', 'Jahr_Vorschlag', 'Jahr_Konfidenz',
     'Genre_Vorschlag', 'Album_Vorschlag', 'STYLE_Vorschlag', 'DISCOGS_RELEASE_ID_Vorschlag',
-    'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'VORSCHLAG_STATUS',
+    'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'Sprache_Vorschlag', 'VORSCHLAG_STATUS',
 ]
 
 # ---------------------------------------------------------------------------
@@ -720,6 +728,7 @@ def phase_fetch(db_path, fetch_csv, full=False):
                 df.at[idx, 'Label_Vorschlag'] = discogs_res['label']
                 df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
                 df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
+                df.at[idx, 'Sprache_Vorschlag'] = ''  # API liefert hier meist nichts brauchbares, bleibt vorerst leer
                 df.at[idx, 'VORSCHLAG_STATUS'] = 'FERTIG'
 
                 conf_color = "green" if combined_conf == "hoch" else ("yellow" if combined_conf == "mittel" else "red")
@@ -766,8 +775,8 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             custom_text_entered = False
 
             # 1. Artist
-            art_sugg = row.get('Artist_Vorschlag', '')
-            if pd.notna(art_sugg) and str(art_sugg).strip():
+            art_sugg = clean_nan(row.get('Artist_Vorschlag'))
+            if art_sugg:
                 inp = console.input(t('rev_artist', sugg=art_sugg)).strip()
                 if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Artist'] = art_sugg
                 elif inp and inp.lower() not in ['n', 'nein']: 
@@ -775,8 +784,8 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     custom_text_entered = True
 
             # 2. Title
-            tit_sugg = row.get('Title_Vorschlag', '')
-            if pd.notna(tit_sugg) and str(tit_sugg).strip():
+            tit_sugg = clean_nan(row.get('Title_Vorschlag'))
+            if tit_sugg:
                 inp = console.input(t('rev_title', sugg=tit_sugg)).strip()
                 if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Title'] = tit_sugg
                 elif inp and inp.lower() not in ['n', 'nein']:
@@ -811,11 +820,11 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
 
             # 3. Jahr
-            jahr_sugg = df.at[idx, 'Jahr_Vorschlag']
-            konf = df.at[idx, 'Jahr_Konfidenz'] if pd.notna(df.at[idx, 'Jahr_Konfidenz']) else 'niedrig'
+            jahr_sugg = clean_nan(df.at[idx, 'Jahr_Vorschlag'])
+            konf = clean_nan(df.at[idx, 'Jahr_Konfidenz']) or 'niedrig'
             conf_badge = f"[green]{t('conf_hoch')}[/green]" if konf == "hoch" else (f"[yellow]{t('conf_mittel')}[/yellow]" if konf == "mittel" else f"[red]{t('conf_niedrig')}[/red]")
             
-            if pd.notna(jahr_sugg) and str(jahr_sugg).strip():
+            if jahr_sugg:
                 if auto_hoch and konf == 'hoch':
                     df.at[idx, 'Jahr'] = jahr_sugg
                     console.print(t('rev_year_auto', sugg=jahr_sugg))
@@ -825,8 +834,8 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Jahr'] = inp
 
             # 4. Genre
-            genre_sugg = df.at[idx, 'Genre_Vorschlag']
-            if pd.notna(genre_sugg) and str(genre_sugg).strip():
+            genre_sugg = clean_nan(df.at[idx, 'Genre_Vorschlag'])
+            if genre_sugg:
                 if auto_hoch and konf == 'hoch':
                     df.at[idx, 'Genre'] = genre_sugg
                     console.print(t('rev_genre_auto', sugg=genre_sugg))
@@ -835,25 +844,37 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
                     elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
 
-            # 5. Album & Label
-            album_sugg = df.at[idx, 'Album_Vorschlag']
-            if pd.notna(album_sugg) and str(album_sugg).strip():
-                inp = console.input(t('rev_album', sugg=album_sugg)).strip()
-                if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Album'] = album_sugg
-                elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
+            # 5. Album
+            album_sugg = clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
+            disp_album = album_sugg if album_sugg else t('no_sugg')
+            inp = console.input(t('rev_album', sugg=disp_album)).strip()
+            if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                if album_sugg: df.at[idx, 'Album'] = album_sugg
+            elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
 
-            label_sugg = df.at[idx, 'Label_Vorschlag']
-            if pd.notna(label_sugg) and str(label_sugg).strip():
-                inp = console.input(t('rev_label', sugg=label_sugg)).strip()
-                if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Label'] = label_sugg
-                elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
+            # 6. Label
+            label_sugg = clean_nan(df.at[idx, 'Label_Vorschlag'] if 'Label_Vorschlag' in df.columns else row.get('Label_Vorschlag'))
+            disp_label = label_sugg if label_sugg else t('no_sugg')
+            inp = console.input(t('rev_label', sugg=disp_label)).strip()
+            if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                if label_sugg: df.at[idx, 'Label'] = label_sugg
+            elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
 
+            # 7. Sprache
+            lang_sugg = clean_nan(df.at[idx, 'Sprache_Vorschlag'] if 'Sprache_Vorschlag' in df.columns else row.get('Sprache_Vorschlag'))
+            disp_lang = lang_sugg if lang_sugg else t('no_sugg')
+            inp = console.input(t('rev_lang', sugg=disp_lang)).strip()
+            if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                if lang_sugg: df.at[idx, 'Sprache'] = lang_sugg
+            elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Sprache'] = inp
+
+            # Restliche Attribute (Style, Discogs-ID, Labelcode, ISRC)
             for target_col, sugg_col in [
                 ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
                 ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
             ]:
-                s_val = df.at[idx, sugg_col]
-                if pd.notna(s_val) and str(s_val).strip(): df.at[idx, target_col] = str(s_val).strip()
+                s_val = clean_nan(df.at[idx, sugg_col] if sugg_col in df.columns else row.get(sugg_col))
+                if s_val: df.at[idx, target_col] = s_val
 
             df.at[idx, 'REVIEW_STATUS'] = 'JA'
             log_change("REVIEW_OK", f"ID {row.get('ID')}: {df.at[idx, 'Artist']} - {df.at[idx, 'Title']}")
