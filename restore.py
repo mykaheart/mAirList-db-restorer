@@ -1,9 +1,10 @@
 """
 ==============================================================================
-                        mAirList DB Restorer
+                         mAirList DB Restorer
 ==============================================================================
  Author          : Myka Vormeng, with Google Gemini
- Purpose         : Automatic completion & repair of local mAirList databases
+ Purpose         : Automatic completion & repair of local mAirList databases 
+                   (.mldb / SQLite)
  License         : Free use for the mAirList community
 ==============================================================================
 """
@@ -35,7 +36,7 @@ console = Console()
 
 CONFIG_FILE = 'config.json'
 LOG_FILE = 'restorer.log'
-APP_VERSION = "0.4.7 Beta"
+APP_VERSION = "0.4.16 Beta"
 
 # ---------------------------------------------------------------------------
 # Language Dictionary
@@ -50,7 +51,15 @@ T = {
         'setup_email': "  Deine Kontakt-E-Mail: ",
         'setup_email_err': "[red]Ungültige E-Mail-Adresse, bitte erneut eingeben.[/red]",
         'setup_saved': "[green]✓ Zugangsdaten sicher gespeichert in '{config_file}'.[/green]\n",
-        'oad_skipped': "[dim]-> {count} OAD-Elemente übersprungen.[/dim]",
+        'ign_current': "\n[cyan]Aktuelle Ordner-Ausnahmen für diese DB:[/cyan] [yellow]{liste}[/yellow]",
+        'ign_reset': "Möchtest du diese Liste neu erstellen? [j/N]: ",
+        'ign_none': "Keine",
+        'ign_setup_title': "\n[bold cyan]Ordner-Ausnahmen für diese Datenbank konfigurieren[/bold cyan]\nHier kannst du Ordner angeben, die ignoriert werden sollen (z.B. Jingles, News).",
+        'ign_prompt': "  [cyan]Drag & Drop Ordner hierher[/cyan] ODER tippe [cyan]virtuellen Ordnernamen[/cyan] (Enter = Fertig): ",
+        'ign_added_phys': "  [green]✓ Physikalischer Pfad ignoriert:[/green] {path}",
+        'ign_added_virt': "  [green]✓ Virtueller/Teil-Ordner ignoriert:[/green] {name}",
+        'ign_saved': "[green]✓ Ausnahmen für diese DB in config.json gespeichert![/green]\n",
+        'ign_skip_count': "\n[bold green]✓ SUCCESS: {count} ignorierte Elemente (OAD/Jingles/News) erfolgreich übersprungen![/bold green]",
         'fetch_load_prog': "[cyan]Fortschritt geladen aus '{csv}' ({count} Zeilen).[/cyan]",
         'fetch_sync_del': "[yellow]-> {count} Track(s) wurden in mAirList gelöscht und aus CSV entfernt.[/yellow]",
         'fetch_new_tracks': "[green]-> {count} neue Track(s) aus '{db}' ergänzt.[/green]",
@@ -100,7 +109,15 @@ T = {
         'setup_email': "  Your Contact Email: ",
         'setup_email_err': "[red]Invalid email address, please try again.[/red]",
         'setup_saved': "[green]✓ Credentials securely saved in '{config_file}'.[/green]\n",
-        'oad_skipped': "[dim]-> Skipped {count} OAD elements.[/dim]",
+        'ign_current': "\n[cyan]Current folder exceptions for this DB:[/cyan] [yellow]{liste}[/yellow]",
+        'ign_reset': "Do you want to recreate this list? [y/N]: ",
+        'ign_none': "None",
+        'ign_setup_title': "\n[bold cyan]Configure folder exceptions for this database[/bold cyan]\nSpecify folders to be skipped during fetch (e.g., Jingles, News).",
+        'ign_prompt': "  [cyan]Drag & Drop folder here[/cyan] OR type [cyan]virtual folder name[/cyan] (Enter = Done): ",
+        'ign_added_phys': "  [green]✓ Physical path ignored:[/green] {path}",
+        'ign_added_virt': "  [green]✓ Virtual/Partial folder ignored:[/green] {name}",
+        'ign_saved': "[green]✓ Exceptions for this DB saved to config.json![/green]\n",
+        'ign_skip_count': "\n[bold green]✓ SUCCESS: Skipped {count} ignored elements (OAD/Jingles/News etc.)![/bold green]",
         'fetch_load_prog': "[cyan]Progress loaded from '{csv}' ({count} rows).[/cyan]",
         'fetch_sync_del': "[yellow]-> {count} track(s) were deleted in mAirList and removed from CSV.[/yellow]",
         'fetch_new_tracks': "[green]-> Added {count} new track(s) from '{db}'.[/green]",
@@ -149,7 +166,7 @@ def t(key, **kwargs):
     return T[CURRENT_LANG][key].format(**kwargs)
 
 # ---------------------------------------------------------------------------
-# Logging Setup
+# Logging & Console Setup
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     filename=LOG_FILE,
@@ -161,6 +178,14 @@ logging.basicConfig(
 
 def log_change(action, details):
     logging.info(f"{action.upper()}: {details}")
+
+def clear_input_buffer():
+    try:
+        import msvcrt
+        while msvcrt.kbhit():
+            msvcrt.getch()
+    except Exception:
+        pass
 
 # Felder für item_attributes
 MLDB_ATTRIBUTE_FIELDS = [
@@ -247,13 +272,56 @@ def init_credentials():
     config_data = {
         'DISCOGS_KEY': encode_b64(DISCOGS_KEY),
         'DISCOGS_SECRET': encode_b64(DISCOGS_SECRET),
-        'MB_CONTACT': encode_b64(MB_CONTACT)
+        'MB_CONTACT': encode_b64(MB_CONTACT),
+        'DB_IGNORES': config.get('DB_IGNORES', {})
     }
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, indent=4)
 
     console.print(t('setup_saved', config_file=CONFIG_FILE))
     HEADERS = {'User-Agent': f'mAirListDBRestorer/{APP_VERSION} ( {MB_CONTACT} )'}
+
+def setup_ignored_folders(db_path):
+    db_abs = os.path.abspath(db_path)
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception: pass
+
+    db_ignores_dict = config.get('DB_IGNORES', {})
+
+    if db_abs in db_ignores_dict:
+        current_ignores = db_ignores_dict[db_abs]
+        disp_list = ", ".join(current_ignores) if current_ignores else t('ign_none')
+        console.print(t('ign_current', liste=disp_list))
+        clear_input_buffer()
+        ans = console.input(f"[yellow]{t('ign_reset')}[/yellow]").strip().lower()
+        if ans not in ['j', 'ja', 'y', 'yes']:
+            return current_ignores
+
+    console.print(t('ign_setup_title'))
+    ignored = []
+    while True:
+        clear_input_buffer()
+        inp = console.input(t('ign_prompt')).strip().strip('"').strip("'")
+        if not inp:
+            break
+        ignored.append(inp)
+        if '\\' in inp or '/' in inp:
+            console.print(t('ign_added_phys', path=inp))
+        else:
+            console.print(t('ign_added_virt', name=inp))
+
+    db_ignores_dict[db_abs] = ignored
+    config['DB_IGNORES'] = db_ignores_dict
+
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4)
+
+    console.print(t('ign_saved'))
+    return ignored
 
 # ---------------------------------------------------------------------------
 # Rate-Limiter & HTTP
@@ -309,10 +377,12 @@ COMPILATION_KEYWORDS = [
 
 LABEL_CODE_CACHE = {}
 
+# VIP Dictionary für Härtefälle wie Duran Duran Duran
 ARTIST_FIXES = {
     "ac, dc": "AC/DC", "ac dc": "AC/DC", "ac-dc": "AC/DC", "acdc": "AC/DC",
     "a-ha": "a-ha", "a ha": "a-ha", "aha": "a-ha",
-    "b-52s": "The B-52's", "b 52s": "The B-52's", "b-52's": "The B-52's", "the b-52s": "The B-52's"
+    "b-52s": "The B-52's", "b 52s": "The B-52's", "b-52's": "The B-52's", "the b-52s": "The B-52's",
+    "duran duran": "Duran Duran", "duran duran duran": "Duran Duran"
 }
 
 def contains_non_latin(text):
@@ -389,6 +459,13 @@ def fetch_label_code_from_discogs_release(release_id):
 def suggest_artist_spelling(artist):
     if not artist: return None
     main_artist = artist.split('feat.')[0].strip() if 'feat.' in artist else artist
+    
+    # VIP-Check: Wenn der Name im VIP-Buch steht, MusicBrainz komplett überspringen!
+    if main_artist.lower() in ARTIST_FIXES:
+        res_art = ARTIST_FIXES[main_artist.lower()]
+        if 'feat.' in artist: return f"{res_art} feat.{artist.split('feat.')[1]}"
+        return res_art
+        
     try:
         res = mb_get("https://musicbrainz.org/ws/2/artist/", {'query': main_artist, 'fmt': 'json', 'limit': 5})
         if res.status_code == 200:
@@ -521,39 +598,130 @@ PROPOSAL_COLUMNS = [
 # ---------------------------------------------------------------------------
 # MLDB SQLite Logic
 # ---------------------------------------------------------------------------
-def load_dataframe_from_mldb(db_path):
+def load_dataframe_from_mldb(db_path, ignored_folders=None):
     if not os.path.exists(db_path): raise FileNotFoundError(t('err_file_not_found', file=db_path))
+    if ignored_folders is None: ignored_folders = []
+    
     uri = f"file:{os.path.abspath(db_path)}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
+    
     try:
-        try: items = pd.read_sql_query("SELECT idx AS ID, title AS Title, artist AS Artist, filename AS Filename FROM items", conn)
-        except Exception:
-            items = pd.read_sql_query("SELECT idx AS ID, title AS Title, artist AS Artist FROM items", conn)
-            items['Filename'] = ''
-        oad_item_ids = set()
+        items = pd.read_sql_query("SELECT * FROM items", conn)
+        items['ID'] = items['idx'].astype(str)
+        items['Title'] = items['title'] if 'title' in items.columns else ''
+        items['Artist'] = items['artist'] if 'artist' in items.columns else ''
+        items['Filename'] = items['filename'] if 'filename' in items.columns else ''
+    except Exception as e:
+        console.print(f"[red]Kritischer Fehler beim Lesen der mAirList Items: {e}[/red]")
+        sys.exit(1)
+            
+    try:
+        folder_df = pd.read_sql_query("SELECT * FROM folders", conn)
+        folder_df = folder_df.dropna(subset=['idx'])
+        folder_df['idx'] = folder_df['idx'].astype(int)
+        f_dict = folder_df.set_index('idx').to_dict('index')
+        
+        def build_vpath(fid):
+            parts = []
+            try: curr = int(fid)
+            except: return ""
+            
+            visited = set()
+            while curr in f_dict and curr != 0 and curr not in visited:
+                visited.add(curr)
+                name = str(f_dict[curr].get('name', '')).strip()
+                if name and name.lower() not in ['nan', 'none']: 
+                    parts.insert(0, name)
+                
+                p_val = f_dict[curr].get('parent', 0)
+                try: curr = int(p_val) if pd.notna(p_val) else 0
+                except: curr = 0
+            return " / ".join(parts).lower()
+            
+        vpath_map = {k: build_vpath(k) for k in f_dict.keys()}
+        
+        item_folders = {}
+        
+        # PLAN A: mAirList speichert die Verknüpfung meistens in "item_folders"
         try:
-            folder_df = pd.read_sql_query("SELECT idx, name FROM folders", conn)
-            oad_folder_ids = folder_df[folder_df['name'].astype(str).str.upper() == 'OAD']['idx'].tolist()
-            if oad_folder_ids:
-                folder_ids_str = ",".join(map(str, oad_folder_ids))
-                oad_items_df = pd.read_sql_query(f"SELECT item FROM folder_items WHERE folder IN ({folder_ids_str})", conn)
-                oad_item_ids = set(oad_items_df['item'].astype(str))
-        except Exception: pass
-        attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
-    finally:
-        conn.close()
+            folder_items_df = pd.read_sql_query("SELECT * FROM item_folders", conn)
+            for _, r in folder_items_df.iterrows():
+                try:
+                    i_id = int(r['item'])
+                    f_id = int(r['folder'])
+                    if i_id not in item_folders:
+                        item_folders[i_id] = []
+                    if f_id in vpath_map:
+                        item_folders[i_id].append(vpath_map[f_id])
+                except: pass
+        except Exception:
+            # PLAN B: Fallback auf "folder_items" für ältere mAirList-Versionen
+            try:
+                folder_items_df = pd.read_sql_query("SELECT * FROM folder_items", conn)
+                for _, r in folder_items_df.iterrows():
+                    try:
+                        i_id = int(r['item'])
+                        f_id = int(r['folder'])
+                        if i_id not in item_folders:
+                            item_folders[i_id] = []
+                        if f_id in vpath_map:
+                            item_folders[i_id].append(vpath_map[f_id])
+                    except: pass
+            except:
+                pass
 
-    items['ID'] = items['ID'].astype(str)
-    def is_oad(row):
-        if str(row.get('ID', '')) in oad_item_ids: return True
+    except Exception:
+        item_folders = {}
+        
+    try:
+        attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
+    except:
+        attrs = pd.DataFrame()
+        
+    conn.close()
+
+    def is_ignored(row):
+        try: item_id = int(row.get('ID', 0))
+        except: item_id = 0
+        
         fn = str(row.get('Filename', ''))
-        if fn and re.search(r'(?:^|[\/\\])OAD(?:[\/\\]|$)', fn, flags=re.IGNORECASE): return True
+        if fn.lower() in ['nan', 'none']: fn = ""
+        
+        v_paths = item_folders.get(item_id, [])
+        fn_norm = fn.replace('/', '\\').lower() if fn else ""
+
+        for ign in ignored_folders:
+            ign_str = str(ign).strip()
+            if not ign_str: continue
+            
+            ign_lower = ign_str.lower()
+            ign_norm = ign_str.replace('/', '\\').lower()
+            
+            # 1. Virtuelle Ordner: Suche in der Baum-Hierarchie
+            for vpath in v_paths:
+                v_parts = [p.strip() for p in vpath.split('/')]
+                if ign_lower in v_parts: 
+                    return True
+                if ign_lower == vpath:
+                    return True
+                
+            # 2. Dateipfad: Exakte Teilsuche für NAS/Laufwerke
+            if fn_norm:
+                if '\\' in ign_norm or '/' in ign_norm:
+                    if ign_norm in fn_norm:
+                        return True
+                else:
+                    parts = fn_norm.split('\\')
+                    if ign_lower in parts:
+                        return True
         return False
 
     before_count = len(items)
-    items = items[~items.apply(is_oad, axis=1)].copy()
-    skipped_oad = before_count - len(items)
-    if skipped_oad > 0: console.print(t('oad_skipped', count=skipped_oad))
+    items = items[~items.apply(is_ignored, axis=1)].copy()
+    skipped_count = before_count - len(items)
+    
+    if skipped_count > 0: 
+        console.print(t('ign_skip_count', count=skipped_count))
 
     if not attrs.empty:
         attrs['ID'] = attrs['ID'].astype(str)
@@ -561,6 +729,7 @@ def load_dataframe_from_mldb(db_path):
         df = items.merge(pivot, on='ID', how='left')
     else:
         df = items.copy()
+        
     for col in MLDB_ATTRIBUTE_FIELDS:
         if col not in df.columns: df[col] = ''
     return df
@@ -612,7 +781,8 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
 # PHASE 1: fetch
 # ---------------------------------------------------------------------------
 def phase_fetch(db_path, fetch_csv, full=False):
-    input_df = load_dataframe_from_mldb(db_path)
+    ignored_folders = setup_ignored_folders(db_path)
+    input_df = load_dataframe_from_mldb(db_path, ignored_folders)
     
     if os.path.exists(fetch_csv):
         df = pd.read_csv(fetch_csv, dtype=str)
@@ -699,41 +869,48 @@ def phase_fetch(db_path, fetch_csv, full=False):
             for idx, row in df.iterrows():
                 if str(row.get('VORSCHLAG_STATUS', '')).strip().upper() == 'FERTIG': continue
 
-                raw_artist, raw_title = row.get('Artist', ''), row.get('Title', '')
-                c_art, c_tit = clean_artist_base(raw_artist), clean_title_base(raw_title)
+                # NEU: Der fette Crash-Airbag!
+                try:
+                    raw_artist, raw_title = row.get('Artist', ''), row.get('Title', '')
+                    c_art, c_tit = clean_artist_base(raw_artist), clean_title_base(raw_title)
 
-                art_sugg = suggest_artist_spelling(c_art) or c_art
-                tit_sugg = suggest_title_spelling(art_sugg, c_tit) or c_tit
+                    art_sugg = suggest_artist_spelling(c_art) or c_art
+                    tit_sugg = suggest_title_spelling(art_sugg, c_tit) or c_tit
 
-                mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(art_sugg, tit_sugg)
-                discogs_res = fetch_discogs_details(art_sugg, tit_sugg)
+                    mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(art_sugg, tit_sugg)
+                    discogs_res = fetch_discogs_details(art_sugg, tit_sugg)
 
-                all_years = [mb_year] if mb_year else []
-                all_years += [y for y in discogs_res['years']]
-                oldest_year = filter_valid_years(all_years)
+                    all_years = [mb_year] if mb_year else []
+                    all_years += [y for y in discogs_res['years']]
+                    oldest_year = filter_valid_years(all_years)
 
-                conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
-                rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
-                best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
-                combined_conf = rank_to_conf[best_rank] if oldest_year else 'niedrig'
+                    conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
+                    rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
+                    best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
+                    combined_conf = rank_to_conf[best_rank] if oldest_year else 'niedrig'
 
-                df.at[idx, 'Artist_Vorschlag'] = suggest_artist_spelling(c_art) or ''
-                df.at[idx, 'Title_Vorschlag'] = suggest_title_spelling(art_sugg, c_tit) or ''
-                df.at[idx, 'Jahr_Vorschlag'] = oldest_year
-                df.at[idx, 'Jahr_Konfidenz'] = combined_conf
-                df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
-                df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
-                df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style']
-                df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id']
-                df.at[idx, 'Label_Vorschlag'] = discogs_res['label']
-                df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
-                df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
-                df.at[idx, 'Sprache_Vorschlag'] = ''  # API liefert hier meist nichts brauchbares, bleibt vorerst leer
-                df.at[idx, 'VORSCHLAG_STATUS'] = 'FERTIG'
+                    df.at[idx, 'Artist_Vorschlag'] = suggest_artist_spelling(c_art) or ''
+                    df.at[idx, 'Title_Vorschlag'] = suggest_title_spelling(art_sugg, c_tit) or ''
+                    df.at[idx, 'Jahr_Vorschlag'] = oldest_year
+                    df.at[idx, 'Jahr_Konfidenz'] = combined_conf
+                    df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                    df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
+                    df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style']
+                    df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id']
+                    df.at[idx, 'Label_Vorschlag'] = discogs_res['label']
+                    df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
+                    df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
+                    df.at[idx, 'Sprache_Vorschlag'] = ''
+                    df.at[idx, 'VORSCHLAG_STATUS'] = 'FERTIG'
 
-                conf_color = "green" if combined_conf == "hoch" else ("yellow" if combined_conf == "mittel" else "red")
-                locale_conf = t(f"conf_{combined_conf}")
-                progress.console.print(t('fetch_track_info', id=row.get('ID'), art=art_sugg, tit=tit_sugg, jahr=oldest_year or '?', c_color=conf_color, conf=locale_conf))
+                    conf_color = "green" if combined_conf == "hoch" else ("yellow" if combined_conf == "mittel" else "red")
+                    locale_conf = t(f"conf_{combined_conf}")
+                    progress.console.print(t('fetch_track_info', id=row.get('ID'), art=art_sugg, tit=tit_sugg, jahr=oldest_year or '?', c_color=conf_color, conf=locale_conf))
+                
+                except Exception as e:
+                    # Wenn irgendwas crasht, logge es und mach eiskalt mit dem nächsten Track weiter!
+                    log_change("ERROR", f"Track ID {row.get('ID')} gecrasht: {str(e)}")
+                    progress.console.print(f"[bold red]Fehler bei Track ID {row.get('ID')}: {e} -> Wird übersprungen![/bold red]")
 
                 processed_counter += 1
                 progress.update(task, advance=1)
@@ -775,6 +952,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             custom_text_entered = False
 
             # 1. Artist
+            clear_input_buffer()
             art_sugg = clean_nan(row.get('Artist_Vorschlag'))
             if art_sugg:
                 inp = console.input(t('rev_artist', sugg=art_sugg)).strip()
@@ -784,6 +962,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     custom_text_entered = True
 
             # 2. Title
+            clear_input_buffer()
             tit_sugg = clean_nan(row.get('Title_Vorschlag'))
             if tit_sugg:
                 inp = console.input(t('rev_title', sugg=tit_sugg)).strip()
@@ -820,6 +999,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
 
             # 3. Jahr
+            clear_input_buffer()
             jahr_sugg = clean_nan(df.at[idx, 'Jahr_Vorschlag'])
             konf = clean_nan(df.at[idx, 'Jahr_Konfidenz']) or 'niedrig'
             conf_badge = f"[green]{t('conf_hoch')}[/green]" if konf == "hoch" else (f"[yellow]{t('conf_mittel')}[/yellow]" if konf == "mittel" else f"[red]{t('conf_niedrig')}[/red]")
@@ -834,6 +1014,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Jahr'] = inp
 
             # 4. Genre
+            clear_input_buffer()
             genre_sugg = clean_nan(df.at[idx, 'Genre_Vorschlag'])
             if genre_sugg:
                 if auto_hoch and konf == 'hoch':
@@ -845,6 +1026,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
 
             # 5. Album
+            clear_input_buffer()
             album_sugg = clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
             disp_album = album_sugg if album_sugg else t('no_sugg')
             inp = console.input(t('rev_album', sugg=disp_album)).strip()
@@ -853,6 +1035,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
 
             # 6. Label
+            clear_input_buffer()
             label_sugg = clean_nan(df.at[idx, 'Label_Vorschlag'] if 'Label_Vorschlag' in df.columns else row.get('Label_Vorschlag'))
             disp_label = label_sugg if label_sugg else t('no_sugg')
             inp = console.input(t('rev_label', sugg=disp_label)).strip()
@@ -861,6 +1044,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
 
             # 7. Sprache
+            clear_input_buffer()
             lang_sugg = clean_nan(df.at[idx, 'Sprache_Vorschlag'] if 'Sprache_Vorschlag' in df.columns else row.get('Sprache_Vorschlag'))
             disp_lang = lang_sugg if lang_sugg else t('no_sugg')
             inp = console.input(t('rev_lang', sugg=disp_lang)).strip()
@@ -909,6 +1093,7 @@ def phase_apply(db_path, final_csv):
         console.print(Panel(t('apply_locked'), box=box.HEAVY, style="red"))
         sys.exit(1)
 
+    clear_input_buffer()
     confirm_word = t('apply_confirm_word')
     confirm = console.input(t('apply_confirm')).strip()
     if confirm.lower() not in [confirm_word.lower(), 'j', 'ja', 'y', 'yes']:
