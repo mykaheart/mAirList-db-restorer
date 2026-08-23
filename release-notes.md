@@ -6,7 +6,6 @@ Short summary
 Included
 - restore.py (source)
 - Restore.bat
-- Windows standalone EXE (built by GitHub Actions) inside release ZIP
 
 Usage
 - Copy your .mldb file, place it in the folder, run Restore.bat and follow: fetch → review → apply.
