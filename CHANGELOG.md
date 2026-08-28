@@ -2,10 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.20 Beta] - 2026-08-28
+### Added
+- **Ergonomic Review:** The review prompts now accept an empty input (pressing Enter or Return) as an affirmative response to accept suggestions, significantly speeding up the tagging process for large track lists.
+
 ## [0.4.19 Beta] - 2026-08-28
 ### Added
 - **Language Memory (Sprach-Gedächtnis):** Custom languages entered manually during the review phase (e.g., "Französisch") are now permanently saved to the `config.json` array `CUSTOM_LANGS`. The script dynamically expands the language selection menu for all subsequent tracks.
 - **Undo Function (Step Back):** Replaced the static `for`-loop with an index-based `while`-loop in the review phase. Users can now type `<` or `b` (Back) at any prompt to safely jump back to the previous track and correct typing errors.
+- **Ergonomic Review:** The review prompts now accept an empty input (pressing Enter or Return) as an affirmative response to accept suggestions, significantly speeding up the tagging process for large track lists.
 
 ## [0.4.18 Beta] - 2026-08-28
 ### Added
