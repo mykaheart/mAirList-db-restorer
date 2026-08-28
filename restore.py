@@ -36,7 +36,7 @@ from rich import box
 console = Console(highlight=False)
 
 CONFIG_FILE = 'config.json'
-APP_VERSION = "0.4.19 Beta"
+APP_VERSION = "0.4.20 Beta"
 
 # ---------------------------------------------------------------------------
 # Language Dictionary
@@ -975,7 +975,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 art_sugg = clean_nan(row.get('Artist_Vorschlag'))
                 if art_sugg:
                     inp = ask_input(t('rev_artist', sugg=art_sugg))
-                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Artist'] = art_sugg
+                    if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Artist'] = art_sugg
                     elif inp and inp.lower() not in ['n', 'nein']: 
                         df.at[idx, 'Artist'] = inp
                         custom_text_entered = True
@@ -984,7 +984,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 tit_sugg = clean_nan(row.get('Title_Vorschlag'))
                 if tit_sugg:
                     inp = ask_input(t('rev_title', sugg=tit_sugg))
-                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Title'] = tit_sugg
+                    if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Title'] = tit_sugg
                     elif inp and inp.lower() not in ['n', 'nein']:
                         df.at[idx, 'Title'] = inp
                         custom_text_entered = True
@@ -1027,7 +1027,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         console.print(t('rev_year_auto', sugg=jahr_sugg))
                     else:
                         inp = ask_input(t('rev_year', sugg=jahr_sugg, badge=conf_badge))
-                        if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Jahr'] = jahr_sugg
+                        if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Jahr'] = jahr_sugg
                         elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Jahr'] = inp
 
                 # 4. Genre
@@ -1038,14 +1038,14 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         console.print(t('rev_genre_auto', sugg=genre_sugg))
                     else:
                         inp = ask_input(t('rev_genre', sugg=genre_sugg))
-                        if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
+                        if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
                         elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
 
                 # 5. Album
                 album_sugg = clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
                 disp_album = album_sugg if album_sugg else t('no_sugg')
                 inp = ask_input(t('rev_album', sugg=disp_album))
-                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                if inp.lower() in ['', 'j', 'ja', 'y', 'yes']:
                     if album_sugg: df.at[idx, 'Album'] = album_sugg
                 elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
 
@@ -1053,7 +1053,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 label_sugg = clean_nan(df.at[idx, 'Label_Vorschlag'] if 'Label_Vorschlag' in df.columns else row.get('Label_Vorschlag'))
                 disp_label = label_sugg if label_sugg else t('no_sugg')
                 inp = ask_input(t('rev_label', sugg=disp_label))
-                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                if inp.lower() in ['', 'j', 'ja', 'y', 'yes']:
                     if label_sugg: df.at[idx, 'Label'] = label_sugg
                 elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
 
@@ -1075,7 +1075,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 
                 inp = ask_input(t('rev_lang', sugg=disp_lang, hint=hint_str))
                 
-                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                if inp.lower() in ['', 'j', 'ja', 'y', 'yes']:
                     if lang_sugg: df.at[idx, 'Sprache'] = lang_sugg
                 elif inp in lang_map:
                     df.at[idx, 'Sprache'] = lang_map[inp]
