@@ -195,4 +195,4 @@ pause
 goto menu
 
 :ende
-exit
+pause

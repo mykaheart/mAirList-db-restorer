@@ -32,11 +32,11 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 from rich import box
 
-console = Console()
+# Highlighter deaktivieren, damit Wörter wie 'true' oder Zahlen nicht bunt gefärbt werden
+console = Console(highlight=False)
 
 CONFIG_FILE = 'config.json'
-LOG_FILE = 'restorer.log'
-APP_VERSION = "0.4.16 Beta"
+APP_VERSION = "0.4.19 Beta"
 
 # ---------------------------------------------------------------------------
 # Language Dictionary
@@ -74,7 +74,7 @@ T = {
         'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]py restore.py review --db \"{db}\"[/bold cyan]",
         'err_file_not_found': "[bold red][Fehler][/bold red] '{file}' nicht gefunden.",
         'err_need_fetch': " Erst 'fetch' ausführen.",
-        'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOffene Prüfungen: [bold yellow]{todo}[/bold yellow]{auto}",
+        'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOffene Prüfungen: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tipp: Tippe '<' oder 'b' und Enter, um einen Track zurückzuspringen![/dim]",
         'rev_auto_active': "\n[green]--auto-hoch aktiv[/green]",
         'rev_row': "[bold white on blue] Zeile {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
         'rev_artist': "  [cyan]Artist[/cyan] -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
@@ -86,7 +86,7 @@ T = {
         'rev_genre': "  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Genre][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
-        'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
+        'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[{hint}][/dim]: ",
         'no_sugg': "- (Kein Vorschlag) -",
         'rev_interim': "[dim]  (Zwischenstand gespeichert)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review unterbrochen. Bisherige Entscheidungen sind gespeichert.[/bold yellow]",
@@ -132,7 +132,7 @@ T = {
         'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]py restore.py review --db \"{db}\"[/bold cyan]",
         'err_file_not_found': "[bold red][Error][/bold red] '{file}' not found.",
         'err_need_fetch': " Run 'fetch' first.",
-        'rev_mode': "[bold cyan]Review Mode[/bold cyan]\nPending reviews: [bold yellow]{todo}[/bold yellow]{auto}",
+        'rev_mode': "[bold cyan]Review Mode[/bold cyan]\nPending reviews: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tip: Type '<' or 'b' and Enter to go back one track![/dim]",
         'rev_auto_active': "\n[green]--auto-hoch active[/green]",
         'rev_row': "[bold white on blue] Row {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
         'rev_artist': "  [cyan]Artist[/cyan] -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
@@ -144,7 +144,7 @@ T = {
         'rev_genre': "  [cyan]Genre[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Genre][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
-        'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
+        'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[{hint}][/dim]: ",
         'no_sugg': "- (No suggestion) -",
         'rev_interim': "[dim]  (Intermediate progress saved)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review interrupted. Previous decisions are saved.[/bold yellow]",
@@ -166,16 +166,8 @@ def t(key, **kwargs):
     return T[CURRENT_LANG][key].format(**kwargs)
 
 # ---------------------------------------------------------------------------
-# Logging & Console Setup
+# Logging Helper
 # ---------------------------------------------------------------------------
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    encoding='utf-8'
-)
-
 def log_change(action, details):
     logging.info(f"{action.upper()}: {details}")
 
@@ -201,6 +193,7 @@ DISCOGS_KEY = ""
 DISCOGS_SECRET = ""
 MB_CONTACT = ""
 HEADERS = {}
+CUSTOM_LANGS = []
 
 # ---------------------------------------------------------------------------
 # Security & Helpers
@@ -239,7 +232,7 @@ def clean_nan(val):
     return str(val).strip()
 
 def init_credentials():
-    global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS
+    global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS, CUSTOM_LANGS
     config = {}
     if os.path.exists(CONFIG_FILE):
         try:
@@ -250,6 +243,7 @@ def init_credentials():
     DISCOGS_KEY = decode_b64(config.get('DISCOGS_KEY', '').strip())
     DISCOGS_SECRET = decode_b64(config.get('DISCOGS_SECRET', '').strip())
     MB_CONTACT = decode_b64(config.get('MB_CONTACT', '').strip())
+    CUSTOM_LANGS = config.get('CUSTOM_LANGS', [])
 
     if DISCOGS_KEY and DISCOGS_SECRET and MB_CONTACT:
         HEADERS = {'User-Agent': f'mAirListDBRestorer/{APP_VERSION} ( {MB_CONTACT} )'}
@@ -273,13 +267,27 @@ def init_credentials():
         'DISCOGS_KEY': encode_b64(DISCOGS_KEY),
         'DISCOGS_SECRET': encode_b64(DISCOGS_SECRET),
         'MB_CONTACT': encode_b64(MB_CONTACT),
-        'DB_IGNORES': config.get('DB_IGNORES', {})
+        'DB_IGNORES': config.get('DB_IGNORES', {}),
+        'CUSTOM_LANGS': CUSTOM_LANGS
     }
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, indent=4)
 
     console.print(t('setup_saved', config_file=CONFIG_FILE))
     HEADERS = {'User-Agent': f'mAirListDBRestorer/{APP_VERSION} ( {MB_CONTACT} )'}
+
+def add_custom_lang(lang):
+    if lang not in CUSTOM_LANGS:
+        CUSTOM_LANGS.append(lang)
+        config = {}
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            except Exception: pass
+        config['CUSTOM_LANGS'] = CUSTOM_LANGS
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
 
 def setup_ignored_folders(db_path):
     db_abs = os.path.abspath(db_path)
@@ -460,7 +468,6 @@ def suggest_artist_spelling(artist):
     if not artist: return None
     main_artist = artist.split('feat.')[0].strip() if 'feat.' in artist else artist
     
-    # VIP-Check: Wenn der Name im VIP-Buch steht, MusicBrainz komplett überspringen!
     if main_artist.lower() in ARTIST_FIXES:
         res_art = ARTIST_FIXES[main_artist.lower()]
         if 'feat.' in artist: return f"{res_art} feat.{artist.split('feat.')[1]}"
@@ -642,7 +649,6 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
         
         item_folders = {}
         
-        # PLAN A: mAirList speichert die Verknüpfung meistens in "item_folders"
         try:
             folder_items_df = pd.read_sql_query("SELECT * FROM item_folders", conn)
             for _, r in folder_items_df.iterrows():
@@ -655,7 +661,6 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
                         item_folders[i_id].append(vpath_map[f_id])
                 except: pass
         except Exception:
-            # PLAN B: Fallback auf "folder_items" für ältere mAirList-Versionen
             try:
                 folder_items_df = pd.read_sql_query("SELECT * FROM folder_items", conn)
                 for _, r in folder_items_df.iterrows():
@@ -697,7 +702,6 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
             ign_lower = ign_str.lower()
             ign_norm = ign_str.replace('/', '\\').lower()
             
-            # 1. Virtuelle Ordner: Suche in der Baum-Hierarchie
             for vpath in v_paths:
                 v_parts = [p.strip() for p in vpath.split('/')]
                 if ign_lower in v_parts: 
@@ -705,7 +709,6 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
                 if ign_lower == vpath:
                     return True
                 
-            # 2. Dateipfad: Exakte Teilsuche für NAS/Laufwerke
             if fn_norm:
                 if '\\' in ign_norm or '/' in ign_norm:
                     if ign_norm in fn_norm:
@@ -781,6 +784,10 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
 # PHASE 1: fetch
 # ---------------------------------------------------------------------------
 def phase_fetch(db_path, fetch_csv, full=False):
+    if is_db_locked(db_path):
+        console.print(Panel(t('apply_locked'), box=box.HEAVY, style="red"))
+        sys.exit(1)
+
     ignored_folders = setup_ignored_folders(db_path)
     input_df = load_dataframe_from_mldb(db_path, ignored_folders)
     
@@ -869,7 +876,6 @@ def phase_fetch(db_path, fetch_csv, full=False):
             for idx, row in df.iterrows():
                 if str(row.get('VORSCHLAG_STATUS', '')).strip().upper() == 'FERTIG': continue
 
-                # NEU: Der fette Crash-Airbag!
                 try:
                     raw_artist, raw_title = row.get('Artist', ''), row.get('Title', '')
                     c_art, c_tit = clean_artist_base(raw_artist), clean_title_base(raw_title)
@@ -908,7 +914,6 @@ def phase_fetch(db_path, fetch_csv, full=False):
                     progress.console.print(t('fetch_track_info', id=row.get('ID'), art=art_sugg, tit=tit_sugg, jahr=oldest_year or '?', c_color=conf_color, conf=locale_conf))
                 
                 except Exception as e:
-                    # Wenn irgendwas crasht, logge es und mach eiskalt mit dem nächsten Track weiter!
                     log_change("ERROR", f"Track ID {row.get('ID')} gecrasht: {str(e)}")
                     progress.console.print(f"[bold red]Fehler bei Track ID {row.get('ID')}: {e} -> Wird übersprungen![/bold red]")
 
@@ -927,6 +932,16 @@ def phase_fetch(db_path, fetch_csv, full=False):
 # ---------------------------------------------------------------------------
 # PHASE 2: review
 # ---------------------------------------------------------------------------
+class StepBackException(Exception):
+    pass
+
+def ask_input(prompt_text):
+    clear_input_buffer()
+    val = console.input(prompt_text).strip()
+    if val.lower() == 'b' or val == '<':
+        raise StepBackException()
+    return val
+
 def phase_review(fetch_csv, final_csv, auto_hoch=False):
     try: df = pd.read_csv(fetch_csv, dtype=str)
     except FileNotFoundError:
@@ -942,8 +957,12 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
     console.print(Panel(t('rev_mode', todo=len(todo), auto=auto_txt), box=box.ROUNDED))
 
     reviewed_counter = 0
+    todo_indices = list(todo.index)
+    i = 0
+
     try:
-        for idx in todo.index:
+        while i < len(todo_indices):
+            idx = todo_indices[i]
             row = df.loc[idx]
             artist, title = row.get('Artist', ''), row.get('Title', '')
 
@@ -951,114 +970,135 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             console.print(t('rev_row', row=idx+1, id=row.get('ID'), art=artist, tit=title))
             custom_text_entered = False
 
-            # 1. Artist
-            clear_input_buffer()
-            art_sugg = clean_nan(row.get('Artist_Vorschlag'))
-            if art_sugg:
-                inp = console.input(t('rev_artist', sugg=art_sugg)).strip()
-                if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Artist'] = art_sugg
+            try:
+                # 1. Artist
+                art_sugg = clean_nan(row.get('Artist_Vorschlag'))
+                if art_sugg:
+                    inp = ask_input(t('rev_artist', sugg=art_sugg))
+                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Artist'] = art_sugg
+                    elif inp and inp.lower() not in ['n', 'nein']: 
+                        df.at[idx, 'Artist'] = inp
+                        custom_text_entered = True
+
+                # 2. Title
+                tit_sugg = clean_nan(row.get('Title_Vorschlag'))
+                if tit_sugg:
+                    inp = ask_input(t('rev_title', sugg=tit_sugg))
+                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Title'] = tit_sugg
+                    elif inp and inp.lower() not in ['n', 'nein']:
+                        df.at[idx, 'Title'] = inp
+                        custom_text_entered = True
+
+                # Re-Fetch
+                if custom_text_entered:
+                    updated_art, updated_tit = df.at[idx, 'Artist'], df.at[idx, 'Title']
+                    console.print(t('rev_refetch', art=updated_art, tit=updated_tit))
+                    
+                    c_art, c_tit = clean_artist_base(updated_art), clean_title_base(updated_tit)
+                    mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(c_art, c_tit)
+                    discogs_res = fetch_discogs_details(c_art, c_tit)
+
+                    all_years = [mb_year] if mb_year else []
+                    all_years += [y for y in discogs_res['years']]
+                    oldest_year = filter_valid_years(all_years)
+
+                    conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
+                    rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
+                    best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
+                    
+                    df.at[idx, 'Jahr_Vorschlag'] = oldest_year
+                    df.at[idx, 'Jahr_Konfidenz'] = rank_to_conf[best_rank] if oldest_year else 'niedrig'
+                    df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                    df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
+                    df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style'] or ''
+                    df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
+                    df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
+                    df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
+                    df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
+
+                # 3. Jahr
+                jahr_sugg = clean_nan(df.at[idx, 'Jahr_Vorschlag'])
+                konf = clean_nan(df.at[idx, 'Jahr_Konfidenz']) or 'niedrig'
+                conf_badge = f"[green]{t('conf_hoch')}[/green]" if konf == "hoch" else (f"[yellow]{t('conf_mittel')}[/yellow]" if konf == "mittel" else f"[red]{t('conf_niedrig')}[/red]")
+                
+                if jahr_sugg:
+                    if auto_hoch and konf == 'hoch':
+                        df.at[idx, 'Jahr'] = jahr_sugg
+                        console.print(t('rev_year_auto', sugg=jahr_sugg))
+                    else:
+                        inp = ask_input(t('rev_year', sugg=jahr_sugg, badge=conf_badge))
+                        if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Jahr'] = jahr_sugg
+                        elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Jahr'] = inp
+
+                # 4. Genre
+                genre_sugg = clean_nan(df.at[idx, 'Genre_Vorschlag'])
+                if genre_sugg:
+                    if auto_hoch and konf == 'hoch':
+                        df.at[idx, 'Genre'] = genre_sugg
+                        console.print(t('rev_genre_auto', sugg=genre_sugg))
+                    else:
+                        inp = ask_input(t('rev_genre', sugg=genre_sugg))
+                        if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
+                        elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
+
+                # 5. Album
+                album_sugg = clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
+                disp_album = album_sugg if album_sugg else t('no_sugg')
+                inp = ask_input(t('rev_album', sugg=disp_album))
+                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                    if album_sugg: df.at[idx, 'Album'] = album_sugg
+                elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
+
+                # 6. Label
+                label_sugg = clean_nan(df.at[idx, 'Label_Vorschlag'] if 'Label_Vorschlag' in df.columns else row.get('Label_Vorschlag'))
+                disp_label = label_sugg if label_sugg else t('no_sugg')
+                inp = ask_input(t('rev_label', sugg=disp_label))
+                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                    if label_sugg: df.at[idx, 'Label'] = label_sugg
+                elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
+
+                # 7. Sprache & Dynamisches Menu
+                lang_sugg = clean_nan(df.at[idx, 'Sprache_Vorschlag'] if 'Sprache_Vorschlag' in df.columns else row.get('Sprache_Vorschlag'))
+                disp_lang = lang_sugg if lang_sugg else t('no_sugg')
+                
+                lang_map = {'1': 'Englisch' if CURRENT_LANG == 'de' else 'English',
+                            '2': 'Deutsch' if CURRENT_LANG == 'de' else 'German'}
+                nxt_idx = 3
+                for cl in CUSTOM_LANGS:
+                    lang_map[str(nxt_idx)] = cl
+                    nxt_idx += 1
+                    
+                hint_parts = ["j", "Enter"]
+                for k, v in lang_map.items(): hint_parts.append(f"{k}={v}")
+                hint_parts.append("Text")
+                hint_str = "/".join(hint_parts)
+                
+                inp = ask_input(t('rev_lang', sugg=disp_lang, hint=hint_str))
+                
+                if inp.lower() in ['j', 'ja', 'y', 'yes']:
+                    if lang_sugg: df.at[idx, 'Sprache'] = lang_sugg
+                elif inp in lang_map:
+                    df.at[idx, 'Sprache'] = lang_map[inp]
                 elif inp and inp.lower() not in ['n', 'nein']: 
-                    df.at[idx, 'Artist'] = inp
-                    custom_text_entered = True
+                    df.at[idx, 'Sprache'] = inp
+                    if inp not in CUSTOM_LANGS and inp not in [lang_map['1'], lang_map['2']]:
+                        add_custom_lang(inp)
 
-            # 2. Title
-            clear_input_buffer()
-            tit_sugg = clean_nan(row.get('Title_Vorschlag'))
-            if tit_sugg:
-                inp = console.input(t('rev_title', sugg=tit_sugg)).strip()
-                if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Title'] = tit_sugg
-                elif inp and inp.lower() not in ['n', 'nein']:
-                    df.at[idx, 'Title'] = inp
-                    custom_text_entered = True
+                # Restliche Attribute (Style, Discogs-ID, Labelcode, ISRC)
+                for target_col, sugg_col in [
+                    ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
+                    ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
+                ]:
+                    s_val = clean_nan(df.at[idx, sugg_col] if sugg_col in df.columns else row.get(sugg_col))
+                    if s_val: df.at[idx, target_col] = s_val
 
-            # Re-Fetch
-            if custom_text_entered:
-                updated_art, updated_tit = df.at[idx, 'Artist'], df.at[idx, 'Title']
-                console.print(t('rev_refetch', art=updated_art, tit=updated_tit))
-                
-                c_art, c_tit = clean_artist_base(updated_art), clean_title_base(updated_tit)
-                mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(c_art, c_tit)
-                discogs_res = fetch_discogs_details(c_art, c_tit)
-
-                all_years = [mb_year] if mb_year else []
-                all_years += [y for y in discogs_res['years']]
-                oldest_year = filter_valid_years(all_years)
-
-                conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
-                rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
-                best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
-                
-                df.at[idx, 'Jahr_Vorschlag'] = oldest_year
-                df.at[idx, 'Jahr_Konfidenz'] = rank_to_conf[best_rank] if oldest_year else 'niedrig'
-                df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
-                df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
-                df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style'] or ''
-                df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
-                df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
-                df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
-                df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
-
-            # 3. Jahr
-            clear_input_buffer()
-            jahr_sugg = clean_nan(df.at[idx, 'Jahr_Vorschlag'])
-            konf = clean_nan(df.at[idx, 'Jahr_Konfidenz']) or 'niedrig'
-            conf_badge = f"[green]{t('conf_hoch')}[/green]" if konf == "hoch" else (f"[yellow]{t('conf_mittel')}[/yellow]" if konf == "mittel" else f"[red]{t('conf_niedrig')}[/red]")
-            
-            if jahr_sugg:
-                if auto_hoch and konf == 'hoch':
-                    df.at[idx, 'Jahr'] = jahr_sugg
-                    console.print(t('rev_year_auto', sugg=jahr_sugg))
+            except StepBackException:
+                if i > 0:
+                    i -= 1
+                    console.print("[yellow]⏪ Okay, einen Track zurück...[/yellow]")
                 else:
-                    inp = console.input(t('rev_year', sugg=jahr_sugg, badge=conf_badge)).strip()
-                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Jahr'] = jahr_sugg
-                    elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Jahr'] = inp
-
-            # 4. Genre
-            clear_input_buffer()
-            genre_sugg = clean_nan(df.at[idx, 'Genre_Vorschlag'])
-            if genre_sugg:
-                if auto_hoch and konf == 'hoch':
-                    df.at[idx, 'Genre'] = genre_sugg
-                    console.print(t('rev_genre_auto', sugg=genre_sugg))
-                else:
-                    inp = console.input(t('rev_genre', sugg=genre_sugg)).strip()
-                    if inp.lower() in ['j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
-                    elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
-
-            # 5. Album
-            clear_input_buffer()
-            album_sugg = clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
-            disp_album = album_sugg if album_sugg else t('no_sugg')
-            inp = console.input(t('rev_album', sugg=disp_album)).strip()
-            if inp.lower() in ['j', 'ja', 'y', 'yes']:
-                if album_sugg: df.at[idx, 'Album'] = album_sugg
-            elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Album'] = inp
-
-            # 6. Label
-            clear_input_buffer()
-            label_sugg = clean_nan(df.at[idx, 'Label_Vorschlag'] if 'Label_Vorschlag' in df.columns else row.get('Label_Vorschlag'))
-            disp_label = label_sugg if label_sugg else t('no_sugg')
-            inp = console.input(t('rev_label', sugg=disp_label)).strip()
-            if inp.lower() in ['j', 'ja', 'y', 'yes']:
-                if label_sugg: df.at[idx, 'Label'] = label_sugg
-            elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
-
-            # 7. Sprache
-            clear_input_buffer()
-            lang_sugg = clean_nan(df.at[idx, 'Sprache_Vorschlag'] if 'Sprache_Vorschlag' in df.columns else row.get('Sprache_Vorschlag'))
-            disp_lang = lang_sugg if lang_sugg else t('no_sugg')
-            inp = console.input(t('rev_lang', sugg=disp_lang)).strip()
-            if inp.lower() in ['j', 'ja', 'y', 'yes']:
-                if lang_sugg: df.at[idx, 'Sprache'] = lang_sugg
-            elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Sprache'] = inp
-
-            # Restliche Attribute (Style, Discogs-ID, Labelcode, ISRC)
-            for target_col, sugg_col in [
-                ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
-                ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
-            ]:
-                s_val = clean_nan(df.at[idx, sugg_col] if sugg_col in df.columns else row.get(sugg_col))
-                if s_val: df.at[idx, target_col] = s_val
+                    console.print("[yellow]⚠️ Das ist bereits der erste Track! Weiter zurück geht's nicht.[/yellow]")
+                continue
 
             df.at[idx, 'REVIEW_STATUS'] = 'JA'
             log_change("REVIEW_OK", f"ID {row.get('ID')}: {df.at[idx, 'Artist']} - {df.at[idx, 'Title']}")
@@ -1066,6 +1106,8 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             if reviewed_counter % 10 == 0:
                 save_safe_csv(df, fetch_csv)
                 console.print(t('rev_interim'))
+            
+            i += 1 # Nächster Track
 
     except KeyboardInterrupt:
         console.print(t('rev_interrupt'))
@@ -1127,11 +1169,24 @@ def main():
     args = parser.parse_args()
 
     CURRENT_LANG = args.lang
+    
+    # NEU: Dynamischer Log-Datei-Name mit DB-Namen und Timestamp
+    db_base_name = os.path.splitext(os.path.basename(args.db))[0]
+    timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    dynamic_log_file = f"{db_base_name}_{timestamp_str}.log"
+    
+    logging.basicConfig(
+        filename=dynamic_log_file,
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        encoding='utf-8'
+    )
+    
     init_credentials()
 
-    base_name = os.path.splitext(os.path.basename(args.db))[0]
-    fetch_csv = f"{base_name}_vorschlaege.csv"
-    final_csv = f"{base_name}_restauriert.csv"
+    fetch_csv = f"{db_base_name}_vorschlaege.csv"
+    final_csv = f"{db_base_name}_restauriert.csv"
 
     if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full)
     elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
