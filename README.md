@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.4.19 Beta
+# mAirList DB Restorer v0.4.20 Beta
 **Ein Metadaten-Reparatur-Tool / Metadata Repair Tool for mAirList**
 
 ## 🇩🇪 DEUTSCH
