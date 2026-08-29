@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0 Beta] - 2026-08-29
+### Added
+- **Advanced Live Re-Fetch:** The live re-fetch logic during the review phase now explicitly reacts to manual changes in the 'Year' and 'Album' fields. Modifying these fields triggers a highly targeted API request to fetch the exact release, drastically improving the accuracy of suggested Labels, Label Codes, and Genres.
+
+### Changed
+- **Massive Architecture Refactoring:** Split the monolithic `restore.py` into a clean, modular structure (`main.py`, `api.py`, `db.py`, `utils.py`) to improve maintainability, readability, and pave the way for future integrations.
+- **CLI Execution:** The primary execution command has changed from `py restore.py` to `py main.py`. `Restore.bat` and CLI arguments have been updated accordingly.
+
 ## [0.4.22 Beta] - 2026-08-29
 ### Changed
 - **Genre Consolidation:** Massively simplified the `ALLOWED_GENRES` to 10 core categories (Pop, EDM, Blues, Hiphop, Rap, Rock, Classic Rock, R and B, Soul, Reggae) optimized for rotation scheduling. Expanded the `GENRE_SYNONYMS` mapping to automatically catch and funnel complex API micro-genres (e.g., "Nu Metal" -> "Rock", "Deep House" -> "EDM").

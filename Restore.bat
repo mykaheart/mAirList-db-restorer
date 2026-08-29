@@ -13,8 +13,8 @@ set "c_green=%ESC%[32m"
 set "c_yellow=%ESC%[33m"
 set "c_magenta=%ESC%[35m"
 
-:: --- Version dynamisch aus der restore.py auslesen ---
-for /f "tokens=3" %%a in ('findstr /C:"APP_VERSION = " restore.py') do set "APP_VERSION=%%a"
+:: --- Version dynamisch aus der utils.py auslesen ---
+for /f "tokens=3" %%a in ('findstr /C:"APP_VERSION = " utils.py') do set "APP_VERSION=%%a"
 set "APP_VERSION=%APP_VERSION:"=%"
 
 :lang_select
@@ -164,7 +164,7 @@ goto :eof
 :fetch
 call :check_db
 if "%DB_OK%"=="0" goto menu
-py restore.py fetch --db "%mldbpfad%" --lang %LANG_ARG%
+py main.py fetch --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 
@@ -175,21 +175,21 @@ echo.
 echo %c_yellow%%T_WARN1%%c_reset%
 set /p bestaetigung="%T_SURE% "
 if /i not "%bestaetigung%"=="j" if /i not "%bestaetigung%"=="y" goto menu
-py restore.py fetch --db "%mldbpfad%" --full --lang %LANG_ARG%
+py main.py fetch --db "%mldbpfad%" --full --lang %LANG_ARG%
 pause
 goto menu
 
 :review
 call :check_db
 if "%DB_OK%"=="0" goto menu
-py restore.py review --db "%mldbpfad%" --lang %LANG_ARG%
+py main.py review --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 
 :review_auto
 call :check_db
 if "%DB_OK%"=="0" goto menu
-py restore.py review --auto-hoch --db "%mldbpfad%" --lang %LANG_ARG%
+py main.py review --auto-hoch --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 
@@ -200,7 +200,7 @@ echo.
 echo %c_yellow%%T_WARN4%%c_reset%
 set /p bestaetigung="%T_SURE% "
 if /i not "%bestaetigung%"=="j" if /i not "%bestaetigung%"=="y" goto menu
-py restore.py standardize --db "%mldbpfad%" --lang %LANG_ARG%
+py main.py standardize --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 
@@ -211,7 +211,7 @@ echo.
 echo %c_yellow%%T_WARN2%%c_reset%
 echo %c_yellow%%T_WARN3%%c_reset%
 echo.
-py restore.py apply --db "%mldbpfad%" --lang %LANG_ARG%
+py main.py apply --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 

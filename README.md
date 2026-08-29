@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.4.22 Beta
+# mAirList DB Restorer v0.5.0 Beta
 **Ein Metadaten-Reparatur-Tool / Metadata Repair Tool for mAirList**
 
 ## 🇩🇪 DEUTSCH
@@ -56,10 +56,10 @@ Wähle [1]. Das Skript liest deine Datenbank-Kopie ein und sucht für jeden Trac
 
 SCHRITT 2: DATEN KONTROLLIEREN (Kontrolle)
 Wähle [3] oder [4]. Hier bekommst du die Vorschläge des Skripts präsentiert. Du kannst jeden Vorschlag (Jahr, Genre, Album, Label) mit "Enter" ablehnen, mit "j" annehmen oder eigenen Text eintippen.
-- Live Re-Fetch: Wenn du beim Artist oder Titel eine eigene Korrektur eintippst (z.B. einen Schreibfehler korrigierst), holt das Skript sofort im Hintergrund die neuen, passenden Daten für deine Korrektur!
+- Live Re-Fetch: Wenn du beim Artist, Titel, Jahr oder Album eine eigene Korrektur eintippst (z.B. einen Schreibfehler korrigierst), holt das Skript sofort im Hintergrund die neuen, passenden Daten für deine Korrektur!
 
 SCHRITT 3: IN MAIRLIST SPEICHERN (Speichern)
-Wähle [5]. Das Skript schreibt alle von dir freigegebenen Metadaten in deine Datenbank-KOPIE zurück. 
+Wähle [6]. Das Skript schreibt alle von dir freigegebenen Metadaten in deine Datenbank-KOPIE zurück. 
 Wenn der Vorgang abgeschlossen ist, kannst du die Kopie wieder an ihren ursprünglichen Ort verschieben (während mAirList geschlossen ist) oder die Datenbank in der mAirList-Konfiguration neu verknüpfen.
 
 --------------------------------------------------------------------------------
@@ -141,10 +141,10 @@ You can abort the process at any time with Ctrl+C and resume it later.
 STEP 2: REVIEW DATA (Review)
 Select [3] or [4]. Here you are presented with the script's suggestions. 
 You can reject any suggestion (year, genre, album, label) with "Enter", accept it with "y", or type your own text.
-- Live Re-Fetch: If you type your own correction for Artist or Title (e.g., correcting a typo), the script immediately fetches the new, matching data for your correction in the background!
+- Live Re-Fetch: If you type your own correction for Artist, Title, Year, or Album, the script immediately fetches the new, matching data for your correction in the background!
 
 STEP 3: SAVE TO MAIRLIST (Apply)
-Select [5]. The script writes all the metadata you approved back into your database COPY. 
+Select [6]. The script writes all the metadata you approved back into your database COPY. 
 When the process is complete, you can move the copy back to its original location (while mAirList is closed) or reconnect the database in the mAirList configuration.
 
 --------------------------------------------------------------------------------
