@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
 from rich import box
+import requests
 
 import utils
 import api
@@ -34,6 +35,28 @@ def ask_input(prompt_text):
     if val.lower() == 'b' or val == '<':
         raise StepBackException()
     return val
+
+def check_for_updates():
+    try:
+        url = "https://raw.githubusercontent.com/mykaheart/mAirList-db-restorer/main/utils.py"
+        res = requests.get(url, timeout=1.5)
+        if res.status_code == 200:
+            for line in res.text.splitlines():
+                if line.startswith("APP_VERSION ="):
+                    remote_version = line.split("=")[1].strip().strip('"').strip("'")
+                    if remote_version != utils.APP_VERSION:
+                        if utils.CURRENT_LANG == 'de':
+                            console.print(f"[yellow]⚡ Update verfügbar! Neue Version {remote_version} ist auf GitHub (Du nutzt {utils.APP_VERSION}).[/yellow]")
+                        else:
+                            console.print(f"[yellow]⚡ Update available! New version {remote_version} is on GitHub (You are using {utils.APP_VERSION}).[/yellow]")
+                    else:
+                        if utils.CURRENT_LANG == 'de':
+                            console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
+                        else:
+                            console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
+                    return
+    except Exception:
+        pass
 
 # ---------------------------------------------------------------------------
 # PHASE 1: fetch
@@ -254,7 +277,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                             df.at[idx, 'Jahr'] = inp
                             custom_refetch_needed = True
 
-                # 4. Album (Vorgezogen vor Genre/Label)
+                # 4. Album
                 album_sugg = utils.clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
                 disp_album = album_sugg if album_sugg else utils.t('no_sugg')
                 inp = ask_input(utils.t('rev_album', sugg=disp_album))
@@ -264,7 +287,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     df.at[idx, 'Album'] = inp
                     custom_refetch_needed = True
 
-                # --- LIVE RE-FETCH LOGIC (Artist/Title/Year/Album) ---
+                # --- LIVE RE-FETCH LOGIC ---
                 if custom_refetch_needed:
                     updated_art, updated_tit = str(df.at[idx, 'Artist']), str(df.at[idx, 'Title'])
                     target_y = utils.clean_nan(df.at[idx, 'Jahr'])
@@ -281,7 +304,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         mb_year, mb_conf, isrc, mb_album = future_mb.result()
                         discogs_res = future_discogs.result()
 
-                    # Aktualisiere die Vorschläge im Hintergrund für die folgenden Abfragen
                     df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
                     df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
                     df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
@@ -335,7 +357,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     if inp not in utils.CUSTOM_LANGS and inp not in [lang_map['1'], lang_map['2']]:
                         utils.add_custom_lang(inp)
 
-                # Restliche Attribute (Style, Discogs-ID, Labelcode, ISRC)
+                # Restliche Attribute
                 for target_col, sugg_col in [
                     ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
                     ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
@@ -358,7 +380,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 utils.save_safe_csv(df, fetch_csv)
                 console.print(utils.t('rev_interim'))
             
-            i += 1 # Nächster Track
+            i += 1
 
     except KeyboardInterrupt:
         console.print(utils.t('rev_interrupt'))
@@ -410,7 +432,7 @@ def phase_apply(db_path, final_csv):
     console.print(utils.t('apply_success', count=updated, db=db_path))
 
 # ---------------------------------------------------------------------------
-# PHASE 4: standardize (Standalone Genre-Cleanup)
+# PHASE 4: standardize
 # ---------------------------------------------------------------------------
 def phase_standardize(db_path):
     if not os.path.exists(db_path):
@@ -464,8 +486,10 @@ def main():
     parser.add_argument('--lang', choices=['de', 'en'], default='de')
     args = parser.parse_args()
 
-    # Sprache global setzen
     utils.CURRENT_LANG = args.lang
+    
+    # GitHub Update Check beim Start ausführen
+    check_for_updates()
     
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
