@@ -44,10 +44,12 @@ set "T_OPT2=Voll-Abruf  - ALLE Tracks komplett neu laden (Reset)"
 set "T_H2=--- SCHRITT 2: DATEN KONTROLLIEREN ---"
 set "T_OPT3=Kontrolle   - Alle Vorschlaege manuell pruefen"
 set "T_OPT4=Kontrolle   - Sichere Treffer automatisch uebernehmen (unsichere werden abgefragt)"
-set "T_H3=--- SCHRITT 3: IN MAIRLIST SPEICHERN ---"
-set "T_OPT5=Speichern   - Gepruefte Werte in .mldb-Kopie schreiben"
-set "T_OPT6=Beenden"
-set "T_PROMPT=Auswahl [0-6]:"
+set "T_H3=--- MASSENBEARBEITUNG ---"
+set "T_OPT5=Genres      - Alle DB-Genres gem. Skript standardisieren"
+set "T_H4=--- SCHRITT 3: IN MAIRLIST SPEICHERN ---"
+set "T_OPT6=Speichern   - Gepruefte Werte in .mldb-Kopie schreiben"
+set "T_OPT7=Beenden"
+set "T_PROMPT=Auswahl [0-7]:"
 set "T_ERR=Ungueltige Auswahl. Bitte erneut versuchen."
 set "T_HINT=Hinweis: Bitte den Pfad zu einer KOPIE deiner Datenbank angeben."
 set "T_HINT2=(Tipp: Einfach die .mldb-Datei in dieses Fenster ziehen und Enter druecken)"
@@ -57,6 +59,7 @@ set "T_WARN1=ACHTUNG: Dies ruft ALLE Tracks erneut ab, auch bereits verarbeitete
 set "T_SURE=Wirklich fortfahren? [j/N]:"
 set "T_WARN2=ACHTUNG: Dieser Vorgang schreibt alle geprueften Werte in die oben"
 set "T_WARN3=ausgewaehlte .mldb-Datei. Nutze hierfuer IMMER EINE KOPIE!"
+set "T_WARN4=ACHTUNG: Dies ueberschreibt alle abweichenden Genres direkt in der Datenbank."
 goto menu
 
 :lang_en
@@ -71,10 +74,12 @@ set "T_OPT2=Full Fetch  - Re-fetch ALL tracks (Reset)"
 set "T_H2=--- STEP 2: REVIEW DATA ---"
 set "T_OPT3=Review      - Manually inspect all proposals"
 set "T_OPT4=Review      - Auto-accept safe matches (ask for unsure ones)"
-set "T_H3=--- STEP 3: SAVE TO MAIRLIST ---"
-set "T_OPT5=Apply       - Write verified values to .mldb copy"
-set "T_OPT6=Exit"
-set "T_PROMPT=Choice [0-6]:"
+set "T_H3=--- MASS EDITING ---"
+set "T_OPT5=Genres      - Standardize all DB genres according to script"
+set "T_H4=--- STEP 3: SAVE TO MAIRLIST ---"
+set "T_OPT6=Apply       - Write verified values to .mldb copy"
+set "T_OPT7=Exit"
+set "T_PROMPT=Choice [0-7]:"
 set "T_ERR=Invalid choice. Please try again."
 set "T_HINT=Note: Please provide the path to a COPY of your database."
 set "T_HINT2=(Tip: Just drag and drop the .mldb file into this window and press Enter)"
@@ -84,6 +89,7 @@ set "T_WARN1=WARNING: This will re-fetch ALL tracks, including already processed
 set "T_SURE=Really continue? [y/N]:"
 set "T_WARN2=WARNING: This operation writes all verified values to the"
 set "T_WARN3=selected .mldb file. ALWAYS USE A COPY for this!"
+set "T_WARN4=WARNING: This will overwrite all deviating genres directly in the database."
 goto menu
 
 :menu
@@ -117,7 +123,10 @@ echo.
 echo %c_yellow% %T_H3%%c_reset%
 echo  [%c_green%5%c_reset%] %T_OPT5%
 echo.
+echo %c_yellow% %T_H4%%c_reset%
 echo  [%c_green%6%c_reset%] %T_OPT6%
+echo.
+echo  [%c_green%7%c_reset%] %T_OPT7%
 echo.
 set /p wahl="%c_cyan%%T_PROMPT% %c_reset%"
 
@@ -126,8 +135,9 @@ if "%wahl%"=="1" goto fetch
 if "%wahl%"=="2" goto fetch_full
 if "%wahl%"=="3" goto review
 if "%wahl%"=="4" goto review_auto
-if "%wahl%"=="5" goto apply
-if "%wahl%"=="6" goto ende
+if "%wahl%"=="5" goto standardize
+if "%wahl%"=="6" goto apply
+if "%wahl%"=="7" goto ende
 echo %c_yellow%%T_ERR%%c_reset%
 pause
 goto menu
@@ -180,6 +190,17 @@ goto menu
 call :check_db
 if "%DB_OK%"=="0" goto menu
 py restore.py review --auto-hoch --db "%mldbpfad%" --lang %LANG_ARG%
+pause
+goto menu
+
+:standardize
+call :check_db
+if "%DB_OK%"=="0" goto menu
+echo.
+echo %c_yellow%%T_WARN4%%c_reset%
+set /p bestaetigung="%T_SURE% "
+if /i not "%bestaetigung%"=="j" if /i not "%bestaetigung%"=="y" goto menu
+py restore.py standardize --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 

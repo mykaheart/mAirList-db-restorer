@@ -24,6 +24,7 @@ import base64
 import difflib
 import statistics
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from collections import Counter
 
@@ -36,7 +37,7 @@ from rich import box
 console = Console(highlight=False)
 
 CONFIG_FILE = 'config.json'
-APP_VERSION = "0.4.20 Beta"
+APP_VERSION = "0.4.22 Beta"
 
 # ---------------------------------------------------------------------------
 # Language Dictionary
@@ -100,7 +101,10 @@ T = {
         'apply_backup': "[green]✓ Backup angelegt: {path}[/green]",
         'apply_err_lock': "\n[bold red][Fehler] Datenbank gelockt / Zugriff verweigert:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Fertig! {count} Zeile(n) in '{db}' erfolgreich aktualisiert.[/bold green]",
-        'conf_hoch': "hoch", 'conf_mittel': "mittel", 'conf_niedrig': "niedrig"
+        'conf_hoch': "hoch", 'conf_mittel': "mittel", 'conf_niedrig': "niedrig",
+        'std_start': "\n[bold cyan]Starte Genre-Standardisierung in der gesamten Datenbank...[/bold cyan]",
+        'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
+        'std_no_changes': "[yellow]Keine Aenderungen noetig. Alle Genres der DB sind bereits standardisiert![/yellow]"
     },
     'en': {
         'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails will be safely masked locally in 'config.json'.",
@@ -158,7 +162,10 @@ T = {
         'apply_backup': "[green]✓ Backup created: {path}[/green]",
         'apply_err_lock': "\n[bold red][Error] Database locked / Access denied:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Done! {count} row(s) in '{db}' successfully updated.[/bold green]",
-        'conf_hoch': "high", 'conf_mittel': "medium", 'conf_niedrig': "low"
+        'conf_hoch': "high", 'conf_mittel': "medium", 'conf_niedrig': "low",
+        'std_start': "\n[bold cyan]Starting genre standardization across the entire database...[/bold cyan]",
+        'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
+        'std_no_changes': "[yellow]No changes needed. All DB genres are already standardized![/yellow]"
     }
 }
 
@@ -361,20 +368,33 @@ def discogs_get(url, params, timeout=5):
 # Genre-Normalisierung & Cleaning
 # ---------------------------------------------------------------------------
 ALLOWED_GENRES = [
-    "Big Room", "Blues", "Classic Rock", "Country", "Dance", "Dancehall", "Dance-Pop",
-    "Deep House", "Deutsch-Hiphop", "Deutsch-Pop", "Deutsch-Rock", "Dubstep", "EDM",
-    "Eurodance", "Funk", "Future House", "Gothic Rock", "Hard Rock", "Hardstyle",
-    "Hiphop", "House", "Indie Rock", "Industrial", "Jazz", "Metal", "Oldies",
-    "Pop", "Pop-Rock", "Progressive House", "Psytrance", "Punk Rock", "R and B",
-    "Rap", "Reggae", "Rock", "Rock n Roll", "Schlager", "Slap House", "Soul",
-    "Synth-Pop", "Tech House", "Techno", "Trance", "Trap", "Tropical House"
+    "Pop", "EDM", "Blues", "Hiphop", "Rap", "Rock", "Classic Rock", 
+    "R and B", "Soul", "Reggae"
 ]
 
 GENRE_SYNONYMS = {
-    "euro house": "Eurodance", "synth-pop": "Synth-Pop", "synthpop": "Synth-Pop",
-    "hip hop": "Hiphop", "hip-hop": "Hiphop", "r&b": "R and B", "r&b / soul": "R and B",
-    "rock & roll": "Rock n Roll", "rock 'n' roll": "Rock n Roll", "pop rock": "Pop-Rock",
-    "indie": "Indie Rock", "edm": "EDM", "electronic": "Dance"
+    # --- EDM & Electronic Mappings ---
+    "house": "EDM", "deep house": "EDM", "techno": "EDM", "trance": "EDM", 
+    "eurodance": "EDM", "dubstep": "EDM", "dance": "EDM", "dance-pop": "EDM", 
+    "slap house": "EDM", "big room": "EDM", "future house": "EDM", "hardstyle": "EDM", 
+    "progressive house": "EDM", "psytrance": "EDM", "tech house": "EDM", 
+    "trap": "EDM", "tropical house": "EDM", "electronic": "EDM", "euro house": "EDM",
+    
+    # --- Rock & Metal Mappings (Die "Kuschel"-Abteilung) ---
+    "hard rock": "Rock", "indie rock": "Rock", "punk rock": "Rock", 
+    "gothic rock": "Rock", "alternative rock": "Rock", "pop-rock": "Rock", 
+    "metal": "Rock", "heavy metal": "Rock", "nu metal": "Rock", "industrial": "Rock", 
+    "rock n roll": "Rock", "rock & roll": "Rock", "rock 'n' roll": "Rock", "deutsch-rock": "Rock",
+    
+    # --- Pop Mappings ---
+    "synth-pop": "Pop", "synthpop": "Pop", "deutsch-pop": "Pop", "indie pop": "Pop",
+    
+    # --- Urban & Black Music Mappings ---
+    "hip hop": "Hiphop", "hip-hop": "Hiphop", "deutsch-hiphop": "Hiphop",
+    "r&b": "R and B", "r&b / soul": "R and B",
+    
+    # --- Reggae Mappings ---
+    "dancehall": "Reggae"
 }
 
 COMPILATION_KEYWORDS = [
@@ -751,30 +771,52 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     updated = 0
+    
+    # Listen für den Bulk-Write vorbereiten
+    items_update = []
+    attrs_insert = []
+    restauriert_insert = []
+    
     try:
+        # Alle existierenden IDs auf einmal laden, statt für jeden Track einzeln zu fragen
+        cur.execute("SELECT idx FROM items")
+        valid_ids = {row[0] for row in cur.fetchall()}
+        
         for _, row in df.iterrows():
             item_id = row.get('ID')
             if pd.isna(item_id) or not str(item_id).strip(): continue
             item_id = int(item_id)
             
-            cur.execute("SELECT 1 FROM items WHERE idx = ?", (item_id,))
-            if not cur.fetchone(): continue 
+            if item_id not in valid_ids: continue 
             
             title, artist = row.get('Title', ''), row.get('Artist', '')
+            
+            # Daten für die 'items'-Tabelle sammeln
             if pd.notna(title) or pd.notna(artist):
-                cur.execute("UPDATE items SET title = COALESCE(?, title), artist = COALESCE(?, artist) WHERE idx = ?",
-                            (title if pd.notna(title) and str(title).strip() else None,
-                             artist if pd.notna(artist) and str(artist).strip() else None, item_id))
+                t_val = title if pd.notna(title) and str(title).strip() else None
+                a_val = artist if pd.notna(artist) and str(artist).strip() else None
+                items_update.append((t_val, a_val, item_id))
+            
+            # Daten für die 'item_attributes'-Tabelle sammeln
             for field in MLDB_ATTRIBUTE_FIELDS:
                 value = row.get(field, '')
                 if pd.notna(value) and str(value).strip():
-                    cur.execute("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, ?, ?)",
-                                (item_id, field, str(value).strip()))
+                    attrs_insert.append((item_id, field, str(value).strip()))
+                    
             if mark_restauriert:
-                cur.execute("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, 'RESTAURIERT', 'JA')", (item_id,))
+                restauriert_insert.append((item_id, 'RESTAURIERT', 'JA'))
             
             log_change("APPLY", f"ID {item_id}: {artist} - {title}")
             updated += 1
+        
+        # BULK-WRITE: Alles in einem Rutsch in die Datenbank schreiben
+        if items_update:
+            cur.executemany("UPDATE items SET title = COALESCE(?, title), artist = COALESCE(?, artist) WHERE idx = ?", items_update)
+        if attrs_insert:
+            cur.executemany("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, ?, ?)", attrs_insert)
+        if restauriert_insert:
+            cur.executemany("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, ?, ?)", restauriert_insert)
+            
         conn.commit()
     finally:
         conn.close()
@@ -883,8 +925,13 @@ def phase_fetch(db_path, fetch_csv, full=False):
                     art_sugg = suggest_artist_spelling(c_art) or c_art
                     tit_sugg = suggest_title_spelling(art_sugg, c_tit) or c_tit
 
-                    mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(art_sugg, tit_sugg)
-                    discogs_res = fetch_discogs_details(art_sugg, tit_sugg)
+                    # APIs parallel anfragen
+                    with ThreadPoolExecutor(max_workers=2) as executor:
+                        future_mb = executor.submit(fetch_musicbrainz_details, art_sugg, tit_sugg)
+                        future_discogs = executor.submit(fetch_discogs_details, art_sugg, tit_sugg)
+                        
+                        mb_year, mb_conf, isrc, mb_album = future_mb.result()
+                        discogs_res = future_discogs.result()
 
                     all_years = [mb_year] if mb_year else []
                     all_years += [y for y in discogs_res['years']]
@@ -995,8 +1042,14 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     console.print(t('rev_refetch', art=updated_art, tit=updated_tit))
                     
                     c_art, c_tit = clean_artist_base(updated_art), clean_title_base(updated_tit)
-                    mb_year, mb_conf, isrc, mb_album = fetch_musicbrainz_details(c_art, c_tit)
-                    discogs_res = fetch_discogs_details(c_art, c_tit)
+                    
+                    # APIs parallel anfragen
+                    with ThreadPoolExecutor(max_workers=2) as executor:
+                        future_mb = executor.submit(fetch_musicbrainz_details, c_art, c_tit)
+                        future_discogs = executor.submit(fetch_discogs_details, c_art, c_tit)
+                        
+                        mb_year, mb_conf, isrc, mb_album = future_mb.result()
+                        discogs_res = future_discogs.result()
 
                     all_years = [mb_year] if mb_year else []
                     all_years += [y for y in discogs_res['years']]
@@ -1158,10 +1211,57 @@ def phase_apply(db_path, final_csv):
 
     console.print(t('apply_success', count=updated, db=db_path))
 
+# ---------------------------------------------------------------------------
+# PHASE: standardize (Standalone Genre-Cleanup)
+# ---------------------------------------------------------------------------
+def phase_standardize(db_path):
+    if not os.path.exists(db_path):
+        console.print(t('err_file_not_found', file=db_path))
+        sys.exit(1)
+
+    if is_db_locked(db_path):
+        console.print(Panel(t('apply_locked'), box=box.HEAVY, style="red"))
+        sys.exit(1)
+
+    console.print(t('std_start'))
+
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    updates = []
+
+    try:
+        cur.execute("SELECT item, value FROM item_attributes WHERE name = 'Genre'")
+        rows = cur.fetchall()
+
+        for item_id, current_genre in rows:
+            if not current_genre: continue
+            
+            # Map das existierende Genre durch den Trichter
+            mapped_genre = map_to_allowed_genre([current_genre], [])
+            
+            # Falls ein Mapping erfolgreich war und es sich vom alten Eintrag unterscheidet
+            if mapped_genre and mapped_genre != current_genre:
+                updates.append((mapped_genre, item_id, 'Genre'))
+
+        if updates:
+            # Bulk Update der item_attributes Tabelle
+            cur.executemany("UPDATE item_attributes SET value = ? WHERE item = ? AND name = ?", updates)
+            conn.commit()
+            console.print(t('std_done', count=len(updates)))
+            log_change("STANDARDIZE", f"{len(updates)} Genres bereinigt.")
+        else:
+            console.print(t('std_no_changes'))
+            
+    except sqlite3.OperationalError as e:
+        console.print(t('apply_err_lock', err=str(e)))
+        sys.exit(1)
+    finally:
+        conn.close()
+
 def main():
     global CURRENT_LANG
     parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{APP_VERSION}")
-    parser.add_argument('phase', choices=['fetch', 'review', 'apply'])
+    parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'standardize'])
     parser.add_argument('--auto-hoch', action='store_true')
     parser.add_argument('--full', action='store_true')
     parser.add_argument('--db', required=True, help="Pfad zur mAirList .mldb-Datei")
@@ -1170,7 +1270,6 @@ def main():
 
     CURRENT_LANG = args.lang
     
-    # NEU: Dynamischer Log-Datei-Name mit DB-Namen und Timestamp
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
     dynamic_log_file = f"{db_base_name}_{timestamp_str}.log"
@@ -1190,6 +1289,7 @@ def main():
 
     if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full)
     elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
+    elif args.phase == 'standardize': phase_standardize(args.db)
     else: phase_apply(args.db, final_csv)
 
 if __name__ == '__main__':
