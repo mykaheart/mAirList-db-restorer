@@ -49,14 +49,15 @@ def check_for_updates():
                             console.print(f"[yellow]⚡ Update verfügbar! Neue Version {remote_version} ist auf GitHub (Du nutzt {utils.APP_VERSION}).[/yellow]")
                         else:
                             console.print(f"[yellow]⚡ Update available! New version {remote_version} is on GitHub (You are using {utils.APP_VERSION}).[/yellow]")
+                        sys.exit(2)
                     else:
                         if utils.CURRENT_LANG == 'de':
                             console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
                         else:
                             console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
-                    return
+                        sys.exit(0)
     except Exception:
-        pass
+        sys.exit(0)
 
 # ---------------------------------------------------------------------------
 # PHASE 1: fetch
@@ -479,17 +480,22 @@ def phase_standardize(db_path):
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{utils.APP_VERSION}")
-    parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'standardize'])
+    parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'standardize', 'check_update'])
     parser.add_argument('--auto-hoch', action='store_true')
     parser.add_argument('--full', action='store_true')
-    parser.add_argument('--db', required=True, help="Pfad zur mAirList .mldb-Datei")
+    parser.add_argument('--db', help="Pfad zur mAirList .mldb-Datei")
     parser.add_argument('--lang', choices=['de', 'en'], default='de')
     args = parser.parse_args()
 
     utils.CURRENT_LANG = args.lang
     
-    # GitHub Update Check beim Start ausführen
-    check_for_updates()
+    if args.phase == 'check_update':
+        check_for_updates()
+        return
+        
+    if not args.db:
+        console.print("[red]Fehler: --db Argument fehlt![/red]")
+        sys.exit(1)
     
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')

@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.5.0 Beta"
+APP_VERSION = "0.5.1 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session

@@ -60,7 +60,7 @@ set "T_SURE=Wirklich fortfahren? [j/N]:"
 set "T_WARN2=ACHTUNG: Dieser Vorgang schreibt alle geprueften Werte in die oben"
 set "T_WARN3=ausgewaehlte .mldb-Datei. Nutze hierfuer IMMER EINE KOPIE!"
 set "T_WARN4=ACHTUNG: Dies ueberschreibt alle abweichenden Genres direkt in der Datenbank."
-goto menu
+goto update_check
 
 :lang_en
 set "LANG_ARG=en"
@@ -90,7 +90,20 @@ set "T_SURE=Really continue? [y/N]:"
 set "T_WARN2=WARNING: This operation writes all verified values to the"
 set "T_WARN3=selected .mldb file. ALWAYS USE A COPY for this!"
 set "T_WARN4=WARNING: This will overwrite all deviating genres directly in the database."
-goto menu
+goto update_check
+
+:update_check
+:: --- Update Check beim Start ---
+cls
+echo.
+py main.py check_update --lang %LANG_ARG%
+if errorlevel 2 (
+    echo.
+    echo Bitte lade die neue Version von GitHub herunter!
+    pause
+) else (
+    timeout /t 2 >nul
+)
 
 :menu
 cls

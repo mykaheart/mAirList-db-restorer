@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1 Beta] - 2026-08-30
+### Changed
+- **Startup UX / Update Check:** Extracted the GitHub update check into a dedicated execution phase (`check_update`). The `Restore.bat` script now triggers this check *before* loading the main database menu, ensuring that update notifications are highly visible and no longer instantly overwritten by the UI.
+- **Graceful Transitions:** If an update is available, the console now pauses for the user to read the alert. If the tool is up to date, it displays a brief confirmation (2 seconds) before smoothly transitioning into the main menu.
+
 ## [0.5.0 Beta] - 2026-08-29
 ### Added
 - **Advanced Live Re-Fetch:** The live re-fetch logic during the review phase now explicitly reacts to manual changes in the 'Year' and 'Album' fields. Modifying these fields triggers a highly targeted API request to fetch the exact release, drastically improving the accuracy of suggested Labels, Label Codes, and Genres.
@@ -44,31 +49,3 @@ All notable changes to this project will be documented in this file.
 - **Terminal Highlighting Glitch:** Disabled the default `rich` console syntax highlighter (`highlight=False`) to prevent random words like 'true' or raw numbers from being incorrectly colored in the terminal output.
 - **Duran Duran VIP Fix:** Added "Duran Duran" to the `ARTIST_FIXES` dictionary to prevent the MusicBrainz API from confusing the legendary 80s band with the American breakcore artist "Duran Duran Duran".
 - **Batch File Persistence:** Replaced the `exit` command with `pause` in `Restore.bat` to ensure the terminal window remains open after execution or unexpected crashes.
-
-## [0.4.7 Beta] - 2026-08-23
-### Added
-- **Language Support:** Added 'Sprache' (Language) as a supported attribute in the review and apply phases.
-- **Forced Prompts:** The review process now explicitly asks for Album, Label, and Language, ensuring these fields can be filled manually even if the APIs return no suggestions.
-
-### Fixed
-- **Display Bug:** Resolved an issue where empty API results (Pandas NaN values) were displayed as the string 'nan' during the manual review.
-
-## [0.4.5 Beta] - 2026-08-22
-### Added
-- **Bilingual Support:** The tool is now fully bilingual! Added complete English and German localization.
-- **Batch Menu Update:** `Restore.bat` now includes a language selection screen on startup.
-- **CLI Argument:** Added `--lang` argument to `restore.py` to seamlessly pass the selected language to the Python environment.
-
-## [0.4.4 Beta] - 2026-08-22
-### Added
-- **Smart Year Gap-Filter:** Implemented an advanced logic to intelligently ignore extreme year outliers (e.g., 1945 vs. 2004) while preserving legitimate historical re-releases.
-- **VIP Dictionary:** Added `ARTIST_FIXES` to automatically correct notorious artist naming conventions (e.g., forcing "AC/DC" or "a-ha").
-
-### Fixed
-- **Artist Split Bug:** Removed aggressive comma-splitting rules that accidentally turned bands like "AC, DC" into feature artists.
-
-## [0.4.0 Beta] - Initial Public Release
-### Added
-- Core functionality: Fetch from MusicBrainz and Discogs, manual review flow, and safe application to local mAirList SQLite databases (`.mldb`).
-- Rich CLI interface with progress bars and dynamic console styling.
-- Local Base64-masked credential storage for Discogs API and MusicBrainz contact info.
