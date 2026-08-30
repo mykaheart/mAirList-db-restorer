@@ -47,12 +47,16 @@ def check_for_updates():
                     if remote_version != utils.APP_VERSION:
                         if utils.CURRENT_LANG == 'de':
                             console.print(f"[yellow]⚡ Update verfügbar! Neue Version {remote_version} ist auf GitHub (Du nutzt {utils.APP_VERSION}).[/yellow]")
+                        elif utils.CURRENT_LANG == 'nl':
+                            console.print(f"[yellow]⚡ Update beschikbaar! Nieuwe versie {remote_version} staat op GitHub (Je gebruikt {utils.APP_VERSION}).[/yellow]")
                         else:
                             console.print(f"[yellow]⚡ Update available! New version {remote_version} is on GitHub (You are using {utils.APP_VERSION}).[/yellow]")
                         sys.exit(2)
                     else:
                         if utils.CURRENT_LANG == 'de':
                             console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
+                        elif utils.CURRENT_LANG == 'nl':
+                            console.print(f"[dim]Versie is up-to-date ({utils.APP_VERSION}).[/dim]")
                         else:
                             console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
                         sys.exit(0)
@@ -335,9 +339,10 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 lang_sugg = utils.clean_nan(df.at[idx, 'Sprache_Vorschlag'] if 'Sprache_Vorschlag' in df.columns else row.get('Sprache_Vorschlag'))
                 disp_lang = lang_sugg if lang_sugg else utils.t('no_sugg')
                 
-                lang_map = {'1': 'Englisch' if utils.CURRENT_LANG == 'de' else 'English',
-                            '2': 'Deutsch' if utils.CURRENT_LANG == 'de' else 'German'}
-                nxt_idx = 3
+                lang_map = {'1': 'Engels' if utils.CURRENT_LANG == 'nl' else ('Englisch' if utils.CURRENT_LANG == 'de' else 'English'),
+                            '2': 'Duits' if utils.CURRENT_LANG == 'nl' else ('Deutsch' if utils.CURRENT_LANG == 'de' else 'German'),
+                            '3': 'Nederlands' if utils.CURRENT_LANG == 'nl' else ('Niederländisch' if utils.CURRENT_LANG == 'de' else 'Dutch')}
+                nxt_idx = 4
                 for cl in utils.CUSTOM_LANGS:
                     lang_map[str(nxt_idx)] = cl
                     nxt_idx += 1
@@ -355,7 +360,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     df.at[idx, 'Sprache'] = lang_map[inp]
                 elif inp and inp.lower() not in ['n', 'nein']: 
                     df.at[idx, 'Sprache'] = inp
-                    if inp not in utils.CUSTOM_LANGS and inp not in [lang_map['1'], lang_map['2']]:
+                    if inp not in utils.CUSTOM_LANGS and inp not in [lang_map['1'], lang_map['2'], lang_map['3']]:
                         utils.add_custom_lang(inp)
 
                 # Restliche Attribute
@@ -484,7 +489,7 @@ def main():
     parser.add_argument('--auto-hoch', action='store_true')
     parser.add_argument('--full', action='store_true')
     parser.add_argument('--db', help="Pfad zur mAirList .mldb-Datei")
-    parser.add_argument('--lang', choices=['de', 'en'], default='de')
+    parser.add_argument('--lang', choices=['de', 'en', 'nl'], default='de')
     args = parser.parse_args()
 
     utils.CURRENT_LANG = args.lang

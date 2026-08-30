@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.5.1 Beta"
+APP_VERSION = "0.5.2 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -157,7 +157,68 @@ T = {
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
         'std_no_changes': "[yellow]No changes needed. All DB genres are already standardized![/yellow]"
     }
-}
+}'nl': {
+        'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal gemaskeerd in 'config.json' opgeslagen.",
+        'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
+        'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
+        'setup_email': "  Jouw contact e-mail: ",
+        'setup_email_err': "[red]Ongeldig e-mailadres, probeer het opnieuw.[/red]",
+        'setup_saved': "[green]✓ Inloggegevens veilig opgeslagen in '{config_file}'.[/green]\n",
+        'ign_current': "\n[cyan]Huidige map-uitzonderingen voor deze DB:[/cyan] [yellow]{liste}[/yellow]",
+        'ign_reset': "Wil je deze lijst opnieuw aanmaken? [j/N]: ",
+        'ign_none': "Geen",
+        'ign_setup_title': "\n[bold cyan]Map-uitzonderingen configureren[/bold cyan]\nGeef mappen op die genegeerd moeten worden (bijv. Jingles, News).",
+        'ign_prompt': "  [cyan]Sleep map hierheen[/cyan] OF typ [cyan]virtuele mapnaam[/cyan] (Enter = Klaar): ",
+        'ign_added_phys': "  [green]✓ Fysiek pad genegeerd:[/green] {path}",
+        'ign_added_virt': "  [green]✓ Virtuele/gedeeltelijke map genegeerd:[/green] {name}",
+        'ign_saved': "[green]✓ Uitzonderingen opgeslagen in config.json![/green]\n",
+        'ign_skip_count': "\n[bold green]✓ SUCCES: {count} genegeerde elementen (OAD/Jingles/News) succesvol overgeslagen![/bold green]",
+        'fetch_load_prog': "[cyan]Voortgang geladen uit '{csv}' ({count} rijen).[/cyan]",
+        'fetch_sync_del': "[yellow]-> {count} track(s) zijn verwijderd in mAirList en uit CSV gehaald.[/yellow]",
+        'fetch_new_tracks': "[green]-> {count} nieuwe track(s) uit '{db}' toegevoegd.[/green]",
+        'fetch_reset': "[yellow]-> {count} track(s) gereset in mAirList – worden opnieuw opgehaald![/yellow]",
+        'fetch_first': "[cyan]Eerste run: Lezen direct uit SQLite-kopie '{db}'.[/cyan]",
+        'fetch_full': "[bold yellow]Volledige hercontrole aangevraagd (--full)[/bold yellow]",
+        'fetch_start': "[bold green]Start automatische fetch[/bold green]\nOpenstaande tracks: [bold yellow]{offen}[/bold yellow] van [bold]{total}[/bold] totaal",
+        'fetch_done_already': "[bold green]✓ Alle tracks zijn al up-to-date![/bold green]",
+        'fetch_progress': "[bold magenta]Metadata ophalen...",
+        'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jaar: [bold cyan]{jahr}[/bold cyan], Betrouwbaarheid: [{c_color}]{conf}[/{c_color}])",
+        'fetch_interrupt': "\n[bold yellow]Ophalen onderbroken. Voortgang veilig opgeslagen.[/bold yellow]",
+        'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'err_file_not_found': "[bold red][Fout][/bold red] '{file}' niet gevonden.",
+        'err_need_fetch': " Voer eerst 'fetch' uit.",
+        'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOpenstaande controles: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tip: Typ '<' of 'b' en Enter om een track terug te gaan![/dim]",
+        'rev_auto_active': "\n[green]--auto-hoch actief[/green]",
+        'rev_row': "[bold white on blue] Rij {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
+        'rev_artist': "  [cyan]Artiest[/cyan] -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
+        'rev_title': "  [cyan]Titel[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
+        'rev_refetch': "  [magenta]⚡ Eigen tekst gedetecteerd! Live Re-Fetch voor '{art} - {tit}'...[/magenta]",
+        'rev_year_auto': "  [cyan]Jaar[/cyan]    -> [bold green]{sugg}[/bold green] [dim](auto, betrouwbaarheid hoog)[/dim]",
+        'rev_year': "  [cyan]Jaar[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' ({badge}) [dim]\\[j/Enter/Jaar][/dim]: ",
+        'rev_genre_auto': "  [cyan]Genre[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, betrouwbaarheid hoog)[/dim]",
+        'rev_genre': "  [cyan]Genre[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Genre][/dim]: ",
+        'rev_album': "  [cyan]Album[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
+        'rev_label': "  [cyan]Label[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
+        'rev_lang':  "  [cyan]Taal[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[{hint}][/dim]: ",
+        'no_sugg': "- (Geen suggestie) -",
+        'rev_interim': "[dim]  (Tussenstand opgeslagen)[/dim]",
+        'rev_interrupt': "\n\n[bold yellow]Review onderbroken. Eerdere beslissingen zijn opgeslagen.[/bold yellow]",
+        'rev_success': "\n[bold green]✓ Review voltooid![/bold green] Eindresultaat in [bold cyan]'{csv}'[/bold cyan].",
+        'err_need_fetch_rev': " Voer eerst 'fetch' en 'review' uit.",
+        'apply_warn': "[bold red]WAARSCHUWING: Schrijfactie naar .mldb bestand[/bold red]\nNooit toepassen op een bestand dat momenteel open is in mAirList!",
+        'apply_locked': "[bold red]Database is momenteel vergrendeld![/bold red]\nWaarschijnlijk heeft mAirList (of een ander programma) dit bestand\nmomenteel geopend. Sluit het programma of selecteer een echte\nkopie van het bestand en probeer het opnieuw.",
+        'apply_confirm': "Is dit definitief een KOPIE? Typ '[bold green]JA[/bold green]' om door te gaan: ",
+        'apply_confirm_word': "JA",
+        'apply_abort': "[yellow]Geannuleerd.[/yellow]",
+        'apply_backup': "[green]✓ Back-up aangemaakt: {path}[/green]",
+        'apply_err_lock': "\n[bold red][Fout] Database vergrendeld / Toegang geweigerd:[/bold red] {err}",
+        'apply_success': "\n[bold green]✓ Klaar! {count} rij(en) in '{db}' succesvol bijgewerkt.[/bold green]",
+        'conf_hoch': "hoog", 'conf_mittel': "gemiddeld", 'conf_niedrig': "laag",
+        'std_start': "\n[bold cyan]Start genre-standaardisatie in de hele database...[/bold cyan]",
+        'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
+        'std_no_changes': "[yellow]Geen wijzigingen nodig. Alle genres zijn al gestandaardiseerd![/yellow]"
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Basis-Hilfsfunktionen

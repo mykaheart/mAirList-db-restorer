@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.5.1 Beta
+# mAirList DB Restorer v0.5.0 Beta
 **Ein Metadaten-Reparatur-Tool / Metadata Repair Tool for mAirList**
 
 ## 🇩🇪 DEUTSCH
@@ -79,6 +79,8 @@ Es ist daher zu 100 % ratsam und notwendig, die Ergebnisse im Review-Schritt ode
 
 SUPPORT: 
 Technischen Support (soweit es mir möglich ist) leiste ich ausschließlich über die Issue-Funktion hier auf GitHub. Bitte keine Support-Anfragen über andere Kanäle oder Foren.
+
+
 
 --------------------------------------------------------------------------------
  >>> ENGLISH
@@ -164,3 +166,86 @@ Therefore, it is 100% recommended and necessary to critically review and verify 
 
 SUPPORT: 
 Technical support (as far as I am able to provide it) is handled exclusively via the issue tracker here on GitHub. Please do not send support requests through other channels or forums.
+
+
+
+--------------------------------------------------------------------------------
+ >>> NEDERLANDS
+--------------------------------------------------------------------------------
+
+Iedereen die een muziekdatabase beheert, kent het probleem: ontbrekende jaartallen, lege genre-velden, onvolledige labelcodes of ontbrekende albums. De mAirList DB Restorer neemt dit tijdrovende handwerk van je over.
+
+De tool analyseert je lokale mAirList SQLite-database (.mldb), zoekt via de API's van MusicBrainz en Discogs naar de ontbrekende metadata en schrijft de gecorrigeerde waarden veilig terug in de database.
+
+--------------------------------------------------------------------------------
+ 1. DE FUNCTIES: WAT GEBEURT ER ONDER DE MOTORKAP?
+--------------------------------------------------------------------------------
+Het script zoekt niet zomaar blindelings, maar werkt met meerdere vangnetten om foute tags te voorkomen:
+
+* Smart Cleaning: Voor het zoeken worden artiest en titel opgeschoond. Verschillende schrijfwijzen van features (ft., featuring) worden gestandaardiseerd.
+* Intelligent Matching (Levenshtein): De tool controleert de procentuele overeenkomst van de zoekresultaten. Dit voorkomt dat de API "Duran Duran" per ongeluk koppelt aan de breakcore-artiest "Duran Duran Duran".
+* Outlier-Filter (Mediaan & Hiaat-logica): API's bevatten vaak foutieve gebruikersinvoer. Het script berekent het gemiddelde van alle gevonden releasejaren en negeert absurde uitschieters (bijv. releasejaar 1945 voor een track uit 2004).
+* OAD-Bescherming: Virtuele en fysieke mappen met de naam "OAD" (On Air Design) worden consequent genegeerd. Jingle-pakketten blijven dus onaangetast.
+* Gemaskeerde Configuratie: Je API-keys worden lokaal met Base64 gemaskeerd opgeslagen, zodat ze niet als platte tekst in de config.json staan.
+  
+  LET OP: Base64 is GEEN encryptie, slechts een codering – het kan met elke online tool in seconden worden teruggelezen. De bescherming is alleen bedoeld tegen onbedoeld meekijken, niet tegen gericht uitlezen. Deel je config.json daarom niet (bijv. niet uploaden bij supportvragen of delen met anderen).
+
+--------------------------------------------------------------------------------
+ 2. VEREISTEN & INSTALLATIE
+--------------------------------------------------------------------------------
+Omdat dit een Python-script is, moet je eenmalig Python en drie extra pakketten installeren:
+
+1. Download en installeer Python (https://www.python.org/downloads/) (BELANGRIJK: Vink tijdens de installatie absoluut "Add Python to PATH" aan!).
+2. Open de Windows Opdrachtprompt. 
+   (Tip: Druk op de Windows-toets + R, typ "cmd" in en druk op Enter).
+   Installeer vervolgens de benodigde bibliotheken met het volgende commando:
+   
+   pip install pandas requests rich
+
+Daarnaast heb je (gratis) API-inloggegevens voor Discogs nodig:
+1. Maak een account aan op discogs.com
+2. Ga naar de ontwikkelaarsinstellingen (Settings -> Developers)
+3. Maak een nieuwe App/Token aan en kopieer je "Consumer Key" en "Consumer Secret".
+
+--------------------------------------------------------------------------------
+ 3. DE WORKFLOW (GEBRUIK)
+--------------------------------------------------------------------------------
+BELANGRIJK VOORAF: 
+Werk NOOIT met het databasebestand (.mldb) dat op dat moment in mAirList is geopend! mAirList vergrendelt het bestand tijdens gebruik. Als het script tegelijkertijd probeert te schrijven, kan de database beschadigd raken. 
+-> Maak altijd een KOPIE van je .mldb-bestand op je bureaublad!
+
+VOORBEREIDING: DATABASE SELECTEREN
+Start de tool via het bestand "Restore.bat". Selecteer je taal.
+Kies [0] in het menu. Het script vraagt nu om het pad naar je database. 
+PRO-TIP: Je hoeft het pad niet moeizaam in te typen. Je kunt het .mldb-bestand gewoon vanuit de Windows Verkenner met de muis direct in het consolevenster slepen (Drag & Drop) en op Enter drukken! Het menu onthoudt dit bestand nu voor alle volgende stappen.
+
+Bij de allereerste start vraagt het script om je Discogs-keys en een contact-e-mail voor MusicBrainz (eis van de API). Daarna begint het proces:
+
+STAP 1: METADATA OPHALEN (Smart-Fetch)
+Kies [1]. Het script leest je database-kopie in en zoekt voor elke track die nog niet is verwerkt naar metadata. De originele waarden blijven volledig onaangetast. De voortgang wordt continu tussentijds opgeslagen. Je kunt het proces op elk moment afbreken met Ctrl+C en later hervatten.
+
+STAP 2: DATA CONTROLEREN (Review)
+Kies [3] of [4]. Hier krijg je de suggesties van het script gepresenteerd. Je kunt elke suggestie (jaar, genre, album, label) afwijzen met "Enter", accepteren met "j", of eigen tekst intypen.
+- Live Re-Fetch: Als je bij artiest, titel, jaar of album een eigen correctie intypt (bijv. een typefout herstelt), haalt het script direct op de achtergrond de nieuwe, passende data op voor jouw correctie!
+
+STAP 3: IN MAIRLIST OPSLAAN (Apply)
+Kies [6]. Het script schrijft alle door jou goedgekeurde metadata terug in je database-KOPIE. 
+Wanneer het proces is voltooid, kun je de kopie weer naar de oorspronkelijke locatie verplaatsen (terwijl mAirList gesloten is) of de database opnieuw koppelen in de mAirList-configuratie.
+
+--------------------------------------------------------------------------------
+ 4. DE "RESTAURIERT" FLAG (Update-Logica)
+--------------------------------------------------------------------------------
+Bij het opslaan in mAirList stelt het script het attribuut "RESTAURIERT" = "JA" in voor elke verwerkte track. 
+Tracks met deze flag worden bij toekomstige runs automatisch overgeslagen. 
+Valt het je later tijdens live-uitzendingen op dat een track toch verkeerde tags heeft? Geen probleem: verwijder in mAirList gewoon het "RESTAURIERT"-attribuut bij deze track. Bij de volgende script-run herkent de tool dat de track is "vrijgegeven" en haalt deze volledig opnieuw op!
+
+--------------------------------------------------------------------------------
+ 5. TRANSPARANTIE, AI-GEBRUIK & SUPPORT
+--------------------------------------------------------------------------------
+Een open woord over de ontwikkeling: Dit script is grotendeels ontwikkeld met de ondersteuning van Kunstmatige Intelligentie (Google Gemini). Transparantie vind ik hierin erg belangrijk. Ik verzoek je vriendelijk om af te zien van kritiek op de ontstaanswijze. De focus moet liggen op wat deze tool voor de mAirList-community betekent en hoeveel uren vervelend handwerk het jullie kan besparen.
+
+BELANGRIJKE DISCLAIMER: Noch de AI, noch de databases van MusicBrainz of Discogs zijn onfeilbaar. Vanwege de gigantische hoeveelheid verschillende schrijfwijzen, remixen, heruitgaven en gelijknamigheden (bij artiest, titel of label) kan er af en toe verkeerde metadata worden geleverd. Het script vangt veel op door interne filters en logica – maar absoluut ALLES opvangen is simpelweg onmogelijk.
+Het is daarom 100% aan te raden en noodzakelijk om de resultaten in de review-stap of later in mAirList kritisch te bekijken en te controleren!
+
+SUPPORT: 
+Technische ondersteuning (voor zover mogelijk) bied ik uitsluitend aan via de Issue-functie hier op GitHub. Geen supportvragen via andere kanalen of fora a.u.b.

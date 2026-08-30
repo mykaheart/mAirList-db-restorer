@@ -25,11 +25,13 @@ echo %c_cyan%==================================================%c_reset%
 echo.
 echo  [%c_green%1%c_reset%] Deutsch
 echo  [%c_green%2%c_reset%] English
+echo  [%c_green%3%c_reset%] Nederlands
 echo.
-set /p lang_choice="%c_cyan%Select / Auswahl [1-2]: %c_reset%"
+set /p lang_choice="%c_cyan%Select / Auswahl / Keuze [1-3]: %c_reset%"
 
 if "%lang_choice%"=="1" goto lang_de
 if "%lang_choice%"=="2" goto lang_en
+if "%lang_choice%"=="3" goto lang_nl
 goto lang_select
 
 :lang_de
@@ -92,6 +94,36 @@ set "T_WARN3=selected .mldb file. ALWAYS USE A COPY for this!"
 set "T_WARN4=WARNING: This will overwrite all deviating genres directly in the database."
 goto update_check
 
+:lang_nl
+set "LANG_ARG=nl"
+set "T_TITLE=mAirList Database Assistent"
+set "T_DB_NONE=Actieve database: GEEN (Selecteer eerst!)"
+set "T_DB_ACT=Actieve database:"
+set "T_OPT0=Actieve database selecteren / wijzigen"
+set "T_H1=--- STAP 1: METADATA OPHALEN ---"
+set "T_OPT1=Smart-Fetch - Nieuwe tracks laden / hervatten"
+set "T_OPT2=Full-Fetch  - ALLE tracks volledig opnieuw laden (Reset)"
+set "T_H2=--- STAP 2: DATA CONTROLEREN ---"
+set "T_OPT3=Controle    - Alle suggesties handmatig controleren"
+set "T_OPT4=Controle    - Veilige matches automatisch accepteren"
+set "T_H3=--- MASSA-BEWERKING ---"
+set "T_OPT5=Genres      - Alle DB-genres volgens script standaardiseren"
+set "T_H4=--- STAP 3: OPSLAAN IN MAIRLIST ---"
+set "T_OPT6=Opslaan     - Gecontroleerde waarden in .mldb-kopie schrijven"
+set "T_OPT7=Afsluiten"
+set "T_PROMPT=Keuze [0-7]:"
+set "T_ERR=Ongeldige keuze. Probeer het opnieuw."
+set "T_HINT=Let op: Geef het pad op naar een KOPIE van je database."
+set "T_HINT2=(Tip: Sleep het .mldb bestand gewoon in dit venster en druk op Enter)"
+set "T_PATH=Pad:"
+set "T_ERR_DB=Fout: Geen database geselecteerd! Kies eerst optie 0."
+set "T_WARN1=WAARSCHUWING: Dit haalt ALLE tracks opnieuw op, inclusief reeds verwerkte tracks."
+set "T_SURE=Weet je het zeker? [j/N]:"
+set "T_WARN2=WAARSCHUWING: Dit proces schrijft alle gecontroleerde waarden naar het"
+set "T_WARN3=bovenstaande .mldb bestand. Gebruik hiervoor ALTIJD EEN KOPIE!"
+set "T_WARN4=WAARSCHUWING: Dit overschrijft alle afwijkende genres direct in de database."
+goto update_check
+
 :update_check
 :: --- Update Check beim Start ---
 cls
@@ -110,8 +142,8 @@ cls
 echo %c_cyan%==================================================%c_reset%
 echo %c_magenta%   %T_TITLE% v%APP_VERSION%%c_reset%
 echo.
-echo %c_magenta%        (c) 2026 by Myka Vormeng %c_reset%
-echo %c_magenta%             und Google Gemini %c_reset%
+echo %c_magenta%       (c) 2026 by Myka Vormeng (Concept)%c_reset%
+echo %c_magenta%         & Google Gemini (Programming)%c_reset%
 echo %c_cyan%==================================================%c_reset%
 
 if "%mldbpfad%"=="" goto show_no_db
