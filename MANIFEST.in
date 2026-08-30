@@ -1,7 +1,0 @@
-include LICENSE
-include README.md
-include CHANGELOG.md
-include release-notes.md
-include Restore.bat
-include restore.py
-exclude config.json
