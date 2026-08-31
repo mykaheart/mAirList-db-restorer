@@ -31,13 +31,9 @@ Dieses Skript sucht nicht einfach blind drauflos, sondern arbeitet mit mehreren 
 
 ---
 
-## 📖 Bedienungsanleitung (How-To)
+## 📖 Bedienungsanleitung
 
-Die detaillierte Anleitung zur Installation (Python, benötigte Module) und die Erklärung des genauen Workflows (Schritt-für-Schritt) findest du in den beiliegenden Handbüchern:
-
-*   👉 **[Manual_DE.pdf / Manual_DE.txt]** (Hier Dateipfad/Link einfügen)
-*   👉 **[Manual_EN.pdf / Manual_EN.txt]** (Hier Dateipfad/Link einfügen)
-*   👉 **[Manual_NL.pdf / Manual_NL.txt]** (Hier Dateipfad/Link einfügen)
+Die detaillierte Schritt-für-Schritt-Anleitung zur Installation und Nutzung findest du separat im Repository (`Manual_DE.md`).
 
 ---
 

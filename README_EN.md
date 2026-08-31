@@ -29,13 +29,9 @@ This script doesn't just search blindly; it uses several safety nets and logic s
 
 ---
 
-## 📖 User Manual (How-To)
+## 📖 User Manual
 
-Detailed instructions for installation (Python, required modules) and an explanation of the exact workflow (step-by-step) can be found in the included manuals:
-
-*   👉 **[Manual_DE.pdf / Manual_DE.txt]** (Insert file path/link here)
-*   👉 **[Manual_EN.pdf / Manual_EN.txt]** (Insert file path/link here)
-*   👉 **[Manual_NL.pdf / Manual_NL.txt]** (Insert file path/link here)
+Detailed step-by-step instructions for installation and usage can be found separately in the repository (`Manual_EN.md`).
 
 ---
 

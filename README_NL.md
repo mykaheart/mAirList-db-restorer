@@ -24,18 +24,14 @@ Dit script zoekt niet zomaar blindelings, maar werkt met meerdere vangnetten en 
 
 *   **LOKALE DATABASES:** Deze tool werkt momenteel **uitsluitend met lokale SQLite-databases (`.mldb`)** van mAirList. (Ondersteuning voor netwerkdatabases is gepland voor toekomstige updates).
 *   **TAALCOMPATIBILITEIT:** De veldtoewijzing bij het schrijven naar de database is momenteel geoptimaliseerd voor **Duitse, Engelse en Nederlandse** mAirList-installaties. (Meer talen volgen op verzoek).
-*   **GEEN GARANTIE:** Noch de API's van MusicBrainz of Discogs, noch de algoritmen van deze tool zijn onfeilbaar. Vanwege de gigantische hoeveelheid verschillende schrijfwijzen, remixen en gelijknamigheden kan verkeerde metadata worden geleverd. **Gebruik is op eigen risico!**
+*   **GEEN GARANTIE:** Noch de API's van MusicBrainz of Discogs, noch de algoritmen van deze tool zijn onfeilbar. Vanwege de gigantische hoeveelheid verschillende schrijfwijzen, remixen en gelijknamigheden kan verkeerde metadata worden geleverd. **Gebruik is op eigen risico!**
 *   **WERK ALTIJD OP EEN KOPIE:** Omdat de tool direct en zonder "Undo"-functie in de database schrijft, mag je **NOOIT** werken op het actieve bestand dat momenteel in mAirList is geopend. Gebruik voor deze tool *altijd* een kopie van je `.mldb`-bestand!
 
 ---
 
-## 📖 Gebruikershandleiding (How-To)
+## 📖 Handleiding
 
-De gedetailleerde instructies voor installatie (Python, benodigde modules) en de uitleg van de exacte workflow (stap-voor-stap) vind je in de bijgevoegde handleidingen:
-
-*   👉 **[Manual_DE.pdf / Manual_DE.txt]** (Voeg hier bestandspad/link in)
-*   👉 **[Manual_EN.pdf / Manual_EN.txt]** (Voeg hier bestandspad/link in)
-*   👉 **[Manual_NL.pdf / Manual_NL.txt]** (Voeg hier bestandspad/link in)
+De gedetailleerde stap-voor-stap handleiding voor installatie en gebruik vind je apart in de repository (`Manual_NL.md`).
 
 ---
 
