@@ -77,22 +77,38 @@ def suggest_artist_spelling(artist):
     except Exception: pass
     return None
 
-def suggest_title_spelling(artist, title):
+def suggest_title_spelling(artist, title, local_duration_sec=0):
     if not title or not artist: return None
     try:
         search_title = utils.get_pure_search_title(title)
         res = mb_get("https://musicbrainz.org/ws/2/recording/",
-                      {'query': f'artist:"{artist}" AND recording:"{search_title}"', 'fmt': 'json', 'limit': 3})
+                      {'query': f'artist:"{artist}" AND recording:"{search_title}"', 'fmt': 'json', 'limit': 10})
         if res.status_code == 200:
             recordings = res.json().get('recordings', [])
-            if recordings:
-                official_title = recordings[0].get('title', '')
-                if official_title and official_title.lower() != title.lower():
-                    return official_title
+            if not recordings: return None
+            
+            if local_duration_sec > 0:
+                best_match = None
+                smallest_diff = 9999
+                for rec in recordings:
+                    rec_len = rec.get('length')
+                    if rec_len:
+                        rec_sec = int(rec_len) / 1000.0
+                        diff = abs(rec_sec - local_duration_sec)
+                        if diff <= 18 and diff < smallest_diff:
+                            smallest_diff = diff
+                            best_match = rec.get('title')
+                
+                if best_match and best_match.lower() != title.lower():
+                    return best_match
+
+            official_title = recordings[0].get('title', '')
+            if official_title and official_title.lower() != title.lower():
+                return official_title
     except Exception: pass
     return None
 
-def fetch_musicbrainz_details(artist, title, target_year=None, target_album=None):
+def fetch_musicbrainz_details(artist, title, target_year=None, target_album=None, local_duration_sec=0):
     years, isrc, orig_album, fallback_album = [], None, None, None
     best_score = 0
     try:
@@ -104,8 +120,20 @@ def fetch_musicbrainz_details(artist, title, target_year=None, target_album=None
                       {'query': query, 'fmt': 'json', 'limit': 10, 'inc': 'isrcs+releases'})
         if res.status_code == 200:
             recordings = res.json().get('recordings', [])
-            if recordings: best_score = int(recordings[0].get('score', 0))
-            relevant = [r for r in recordings if int(r.get('score', 0)) >= max(best_score - 10, 50)]
+            
+            if local_duration_sec > 0 and recordings:
+                for rec in recordings:
+                    rec_len = rec.get('length')
+                    if rec_len:
+                        diff = abs(int(rec_len)/1000.0 - local_duration_sec)
+                        if diff <= 18:
+                            best_score = max(best_score, 95)
+            
+            if recordings and best_score == 0:
+                best_score = int(recordings[0].get('score', 0))
+                
+            relevant = [r for r in recordings if int(r.get('score', 0)) >= max(best_score - 15, 50) or (local_duration_sec > 0 and r.get('length') and abs(int(r.get('length',0))/1000.0 - local_duration_sec) <= 18)]
+            
             for rec in relevant:
                 if not isrc and rec.get('isrcs'): isrc = rec.get('isrcs')[0]
                 if rec.get('first-release-date', '')[:4]: years.append(rec.get('first-release-date')[:4])
@@ -129,14 +157,12 @@ def fetch_discogs_details(artist, title, target_year=None, target_album=None):
         pure_title = utils.get_pure_search_title(title)
         params = {'artist': artist, 'track': pure_title, 'key': utils.DISCOGS_KEY, 'secret': utils.DISCOGS_SECRET, 'per_page': 15}
         
-        # Neue Constraints für den Re-Fetch
         if target_album: params['release_title'] = target_album
         if target_year: params['year'] = target_year
 
         res = discogs_get("https://api.discogs.com/database/search", params, timeout=8)
         results = res.json().get('results', []) if res.status_code == 200 else []
 
-        # Fallback: Falls mit Jahr/Album nichts gefunden wird, breiter suchen
         if not results and (target_album or target_year):
             params_fb = {'artist': artist, 'track': pure_title, 'key': utils.DISCOGS_KEY, 'secret': utils.DISCOGS_SECRET, 'per_page': 15}
             res = discogs_get("https://api.discogs.com/database/search", params_fb, timeout=8)

@@ -21,7 +21,6 @@ def get_schema_version(db_path):
         cur.execute("SELECT value FROM config WHERE name = 'schemaversion'")
         row = cur.fetchone()
         conn.close()
-        
         if row and row[0]:
             return int(row[0])
         return None
@@ -32,7 +31,6 @@ def get_schema_version(db_path):
 def verify_db_compatibility(db_path):
     """Prüft, ob die DB-Version vom Restorer unterstützt wird und stoppt ggf. das Skript."""
     version = get_schema_version(db_path)
-    
     if version is None:
         console.print("[bold red]Fehler: Konnte die Schema-Version der Datenbank nicht ermitteln. Ist das wirklich eine mAirList .mldb Datei?[/bold red]")
         sys.exit(1)
@@ -42,7 +40,21 @@ def verify_db_compatibility(db_path):
         sys.exit(1)
         
     return version
-# ---------------------------------
+
+def detect_db_language(db_path, fallback_lang):
+    """Liest ein paar Attribut-Namen aus und erkennt, welche Sprache in mAirList eingestellt ist."""
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT DISTINCT name FROM item_attributes")
+        names = [row[0].lower() for row in cur.fetchall()]
+        conn.close()
+        if 'year' in names or 'language' in names: return 'en'
+        if 'jaar' in names or 'taal' in names: return 'nl'
+        if 'jahr' in names or 'sprache' in names: return 'de'
+        return fallback_lang
+    except:
+        return fallback_lang
 
 def is_db_locked(db_path, timeout=1.0):
     try:
@@ -68,6 +80,8 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
         items['Title'] = items['title'] if 'title' in items.columns else ''
         items['Artist'] = items['artist'] if 'artist' in items.columns else ''
         items['Filename'] = items['filename'] if 'filename' in items.columns else ''
+        items['Duration'] = items['duration'] if 'duration' in items.columns else 0.0
+        items['TotalDuration'] = items['totalduration'] if 'totalduration' in items.columns else 0.0
     except Exception as e:
         console.print(f"[red]Kritischer Fehler beim Lesen der mAirList Items: {e}[/red]")
         sys.exit(1)
@@ -82,21 +96,18 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
             parts = []
             try: curr = int(fid)
             except: return ""
-            
             visited = set()
             while curr in f_dict and curr != 0 and curr not in visited:
                 visited.add(curr)
                 name = str(f_dict[curr].get('name', '')).strip()
                 if name and name.lower() not in ['nan', 'none']: 
                     parts.insert(0, name)
-                
                 p_val = f_dict[curr].get('parent', 0)
                 try: curr = int(p_val) if pd.notna(p_val) else 0
                 except: curr = 0
             return " / ".join(parts).lower()
             
         vpath_map = {k: build_vpath(k) for k in f_dict.keys()}
-        
         item_folders = {}
         
         try:
@@ -122,14 +133,22 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
                         if f_id in vpath_map:
                             item_folders[i_id].append(vpath_map[f_id])
                     except: pass
-            except:
-                pass
+            except: pass
 
     except Exception:
         item_folders = {}
         
     try:
         attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
+        
+        # --- NEU: Wir mappen alle internationalen Attribute intern auf Deutsch ---
+        def map_read_attr(n):
+            nl = str(n).lower()
+            if nl in ['year', 'jaar']: return 'Jahr'
+            if nl in ['language', 'taal']: return 'Sprache'
+            return n
+            
+        attrs['name'] = attrs['name'].apply(map_read_attr)
     except:
         attrs = pd.DataFrame()
         
@@ -138,35 +157,25 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
     def is_ignored(row):
         try: item_id = int(row.get('ID', 0))
         except: item_id = 0
-        
         fn = str(row.get('Filename', ''))
         if fn.lower() in ['nan', 'none']: fn = ""
-        
         v_paths = item_folders.get(item_id, [])
         fn_norm = fn.replace('/', '\\').lower() if fn else ""
-
         for ign in ignored_folders:
             ign_str = str(ign).strip()
             if not ign_str: continue
-            
             ign_lower = ign_str.lower()
             ign_norm = ign_str.replace('/', '\\').lower()
-            
             for vpath in v_paths:
                 v_parts = [p.strip() for p in vpath.split('/')]
-                if ign_lower in v_parts: 
-                    return True
-                if ign_lower == vpath:
-                    return True
-                
+                if ign_lower in v_parts: return True
+                if ign_lower == vpath: return True
             if fn_norm:
                 if '\\' in ign_norm or '/' in ign_norm:
-                    if ign_norm in fn_norm:
-                        return True
+                    if ign_norm in fn_norm: return True
                 else:
                     parts = fn_norm.split('\\')
-                    if ign_lower in parts:
-                        return True
+                    if ign_lower in parts: return True
         return False
 
     before_count = len(items)
@@ -188,6 +197,17 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
     return df
 
 def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
+    db_lang = detect_db_language(db_path, utils.CURRENT_LANG)
+    
+    def map_write_attr(n):
+        if db_lang == 'en':
+            if n == 'Jahr': return 'Year'
+            if n == 'Sprache': return 'Language'
+        elif db_lang == 'nl':
+            if n == 'Jahr': return 'Jaar'
+            if n == 'Sprache': return 'Taal'
+        return n
+
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
     updated = 0
@@ -217,7 +237,8 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
             for field in utils.MLDB_ATTRIBUTE_FIELDS:
                 value = row.get(field, '')
                 if pd.notna(value) and str(value).strip():
-                    attrs_insert.append((item_id, field, str(value).strip()))
+                    db_field = map_write_attr(field)
+                    attrs_insert.append((item_id, db_field, str(value).strip()))
                     
             if mark_restauriert:
                 restauriert_insert.append((item_id, 'RESTAURIERT', 'JA'))
@@ -237,7 +258,6 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
         conn.close()
     return updated
 
-# --- NEU: MASSENBEARBEITUNG / WARTUNG ---
 def run_maintenance_genres(db_path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()

@@ -66,7 +66,7 @@ def check_for_updates():
 # ---------------------------------------------------------------------------
 # PHASE 1: fetch
 # ---------------------------------------------------------------------------
-def phase_fetch(db_path, fetch_csv, full=False):
+def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     db.verify_db_compatibility(db_path)
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
@@ -99,6 +99,13 @@ def phase_fetch(db_path, fetch_csv, full=False):
         if len(new_rows) > 0:
             console.print(utils.t('fetch_new_tracks', count=len(new_rows), db=db_path))
             df = pd.concat([df, new_rows], ignore_index=True, sort=False)
+            
+        if 'Duration' not in df.columns:
+            db_dur = input_df.set_index('ID')['Duration'].to_dict()
+            df['Duration'] = df['ID'].map(db_dur).fillna(0.0)
+        if 'TotalDuration' not in df.columns:
+            db_tdur = input_df.set_index('ID')['TotalDuration'].to_dict()
+            df['TotalDuration'] = df['ID'].map(db_tdur).fillna(0.0)
             
         db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
         db_artists = input_df.set_index('ID')['Artist'].to_dict()
@@ -162,14 +169,16 @@ def phase_fetch(db_path, fetch_csv, full=False):
 
                 try:
                     raw_artist, raw_title = row.get('Artist', ''), row.get('Title', '')
+                    local_dur = utils.get_best_duration(row.get('Duration'), row.get('TotalDuration'))
+                    
                     c_art, c_tit = utils.clean_artist_base(raw_artist), utils.clean_title_base(raw_title)
 
                     art_sugg = api.suggest_artist_spelling(c_art) or c_art
-                    tit_sugg = api.suggest_title_spelling(art_sugg, c_tit) or c_tit
+                    tit_sugg = api.suggest_title_spelling(art_sugg, c_tit, local_dur) or c_tit
 
                     with ThreadPoolExecutor(max_workers=2) as executor:
-                        future_mb = executor.submit(api.fetch_musicbrainz_details, art_sugg, tit_sugg)
-                        future_discogs = executor.submit(api.fetch_discogs_details, art_sugg, tit_sugg)
+                        future_mb = executor.submit(api.fetch_musicbrainz_details, art_sugg, tit_sugg, None, None, local_dur)
+                        future_discogs = executor.submit(api.fetch_discogs_details, art_sugg, tit_sugg, None, None)
                         
                         mb_year, mb_conf, isrc, mb_album = future_mb.result()
                         discogs_res = future_discogs.result()
@@ -184,7 +193,7 @@ def phase_fetch(db_path, fetch_csv, full=False):
                     combined_conf = rank_to_conf[best_rank] if oldest_year else 'niedrig'
 
                     df.at[idx, 'Artist_Vorschlag'] = api.suggest_artist_spelling(c_art) or ''
-                    df.at[idx, 'Title_Vorschlag'] = api.suggest_title_spelling(art_sugg, c_tit) or ''
+                    df.at[idx, 'Title_Vorschlag'] = api.suggest_title_spelling(art_sugg, c_tit, local_dur) or ''
                     df.at[idx, 'Jahr_Vorschlag'] = oldest_year
                     df.at[idx, 'Jahr_Konfidenz'] = combined_conf
                     df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
@@ -209,6 +218,16 @@ def phase_fetch(db_path, fetch_csv, full=False):
                 progress.update(task, advance=1)
                 if processed_counter % 20 == 0: utils.save_safe_csv(df, fetch_csv)
 
+                # --- NEU: BLOCK-PAUSE (CHUNKING) ---
+                if not no_breaks and processed_counter % 50 == 0 and processed_counter < offen:
+                    utils.save_safe_csv(df, fetch_csv)
+                    progress.stop()
+                    console.print(utils.t('fetch_chunk_pause', count=processed_counter))
+                    ans = console.input(utils.t('fetch_chunk_prompt')).strip().lower()
+                    if ans == 'r':
+                        break
+                    progress.start()
+
         except KeyboardInterrupt:
             console.print(utils.t('fetch_interrupt'))
             utils.save_safe_csv(df, fetch_csv)
@@ -223,7 +242,6 @@ def phase_fetch(db_path, fetch_csv, full=False):
 def phase_review(fetch_csv, final_csv, auto_hoch=False):
     try: 
         df = pd.read_csv(fetch_csv, dtype=str)
-        # Sicherheitskopie der Originalwerte anlegen für die O-Taste (Original)
         orig_df = df.copy() 
     except FileNotFoundError:
         console.print(utils.t('err_file_not_found', file=fetch_csv) + utils.t('err_need_fetch'))
@@ -246,6 +264,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             idx = todo_indices[i]
             row = df.loc[idx]
             artist, title = row.get('Artist', ''), row.get('Title', '')
+            local_dur = utils.get_best_duration(row.get('Duration'), row.get('TotalDuration'))
             
             orig_art = utils.clean_nan(orig_df.at[idx, 'Artist'])
             orig_tit = utils.clean_nan(orig_df.at[idx, 'Title'])
@@ -320,7 +339,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     c_art, c_tit = utils.clean_artist_base(updated_art), utils.clean_title_base(updated_tit)
                     
                     with ThreadPoolExecutor(max_workers=2) as executor:
-                        future_mb = executor.submit(api.fetch_musicbrainz_details, c_art, c_tit, target_y, target_a)
+                        future_mb = executor.submit(api.fetch_musicbrainz_details, c_art, c_tit, target_y, target_a, local_dur)
                         future_discogs = executor.submit(api.fetch_discogs_details, c_art, c_tit, target_y, target_a)
                         
                         mb_year, mb_conf, isrc, mb_album = future_mb.result()
@@ -529,6 +548,7 @@ def main():
     parser.add_argument('--full', action='store_true')
     parser.add_argument('--db', help="Pfad zur mAirList .mldb-Datei")
     parser.add_argument('--lang', choices=['de', 'en', 'nl'], default='de')
+    parser.add_argument('--no-breaks', action='store_true', help="Schaltet die 50-Track-Pausen ab")
     args = parser.parse_args()
 
     utils.CURRENT_LANG = args.lang
@@ -540,6 +560,8 @@ def main():
     if not args.db:
         console.print("[red]Fehler: --db Argument fehlt![/red]")
         sys.exit(1)
+    
+    db.verify_db_compatibility(args.db)
     
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -558,7 +580,7 @@ def main():
     fetch_csv = f"{db_base_name}_vorschlaege.csv"
     final_csv = f"{db_base_name}_restauriert.csv"
 
-    if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full)
+    if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full, no_breaks=args.no_breaks)
     elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
     elif args.phase == 'maintenance': phase_maintenance(args.db)
     else: phase_apply(args.db, final_csv)

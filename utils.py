@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.50.25 Beta"
+APP_VERSION = "0.50.27 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -63,6 +63,8 @@ T = {
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jahr: [bold cyan]{jahr}[/bold cyan], Konfidenz: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Abruf unterbrochen. Fortschritt sicher gespeichert.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'fetch_chunk_pause': "\n[bold yellow]☕ {count} Tracks geladen! Wir empfehlen jetzt ein kurzes Review, um den Überblick zu behalten.[/bold yellow]",
+        'fetch_chunk_prompt': "Tippe [cyan]'r'[/cyan] für Review oder [green]Enter[/green] für die nächsten 50 Tracks: ",
         'err_file_not_found': "[bold red][Fehler][/bold red] '{file}' nicht gefunden.",
         'err_need_fetch': " Erst 'fetch' ausführen.",
         'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOffene Prüfungen: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tipp: Tippe '<' oder 'b' und Enter, um einen Track zurückzuspringen![/dim]",
@@ -133,6 +135,8 @@ T = {
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Year: [bold cyan]{jahr}[/bold cyan], Confidence: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Fetch interrupted. Progress safely saved.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks fetched! We recommend a quick review now to keep things manageable.[/bold yellow]",
+        'fetch_chunk_prompt': "Type [cyan]'r'[/cyan] for Review or [green]Enter[/green] for the next 50 tracks: ",
         'err_file_not_found': "[bold red][Error][/bold red] '{file}' not found.",
         'err_need_fetch': " Run 'fetch' first.",
         'rev_mode': "[bold cyan]Review Mode[/bold cyan]\nPending reviews: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tip: Type '<' or 'b' and Enter to go back one track![/dim]",
@@ -203,6 +207,8 @@ T = {
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jaar: [bold cyan]{jahr}[/bold cyan], Betrouwbaarheid: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Ophalen onderbroken. Voortgang veilig opgeslagen.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks opgehaald! We raden een snelle review aan om het overzicht te bewaren.[/bold yellow]",
+        'fetch_chunk_prompt': "Typ [cyan]'r'[/cyan] voor Review of [green]Enter[/green] voor de volgende 50 tracks: ",
         'err_file_not_found': "[bold red][Fout][/bold red] '{file}' niet gevonden.",
         'err_need_fetch': " Voer eerst 'fetch' uit.",
         'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOpenstaande controles: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tip: Typ '<' of 'b' en Enter om een track terug te gaan![/dim]",
@@ -301,6 +307,17 @@ def save_safe_csv(df, filepath):
         df['LYRICS'] = df['LYRICS'].str.replace(r'[\r\n]+', ' ', regex=True)
         df['LYRICS'] = df['LYRICS'].str.replace(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', regex=True)
     df.to_csv(filepath, index=False, encoding='utf-8-sig', quoting=csv.QUOTE_ALL)
+
+def get_best_duration(dur, tot_dur):
+    try:
+        d1 = float(dur) if pd.notna(dur) and str(dur).strip() else 0.0
+        d2 = float(tot_dur) if pd.notna(tot_dur) and str(tot_dur).strip() else 0.0
+        best = max(d1, d2)
+        if best > 100000:
+            best = best / 10000000.0
+        return best
+    except:
+        return 0.0
 
 # ---------------------------------------------------------------------------
 # Konfiguration & Setup
