@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.50.27 Beta] - 2026-08-31
+### Added
+- **Chunking & Overnight Mode:** The fetch phase now automatically pauses every 50 tracks to encourage manageable review blocks. Added a `--no-breaks` option (Overnight Mode) to bypass these pauses for unattended mass-fetching.
+- **Trilingual Attribute Mapping:** The tool now dynamically scans the mAirList `item_attributes` table upon startup to detect the database language (English, German, or Dutch). It automatically maps internal fields (like "Year" or "Language") to the correct local database terminology during the save phase.
+
+## [0.50.26 Beta] - 2026-08-31
+### Added
+- **Duration-Based Version Detection:** The MusicBrainz API fetch now cross-references the local track duration (with a +/- 18 seconds tolerance for cue points) to accurately identify and tag specific release variants, such as Extended Versions, Radio Edits, or Maxi Mixes.
+
+## [0.50.25 Beta] - 2026-08-31
+### Added
+- **Original Value Preservation ('O' Key):** The interactive review now displays the original database value in gray text next to the API suggestion. Users can quickly press `o` to reject the suggestion and safely retain their original local data.
+
+## [0.50.24 Beta] - 2026-08-31
+### Added
+- **Interactive Maintenance Menu:** Replaced the basic standardize phase with a robust, dedicated maintenance menu featuring severe warnings for direct, non-undoable database operations.
+- **Smart Casing & Apostrophe Fix:** Added a mass-edit function to automatically correct title casing (while respecting the `ARTIST_FIXES` dictionary) and standardize various apostrophe characters (`´`, `` ` ``, `‘`) to a clean standard `'`.
+- **Database Cleanup:** Added a dedicated purge function to strip bloated, unneeded attributes like 'Platinum Notes' and 'Lyrics', effectively shrinking the database size.
+
+## [0.50.23 Beta] - 2026-08-31
+### Changed
+- **Version Scheme Update:** Transitioned to a new, standardized two-digit versioning format (`0.xx.xx`).
+### Added
+- **Schema Compatibility Check:** The script now queries the `schemaversion` directly from the mAirList `config` table on startup. Execution is blocked if the schema is unsupported, protecting future mAirList updates from accidental structural corruption.
+
 ## [0.5.2 Beta] - 2026-08-30
 ### Added
 - **Dutch Language Support:** The tool is now fully trilingual! Added complete Dutch (Nederlands) localization for the console interface, review prompts, and the `Restore.bat` startup menu to support the large community of D&R / mAirList users in the Netherlands.
