@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.50.24 Beta"
+APP_VERSION = "0.50.25 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -68,16 +68,16 @@ T = {
         'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOffene Prüfungen: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tipp: Tippe '<' oder 'b' und Enter, um einen Track zurückzuspringen![/dim]",
         'rev_auto_active': "\n[green]--auto-hoch aktiv[/green]",
         'rev_row': "[bold white on blue] Zeile {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
-        'rev_artist': "  [cyan]Artist[/cyan] -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
-        'rev_title': "  [cyan]Title[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
+        'rev_artist': "  [cyan]Artist[/cyan] -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
+        'rev_title': "  [cyan]Title[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_refetch': "  [magenta]⚡ Freitext erkannt! Live Re-Fetch für '{art} - {tit}'...[/magenta]",
-        'rev_year_auto': "  [cyan]Jahr[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Konfidenz hoch)[/dim]",
-        'rev_year': "  [cyan]Jahr[/cyan]   -> Vorschlag: '[bold green]{sugg}[/bold green]' ({badge}) [dim]\\[j/Enter/Jahr][/dim]: ",
-        'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Konfidenz hoch)[/dim]",
-        'rev_genre': "  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Genre][/dim]: ",
-        'rev_album': "  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
-        'rev_label': "  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Text][/dim]: ",
-        'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim]\\[{hint}][/dim]: ",
+        'rev_year_auto': "  [cyan]Jahr[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
+        'rev_year': "  [cyan]Jahr[/cyan]   -> Vorschlag: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Jahr][/dim]: ",
+        'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
+        'rev_genre': "  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Genre][/dim]: ",
+        'rev_album': "  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
+        'rev_label': "  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
+        'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
         'no_sugg': "- (Kein Vorschlag) -",
         'rev_interim': "[dim]  (Zwischenstand gespeichert)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review unterbrochen. Bisherige Entscheidungen sind gespeichert.[/bold yellow]",
@@ -138,16 +138,16 @@ T = {
         'rev_mode': "[bold cyan]Review Mode[/bold cyan]\nPending reviews: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tip: Type '<' or 'b' and Enter to go back one track![/dim]",
         'rev_auto_active': "\n[green]--auto-hoch active[/green]",
         'rev_row': "[bold white on blue] Row {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
-        'rev_artist': "  [cyan]Artist[/cyan] -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
-        'rev_title': "  [cyan]Title[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
+        'rev_artist': "  [cyan]Artist[/cyan] -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
+        'rev_title': "  [cyan]Title[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_refetch': "  [magenta]⚡ Custom text detected! Live re-fetch for '{art} - {tit}'...[/magenta]",
-        'rev_year_auto': "  [cyan]Year[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, high confidence)[/dim]",
-        'rev_year': "  [cyan]Year[/cyan]   -> Suggestion: '[bold green]{sugg}[/bold green]' ({badge}) [dim]\\[y/Enter/Year][/dim]: ",
-        'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, high confidence)[/dim]",
-        'rev_genre': "  [cyan]Genre[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Genre][/dim]: ",
-        'rev_album': "  [cyan]Album[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
-        'rev_label': "  [cyan]Label[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[y/Enter/Text][/dim]: ",
-        'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim]\\[{hint}][/dim]: ",
+        'rev_year_auto': "  [cyan]Year[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
+        'rev_year': "  [cyan]Year[/cyan]   -> Suggestion: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Year][/dim]: ",
+        'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
+        'rev_genre': "  [cyan]Genre[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Genre][/dim]: ",
+        'rev_album': "  [cyan]Album[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
+        'rev_label': "  [cyan]Label[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
+        'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
         'no_sugg': "- (No suggestion) -",
         'rev_interim': "[dim]  (Intermediate progress saved)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review interrupted. Previous decisions are saved.[/bold yellow]",
@@ -208,16 +208,16 @@ T = {
         'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOpenstaande controles: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tip: Typ '<' of 'b' en Enter om een track terug te gaan![/dim]",
         'rev_auto_active': "\n[green]--auto-hoch actief[/green]",
         'rev_row': "[bold white on blue] Rij {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
-        'rev_artist': "  [cyan]Artiest[/cyan] -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
-        'rev_title': "  [cyan]Titel[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
+        'rev_artist': "  [cyan]Artiest[/cyan] -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
+        'rev_title': "  [cyan]Titel[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
         'rev_refetch': "  [magenta]⚡ Eigen tekst gedetecteerd! Live Re-Fetch voor '{art} - {tit}'...[/magenta]",
-        'rev_year_auto': "  [cyan]Jaar[/cyan]    -> [bold green]{sugg}[/bold green] [dim](auto, betrouwbaarheid hoog)[/dim]",
-        'rev_year': "  [cyan]Jaar[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' ({badge}) [dim]\\[j/Enter/Jaar][/dim]: ",
-        'rev_genre_auto': "  [cyan]Genre[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, betrouwbaarheid hoog)[/dim]",
-        'rev_genre': "  [cyan]Genre[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Genre][/dim]: ",
-        'rev_album': "  [cyan]Album[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
-        'rev_label': "  [cyan]Label[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[j/Enter/Tekst][/dim]: ",
-        'rev_lang':  "  [cyan]Taal[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' [dim]\\[{hint}][/dim]: ",
+        'rev_year_auto': "  [cyan]Jaar[/cyan]    -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
+        'rev_year': "  [cyan]Jaar[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Jaar][/dim]: ",
+        'rev_genre_auto': "  [cyan]Genre[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
+        'rev_genre': "  [cyan]Genre[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Genre][/dim]: ",
+        'rev_album': "  [cyan]Album[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
+        'rev_label': "  [cyan]Label[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
+        'rev_lang':  "  [cyan]Taal[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
         'no_sugg': "- (Geen suggestie) -",
         'rev_interim': "[dim]  (Tussenstand opgeslagen)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review onderbroken. Eerdere beslissingen zijn opgeslagen.[/bold yellow]",
@@ -460,7 +460,6 @@ def capitalize_smart(text):
         elif w == '': 
             cap_words.append(w)
         elif w == w.lower() and not any(ch.isdigit() for ch in w):
-            # Prüfen, ob das erste Zeichen ein Buchstabe ist (Verhindert Fehler bei "(are")
             if len(w) > 1 and not w[0].isalpha():
                 cap_words.append(w[0] + w[1].upper() + w[2:])
             else:

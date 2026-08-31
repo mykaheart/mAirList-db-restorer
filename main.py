@@ -221,7 +221,10 @@ def phase_fetch(db_path, fetch_csv, full=False):
 # PHASE 2: review
 # ---------------------------------------------------------------------------
 def phase_review(fetch_csv, final_csv, auto_hoch=False):
-    try: df = pd.read_csv(fetch_csv, dtype=str)
+    try: 
+        df = pd.read_csv(fetch_csv, dtype=str)
+        # Sicherheitskopie der Originalwerte anlegen für die O-Taste (Original)
+        orig_df = df.copy() 
     except FileNotFoundError:
         console.print(utils.t('err_file_not_found', file=fetch_csv) + utils.t('err_need_fetch'))
         sys.exit(1)
@@ -243,6 +246,14 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             idx = todo_indices[i]
             row = df.loc[idx]
             artist, title = row.get('Artist', ''), row.get('Title', '')
+            
+            orig_art = utils.clean_nan(orig_df.at[idx, 'Artist'])
+            orig_tit = utils.clean_nan(orig_df.at[idx, 'Title'])
+            orig_jahr = utils.clean_nan(orig_df.at[idx, 'Jahr'])
+            orig_genre = utils.clean_nan(orig_df.at[idx, 'Genre'])
+            orig_album = utils.clean_nan(orig_df.at[idx, 'Album'])
+            orig_label = utils.clean_nan(orig_df.at[idx, 'Label'])
+            orig_lang = utils.clean_nan(orig_df.at[idx, 'Sprache'])
 
             console.print(f"\n[bold blue]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold blue]")
             console.print(utils.t('rev_row', row=idx+1, id=row.get('ID'), art=artist, tit=title))
@@ -252,8 +263,9 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 # 1. Artist
                 art_sugg = utils.clean_nan(row.get('Artist_Vorschlag'))
                 if art_sugg:
-                    inp = ask_input(utils.t('rev_artist', sugg=art_sugg))
+                    inp = ask_input(utils.t('rev_artist', sugg=art_sugg, orig=orig_art))
                     if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Artist'] = art_sugg
+                    elif inp.lower() == 'o': df.at[idx, 'Artist'] = orig_art
                     elif inp and inp.lower() not in ['n', 'nein']: 
                         df.at[idx, 'Artist'] = inp
                         custom_refetch_needed = True
@@ -261,8 +273,9 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 # 2. Title
                 tit_sugg = utils.clean_nan(row.get('Title_Vorschlag'))
                 if tit_sugg:
-                    inp = ask_input(utils.t('rev_title', sugg=tit_sugg))
+                    inp = ask_input(utils.t('rev_title', sugg=tit_sugg, orig=orig_tit))
                     if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Title'] = tit_sugg
+                    elif inp.lower() == 'o': df.at[idx, 'Title'] = orig_tit
                     elif inp and inp.lower() not in ['n', 'nein']:
                         df.at[idx, 'Title'] = inp
                         custom_refetch_needed = True
@@ -275,10 +288,11 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 if jahr_sugg:
                     if auto_hoch and konf == 'hoch':
                         df.at[idx, 'Jahr'] = jahr_sugg
-                        console.print(utils.t('rev_year_auto', sugg=jahr_sugg))
+                        console.print(utils.t('rev_year_auto', sugg=jahr_sugg, orig=orig_jahr))
                     else:
-                        inp = ask_input(utils.t('rev_year', sugg=jahr_sugg, badge=conf_badge))
+                        inp = ask_input(utils.t('rev_year', sugg=jahr_sugg, badge=conf_badge, orig=orig_jahr))
                         if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Jahr'] = jahr_sugg
+                        elif inp.lower() == 'o': df.at[idx, 'Jahr'] = orig_jahr
                         elif inp and inp.lower() not in ['n', 'nein']: 
                             df.at[idx, 'Jahr'] = inp
                             custom_refetch_needed = True
@@ -286,9 +300,11 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 # 4. Album
                 album_sugg = utils.clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
                 disp_album = album_sugg if album_sugg else utils.t('no_sugg')
-                inp = ask_input(utils.t('rev_album', sugg=disp_album))
+                inp = ask_input(utils.t('rev_album', sugg=disp_album, orig=orig_album))
                 if inp.lower() in ['', 'j', 'ja', 'y', 'yes']:
                     if album_sugg: df.at[idx, 'Album'] = album_sugg
+                elif inp.lower() == 'o': 
+                    df.at[idx, 'Album'] = orig_album
                 elif inp and inp.lower() not in ['n', 'nein']: 
                     df.at[idx, 'Album'] = inp
                     custom_refetch_needed = True
@@ -322,18 +338,21 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 if genre_sugg:
                     if auto_hoch and konf == 'hoch' and not custom_refetch_needed:
                         df.at[idx, 'Genre'] = genre_sugg
-                        console.print(utils.t('rev_genre_auto', sugg=genre_sugg))
+                        console.print(utils.t('rev_genre_auto', sugg=genre_sugg, orig=orig_genre))
                     else:
-                        inp = ask_input(utils.t('rev_genre', sugg=genre_sugg))
+                        inp = ask_input(utils.t('rev_genre', sugg=genre_sugg, orig=orig_genre))
                         if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
+                        elif inp.lower() == 'o': df.at[idx, 'Genre'] = orig_genre
                         elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
 
                 # 6. Label
                 label_sugg = utils.clean_nan(df.at[idx, 'Label_Vorschlag'])
                 disp_label = label_sugg if label_sugg else utils.t('no_sugg')
-                inp = ask_input(utils.t('rev_label', sugg=disp_label))
+                inp = ask_input(utils.t('rev_label', sugg=disp_label, orig=orig_label))
                 if inp.lower() in ['', 'j', 'ja', 'y', 'yes']:
                     if label_sugg: df.at[idx, 'Label'] = label_sugg
+                elif inp.lower() == 'o': 
+                    df.at[idx, 'Label'] = orig_label
                 elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
 
                 # 7. Sprache & Dynamisches Menu
@@ -353,10 +372,12 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                 hint_parts.append("Text")
                 hint_str = "/".join(hint_parts)
                 
-                inp = ask_input(utils.t('rev_lang', sugg=disp_lang, hint=hint_str))
+                inp = ask_input(utils.t('rev_lang', sugg=disp_lang, orig=orig_lang, hint=hint_str))
                 
                 if inp.lower() in ['', 'j', 'ja', 'y', 'yes']:
                     if lang_sugg: df.at[idx, 'Sprache'] = lang_sugg
+                elif inp.lower() == 'o': 
+                    df.at[idx, 'Sprache'] = orig_lang
                 elif inp in lang_map:
                     df.at[idx, 'Sprache'] = lang_map[inp]
                 elif inp and inp.lower() not in ['n', 'nein']: 
