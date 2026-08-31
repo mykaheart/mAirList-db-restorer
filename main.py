@@ -501,6 +501,9 @@ def main():
     if not args.db:
         console.print("[red]Fehler: --db Argument fehlt![/red]")
         sys.exit(1)
+        
+    # --- NEU: Zentraler Check der Datenbank-Kompatibilität ---
+    db.verify_db_compatibility(args.db)
     
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')

@@ -10,6 +10,40 @@ from rich import box
 
 console = Console(highlight=False)
 
+# --- NEU: Schema-Konfiguration ---
+SUPPORTED_SCHEMAS = [25]  
+
+def get_schema_version(db_path):
+    """Liest die Schema-Version aus der mAirList-Datenbank aus."""
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("SELECT value FROM config WHERE name = 'schemaversion'")
+        row = cur.fetchone()
+        conn.close()
+        
+        if row and row[0]:
+            return int(row[0])
+        return None
+    except Exception as e:
+        utils.log_change("ERROR", f"Konnte Schema-Version nicht lesen: {e}")
+        return None
+
+def verify_db_compatibility(db_path):
+    """Prüft, ob die DB-Version vom Restorer unterstützt wird und stoppt ggf. das Skript."""
+    version = get_schema_version(db_path)
+    
+    if version is None:
+        console.print("[bold red]Fehler: Konnte die Schema-Version der Datenbank nicht ermitteln. Ist das wirklich eine mAirList .mldb Datei?[/bold red]")
+        sys.exit(1)
+        
+    if version not in SUPPORTED_SCHEMAS:
+        console.print(Panel(f"[bold red]Inkompatible Datenbank![/bold red]\n\nDeine mAirList-Datenbank nutzt Schema-Version [bold yellow]{version}[/bold yellow].\nDieser Restorer (v{utils.APP_VERSION}) unterstützt aktuell nur die Versionen: [bold green]{SUPPORTED_SCHEMAS}[/bold green].\n\n[dim]Bitte wende dich an die Entwickler, um ein Update für dieses Schema zu erhalten.[/dim]", box=box.HEAVY, style="red"))
+        sys.exit(1)
+        
+    return version
+# ---------------------------------
+
 def is_db_locked(db_path, timeout=1.0):
     try:
         conn = sqlite3.connect(db_path, timeout=timeout)

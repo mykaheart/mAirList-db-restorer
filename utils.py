@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.5.2 Beta"
+APP_VERSION = "0.50.23 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -156,8 +156,8 @@ T = {
         'std_start': "\n[bold cyan]Starting genre standardization across the entire database...[/bold cyan]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
         'std_no_changes': "[yellow]No changes needed. All DB genres are already standardized![/yellow]"
-    }
-}'nl': {
+    },
+    'nl': {
         'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal gemaskeerd in 'config.json' opgeslagen.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
@@ -218,7 +218,7 @@ T = {
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
         'std_no_changes': "[yellow]Geen wijzigingen nodig. Alle genres zijn al gestandaardiseerd![/yellow]"
     }
-)
+}
 
 # ---------------------------------------------------------------------------
 # Basis-Hilfsfunktionen
