@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.50.23 Beta"
+APP_VERSION = "0.50.24 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -92,9 +92,18 @@ T = {
         'apply_err_lock': "\n[bold red][Fehler] Datenbank gelockt / Zugriff verweigert:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Fertig! {count} Zeile(n) in '{db}' erfolgreich aktualisiert.[/bold green]",
         'conf_hoch': "hoch", 'conf_mittel': "mittel", 'conf_niedrig': "niedrig",
-        'std_start': "\n[bold cyan]Starte Genre-Standardisierung in der gesamten Datenbank...[/bold cyan]",
+        'maint_title': "\n[bold cyan]=== WARTUNGS-MENÜ ===[/bold cyan]",
+        'maint_warn': "[bold red]ACHTUNG: ALLE AKTIONEN HIER SCHREIBEN DIREKT IN DIE DATENBANK OHNE UNDO![/bold red]\nBitte arbeite IMMER auf einer Datenbank-Kopie.",
+        'maint_opt1': "  [[green]1[/green]] Genres standardisieren",
+        'maint_opt2': "  [[green]2[/green]] Groß-/Kleinschreibung & Apostrophe korrigieren (Artist/Title)",
+        'maint_opt3': "  [[green]3[/green]] 'Platinum Notes' & 'Lyrics' löschen (DB verkleinern)",
+        'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben nacheinander ausführen",
+        'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
+        'maint_prompt': "Auswahl [0-4]: ",
+        'maint_done_case': "[bold green]✓ Fertig! {count} Tracks (Artist/Title) korrigiert.[/bold green]",
+        'maint_done_clear': "[bold green]✓ Fertig! {count} alte Attribute (Lyrics/Platinum Notes) gelöscht.[/bold green]",
         'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
-        'std_no_changes': "[yellow]Keine Aenderungen noetig. Alle Genres der DB sind bereits standardisiert![/yellow]"
+        'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
     },
     'en': {
         'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails will be safely masked locally in 'config.json'.",
@@ -153,9 +162,18 @@ T = {
         'apply_err_lock': "\n[bold red][Error] Database locked / Access denied:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Done! {count} row(s) in '{db}' successfully updated.[/bold green]",
         'conf_hoch': "high", 'conf_mittel': "medium", 'conf_niedrig': "low",
-        'std_start': "\n[bold cyan]Starting genre standardization across the entire database...[/bold cyan]",
+        'maint_title': "\n[bold cyan]=== MAINTENANCE MENU ===[/bold cyan]",
+        'maint_warn': "[bold red]WARNING: ALL ACTIONS HERE WRITE DIRECTLY TO THE DATABASE WITH NO UNDO![/bold red]\nPlease ensure you are working on a COPY.",
+        'maint_opt1': "  [[green]1[/green]] Standardize Genres",
+        'maint_opt2': "  [[green]2[/green]] Fix Case & Apostrophes (Artist/Title)",
+        'maint_opt3': "  [[green]3[/green]] Delete 'Platinum Notes' & 'Lyrics' (shrink DB)",
+        'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks sequentially",
+        'maint_opt0': "  [[green]0[/green]] Back / Cancel",
+        'maint_prompt': "Choice [0-4]: ",
+        'maint_done_case': "[bold green]✓ Done! Corrected {count} tracks (Artist/Title).[/bold green]",
+        'maint_done_clear': "[bold green]✓ Done! Deleted {count} old attributes (Lyrics/Platinum Notes).[/bold green]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
-        'std_no_changes': "[yellow]No changes needed. All DB genres are already standardized![/yellow]"
+        'maint_no_changes': "[yellow]No changes needed.[/yellow]"
     },
     'nl': {
         'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal gemaskeerd in 'config.json' opgeslagen.",
@@ -214,9 +232,18 @@ T = {
         'apply_err_lock': "\n[bold red][Fout] Database vergrendeld / Toegang geweigerd:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Klaar! {count} rij(en) in '{db}' succesvol bijgewerkt.[/bold green]",
         'conf_hoch': "hoog", 'conf_mittel': "gemiddeld", 'conf_niedrig': "laag",
-        'std_start': "\n[bold cyan]Start genre-standaardisatie in de hele database...[/bold cyan]",
+        'maint_title': "\n[bold cyan]=== ONDERHOUDSMENU ===[/bold cyan]",
+        'maint_warn': "[bold red]WAARSCHUWING: ALLE ACTIES HIER SCHRIJVEN DIRECT NAAR DE DATABASE ZONDER UNDO![/bold red]\nZorg ervoor dat je op een KOPIE werkt.",
+        'maint_opt1': "  [[green]1[/green]] Genres standaardiseren",
+        'maint_opt2': "  [[green]2[/green]] Hoofdletters/kleine letters & apostrofs corrigeren (Artist/Title)",
+        'maint_opt3': "  [[green]3[/green]] 'Platinum Notes' & 'Lyrics' verwijderen (DB verkleinen)",
+        'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken achter elkaar uitvoeren",
+        'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
+        'maint_prompt': "Keuze [0-4]: ",
+        'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
+        'maint_done_clear': "[bold green]✓ Klaar! {count} oude attributen (Lyrics/Platinum Notes) verwijderd.[/bold green]",
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
-        'std_no_changes': "[yellow]Geen wijzigingen nodig. Alle genres zijn al gestandaardiseerd![/yellow]"
+        'maint_no_changes': "[yellow]Geen wijzigingen nodig.[/yellow]"
     }
 }
 
@@ -426,11 +453,20 @@ def capitalize_smart(text):
     cap_words = []
     for w in words:
         wl = w.lower()
-        if wl in ['feat.', 'ft.', 'featuring']: cap_words.append('feat.')
-        elif wl in ['and', '&']: cap_words.append('&')
-        elif w == '': cap_words.append(w)
-        elif w == w.lower() and not any(ch.isdigit() for ch in w): cap_words.append(w[0].upper() + w[1:])
-        else: cap_words.append(w)
+        if wl in ['feat.', 'ft.', 'featuring']: 
+            cap_words.append('feat.')
+        elif wl in ['and', '&']: 
+            cap_words.append('&')
+        elif w == '': 
+            cap_words.append(w)
+        elif w == w.lower() and not any(ch.isdigit() for ch in w):
+            # Prüfen, ob das erste Zeichen ein Buchstabe ist (Verhindert Fehler bei "(are")
+            if len(w) > 1 and not w[0].isalpha():
+                cap_words.append(w[0] + w[1].upper() + w[2:])
+            else:
+                cap_words.append(w[0].upper() + w[1:])
+        else: 
+            cap_words.append(w)
     return " ".join(cap_words)
 
 def clean_artist_base(artist_raw):

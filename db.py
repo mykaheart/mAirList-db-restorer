@@ -2,6 +2,7 @@ import sqlite3
 import pandas as pd
 import os
 import sys
+import re
 import utils
 
 from rich.console import Console
@@ -10,7 +11,6 @@ from rich import box
 
 console = Console(highlight=False)
 
-# --- NEU: Schema-Konfiguration ---
 SUPPORTED_SCHEMAS = [25]  
 
 def get_schema_version(db_path):
@@ -236,3 +236,64 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
     finally:
         conn.close()
     return updated
+
+# --- NEU: MASSENBEARBEITUNG / WARTUNG ---
+def run_maintenance_genres(db_path):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT item, value FROM item_attributes WHERE name = 'Genre'")
+    rows = cur.fetchall()
+    updates = []
+    for item_id, current_genre in rows:
+        if not current_genre: continue
+        mapped = utils.map_to_allowed_genre([current_genre], [])
+        if mapped and mapped != current_genre:
+            updates.append((mapped, item_id, 'Genre'))
+    if updates:
+        cur.executemany("UPDATE item_attributes SET value = ? WHERE item = ? AND name = ?", updates)
+        conn.commit()
+        utils.log_change("MAINTENANCE", f"{len(updates)} Genres bereinigt.")
+    conn.close()
+    return len(updates)
+
+def run_maintenance_case(db_path):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("SELECT idx, artist, title FROM items")
+    rows = cur.fetchall()
+    updates = []
+    for idx, artist, title in rows:
+        changed = False
+        new_art = artist
+        new_tit = title
+        
+        if artist:
+            new_art = re.sub(r"[´`‘’]", "'", str(artist))
+            new_art = utils.capitalize_smart(new_art)
+            if new_art != artist: changed = True
+            
+        if title:
+            new_tit = re.sub(r"[´`‘’]", "'", str(title))
+            new_tit = utils.capitalize_smart(new_tit)
+            if new_tit != title: changed = True
+            
+        if changed:
+            updates.append((new_art, new_tit, idx))
+            
+    if updates:
+        cur.executemany("UPDATE items SET artist = ?, title = ? WHERE idx = ?", updates)
+        conn.commit()
+        utils.log_change("MAINTENANCE", f"{len(updates)} Tracks (Title Case / Apostroph) korrigiert.")
+    conn.close()
+    return len(updates)
+
+def run_maintenance_clear_fields(db_path):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM item_attributes WHERE name IN ('Platinum Notes', 'PLATINUMNOTES', 'Lyrics', 'LYRICS')")
+    deleted = cur.rowcount
+    conn.commit()
+    if deleted > 0:
+        utils.log_change("MAINTENANCE", f"{deleted} alte Attribute (Lyrics/Platinum Notes) entfernt.")
+    conn.close()
+    return deleted

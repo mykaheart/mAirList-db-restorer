@@ -46,8 +46,8 @@ set "T_OPT2=Voll-Abruf  - ALLE Tracks komplett neu laden (Reset)"
 set "T_H2=--- SCHRITT 2: DATEN KONTROLLIEREN ---"
 set "T_OPT3=Kontrolle   - Alle Vorschlaege manuell pruefen"
 set "T_OPT4=Kontrolle   - Sichere Treffer automatisch uebernehmen (unsichere werden abgefragt)"
-set "T_H3=--- MASSENBEARBEITUNG ---"
-set "T_OPT5=Genres      - Alle DB-Genres gem. Skript standardisieren"
+set "T_H3=--- WARTUNG ---"
+set "T_OPT5=Wartung     - Masse-Bearbeitung (Genres, Text, Attribute)"
 set "T_H4=--- SCHRITT 3: IN MAIRLIST SPEICHERN ---"
 set "T_OPT6=Speichern   - Gepruefte Werte in .mldb-Kopie schreiben"
 set "T_OPT7=Beenden"
@@ -61,7 +61,6 @@ set "T_WARN1=ACHTUNG: Dies ruft ALLE Tracks erneut ab, auch bereits verarbeitete
 set "T_SURE=Wirklich fortfahren? [j/N]:"
 set "T_WARN2=ACHTUNG: Dieser Vorgang schreibt alle geprueften Werte in die oben"
 set "T_WARN3=ausgewaehlte .mldb-Datei. Nutze hierfuer IMMER EINE KOPIE!"
-set "T_WARN4=ACHTUNG: Dies ueberschreibt alle abweichenden Genres direkt in der Datenbank."
 goto update_check
 
 :lang_en
@@ -76,8 +75,8 @@ set "T_OPT2=Full Fetch  - Re-fetch ALL tracks (Reset)"
 set "T_H2=--- STEP 2: REVIEW DATA ---"
 set "T_OPT3=Review      - Manually inspect all proposals"
 set "T_OPT4=Review      - Auto-accept safe matches (ask for unsure ones)"
-set "T_H3=--- MASS EDITING ---"
-set "T_OPT5=Genres      - Standardize all DB genres according to script"
+set "T_H3=--- MAINTENANCE ---"
+set "T_OPT5=Maintenance - Mass editing (Genres, Text Case, Attributes)"
 set "T_H4=--- STEP 3: SAVE TO MAIRLIST ---"
 set "T_OPT6=Apply       - Write verified values to .mldb copy"
 set "T_OPT7=Exit"
@@ -91,7 +90,6 @@ set "T_WARN1=WARNING: This will re-fetch ALL tracks, including already processed
 set "T_SURE=Really continue? [y/N]:"
 set "T_WARN2=WARNING: This operation writes all verified values to the"
 set "T_WARN3=selected .mldb file. ALWAYS USE A COPY for this!"
-set "T_WARN4=WARNING: This will overwrite all deviating genres directly in the database."
 goto update_check
 
 :lang_nl
@@ -106,8 +104,8 @@ set "T_OPT2=Full-Fetch  - ALLE tracks volledig opnieuw laden (Reset)"
 set "T_H2=--- STAP 2: DATA CONTROLEREN ---"
 set "T_OPT3=Controle    - Alle suggesties handmatig controleren"
 set "T_OPT4=Controle    - Veilige matches automatisch accepteren"
-set "T_H3=--- MASSA-BEWERKING ---"
-set "T_OPT5=Genres      - Alle DB-genres volgens script standaardiseren"
+set "T_H3=--- ONDERHOUD ---"
+set "T_OPT5=Onderhoud   - Massa-bewerking (Genres, Tekst, Attributen)"
 set "T_H4=--- STAP 3: OPSLAAN IN MAIRLIST ---"
 set "T_OPT6=Opslaan     - Gecontroleerde waarden in .mldb-kopie schrijven"
 set "T_OPT7=Afsluiten"
@@ -121,7 +119,6 @@ set "T_WARN1=WAARSCHUWING: Dit haalt ALLE tracks opnieuw op, inclusief reeds ver
 set "T_SURE=Weet je het zeker? [j/N]:"
 set "T_WARN2=WAARSCHUWING: Dit proces schrijft alle gecontroleerde waarden naar het"
 set "T_WARN3=bovenstaande .mldb bestand. Gebruik hiervoor ALTIJD EEN KOPIE!"
-set "T_WARN4=WAARSCHUWING: Dit overschrijft alle afwijkende genres direct in de database."
 goto update_check
 
 :update_check
@@ -143,7 +140,7 @@ echo %c_cyan%==================================================%c_reset%
 echo %c_magenta%   %T_TITLE% v%APP_VERSION%%c_reset%
 echo.
 echo %c_magenta%       (c) 2026 by Myka Vormeng (Concept)%c_reset%
-echo %c_magenta%         & Google Gemini (Programming)%c_reset%
+echo %c_magenta%           and Google Gemini (Programming)%c_reset%
 echo %c_cyan%==================================================%c_reset%
 
 if "%mldbpfad%"=="" goto show_no_db
@@ -180,7 +177,7 @@ if "%wahl%"=="1" goto fetch
 if "%wahl%"=="2" goto fetch_full
 if "%wahl%"=="3" goto review
 if "%wahl%"=="4" goto review_auto
-if "%wahl%"=="5" goto standardize
+if "%wahl%"=="5" goto maintenance
 if "%wahl%"=="6" goto apply
 if "%wahl%"=="7" goto ende
 echo %c_yellow%%T_ERR%%c_reset%
@@ -238,14 +235,10 @@ py main.py review --auto-hoch --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 
-:standardize
+:maintenance
 call :check_db
 if "%DB_OK%"=="0" goto menu
-echo.
-echo %c_yellow%%T_WARN4%%c_reset%
-set /p bestaetigung="%T_SURE% "
-if /i not "%bestaetigung%"=="j" if /i not "%bestaetigung%"=="y" goto menu
-py main.py standardize --db "%mldbpfad%" --lang %LANG_ARG%
+py main.py maintenance --db "%mldbpfad%" --lang %LANG_ARG%
 pause
 goto menu
 

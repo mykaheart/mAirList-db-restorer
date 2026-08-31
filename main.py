@@ -67,6 +67,7 @@ def check_for_updates():
 # PHASE 1: fetch
 # ---------------------------------------------------------------------------
 def phase_fetch(db_path, fetch_csv, full=False):
+    db.verify_db_compatibility(db_path)
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
         sys.exit(1)
@@ -401,6 +402,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
 # PHASE 3: apply
 # ---------------------------------------------------------------------------
 def phase_apply(db_path, final_csv):
+    db.verify_db_compatibility(db_path)
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
         sys.exit(1)
@@ -438,9 +440,10 @@ def phase_apply(db_path, final_csv):
     console.print(utils.t('apply_success', count=updated, db=db_path))
 
 # ---------------------------------------------------------------------------
-# PHASE 4: standardize
+# PHASE 4: maintenance (Wartung)
 # ---------------------------------------------------------------------------
-def phase_standardize(db_path):
+def phase_maintenance(db_path):
+    db.verify_db_compatibility(db_path)
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
         sys.exit(1)
@@ -448,44 +451,59 @@ def phase_standardize(db_path):
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
         sys.exit(1)
-
-    console.print(utils.t('std_start'))
-
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    updates = []
-
-    try:
-        cur.execute("SELECT item, value FROM item_attributes WHERE name = 'Genre'")
-        rows = cur.fetchall()
-
-        for item_id, current_genre in rows:
-            if not current_genre: continue
+        
+    while True:
+        utils.clear_input_buffer()
+        console.print(utils.t('maint_title'))
+        console.print(Panel(utils.t('maint_warn'), box=box.HEAVY))
+        console.print(utils.t('maint_opt1'))
+        console.print(utils.t('maint_opt2'))
+        console.print(utils.t('maint_opt3'))
+        console.print(utils.t('maint_opt4'))
+        console.print(utils.t('maint_opt0'))
+        
+        choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
+        
+        if choice == '0':
+            break
+        elif choice in ['1', '2', '3', '4']:
+            do_genres = choice in ['1', '4']
+            do_case = choice in ['2', '4']
+            do_clear = choice in ['3', '4']
             
-            mapped_genre = utils.map_to_allowed_genre([current_genre], [])
-            if mapped_genre and mapped_genre != current_genre:
-                updates.append((mapped_genre, item_id, 'Genre'))
-
-        if updates:
-            cur.executemany("UPDATE item_attributes SET value = ? WHERE item = ? AND name = ?", updates)
-            conn.commit()
-            console.print(utils.t('std_done', count=len(updates)))
-            utils.log_change("STANDARDIZE", f"{len(updates)} Genres bereinigt.")
+            try:
+                if do_genres:
+                    count = db.run_maintenance_genres(db_path)
+                    if count > 0:
+                        console.print(utils.t('std_done', count=count))
+                    else:
+                        console.print(utils.t('maint_no_changes'))
+                        
+                if do_case:
+                    count = db.run_maintenance_case(db_path)
+                    if count > 0:
+                        console.print(utils.t('maint_done_case', count=count))
+                    else:
+                        console.print(utils.t('maint_no_changes'))
+                        
+                if do_clear:
+                    count = db.run_maintenance_clear_fields(db_path)
+                    if count > 0:
+                        console.print(utils.t('maint_done_clear', count=count))
+                    else:
+                        console.print(utils.t('maint_no_changes'))
+            except sqlite3.OperationalError as e:
+                console.print(utils.t('apply_err_lock', err=str(e)))
+            break
         else:
-            console.print(utils.t('std_no_changes'))
-            
-    except sqlite3.OperationalError as e:
-        console.print(utils.t('apply_err_lock', err=str(e)))
-        sys.exit(1)
-    finally:
-        conn.close()
+            continue
 
 # ---------------------------------------------------------------------------
 # MAIN
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{utils.APP_VERSION}")
-    parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'standardize', 'check_update'])
+    parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'maintenance', 'check_update'])
     parser.add_argument('--auto-hoch', action='store_true')
     parser.add_argument('--full', action='store_true')
     parser.add_argument('--db', help="Pfad zur mAirList .mldb-Datei")
@@ -501,9 +519,6 @@ def main():
     if not args.db:
         console.print("[red]Fehler: --db Argument fehlt![/red]")
         sys.exit(1)
-        
-    # --- NEU: Zentraler Check der Datenbank-Kompatibilität ---
-    db.verify_db_compatibility(args.db)
     
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -524,7 +539,7 @@ def main():
 
     if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full)
     elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
-    elif args.phase == 'standardize': phase_standardize(args.db)
+    elif args.phase == 'maintenance': phase_maintenance(args.db)
     else: phase_apply(args.db, final_csv)
 
 if __name__ == '__main__':
