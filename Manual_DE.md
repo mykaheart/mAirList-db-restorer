@@ -32,7 +32,7 @@ Um auf die riesige Datenbank von Discogs zugreifen zu dürfen, benötigt das Skr
 4. Klicke auf den Button **"Create an App"** (oder Generate Token).
 5. Gib einen beliebigen Namen für die App ein (z.B. "mAirList Restorer").
 6. Du erhältst nun zwei wichtige kryptische Zeichenketten: Den **Consumer Key** und das **Consumer Secret**.
-7. Kopiere dir diese beiden Werte. Beim allerersten Start der `Restore_2.bat` wird dich das Skript danach fragen und sie sicher und maskiert abspeichern.
+7. Kopiere dir diese beiden Werte. Beim allerersten Start der `Restore.bat` wird dich das Skript danach fragen und sie sicher und maskiert abspeichern.
 
 ---
 
