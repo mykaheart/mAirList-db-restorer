@@ -2,6 +2,22 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.52.00 Beta] - 2026-09-02
+### Toegevoegd
+- **Duplicaatdetectie (Onderhoud):** Een nieuwe, veelgevraagde onderhoudsoptie [6] toegevoegd om tracks met identieke Artiest/Titel-combinaties te vinden[cite: 9]. Om de database-integriteit absoluut te waarborgen, verplaatst de tool geen elementen, maar markeert ze veilig met een nieuw `DOPPELUNG`-attribuut dat op `JA` wordt gezet[cite: 9]. Hierdoor kunnen gebruikers ze gemakkelijk filteren en beheren binnen de mAirList-GUI[cite: 9].
+- **Discogs Master Release-logica:** API-query's naar Discogs geven nu prioriteit aan `type=master`[cite: 9]. Hierdoor wordt expliciet het echte oorspronkelijke releasejaar ("eerste bekende release") opgehaald, in plaats van de datums van latere compilatie-heruitgaven[cite: 9].
+- **Tracktaal ophalen:** De MusicBrainz-API-integratie is voorbereid om het veld met de tracktaal op te halen (indien verstrekt door de database) om het taalattribuut tijdens de review-fase automatisch in te vullen[cite: 9].
+
+### Gewijzigd
+- **Google Drive Update Routing:** De ingebouwde update-checker levert nu direct de Google Drive-link om het gecompileerde, kant-en-klare `.exe` ZIP-pakket te downloaden, waarbij de ruwe GitHub-coderepository wordt omzeild[cite: 9].
+- **Geavanceerde Workspace Cleanup:** Het bestand `config.json` wordt nu automatisch gemigreerd naar en geladen vanuit de map `Data`, zodat de hoofdmap volledig schoon blijft (en alleen de `.exe` bevat)[cite: 9].
+- **Menu Ergonomie:** De prompttekst wanneer het fetch-proces na 50 tracks pauzeert, is verduidelijkt om de gebruiker beter te begeleiden[cite: 9]. Menu-opties [8] en [9] zijn omgewisseld voor een meer intuïtieve lay-out[cite: 9].
+
+### Opgelost
+- **Fetch Restoration Sync Bug:** Een logicafout verholpen waarbij de tool oude `_vorschlaege.csv`-voortgang prioriteerde boven de daadwerkelijke status van de `.mldb`-database[cite: 9]. Tracks die in de database al zijn gemarkeerd als `RESTAURIERT: JA`, worden nu strikt genegeerd, zelfs als ze als in behandeling verschijnen in een oud sessiebestand[cite: 9].
+- **Dummy Element Filtering:** De tool negeert nu expliciet mAirList-systeemitems zoals `Dummy`, `Stream`, `Command`, `Silence` en `Other` tijdens de initiële fetch-fase om nutteloze API-query's te voorkomen[cite: 9].
+- **Case-Insensitive SQL Mapping:** Een crash in het onderhoudsmenu (`no such column: ID`) verholpen door een robuuste, case-insensitieve `PRAGMA`-tabelscanner te implementeren[cite: 9]. De tool identificeert nu dynamisch de juiste primaire sleutels (`idx`/`ID` en `Item`/`ItemIdx`) in alle verschillende mAirList-databaseversies[cite: 9].
+
 ## [0.51.01 Beta] - 2026-09-02
 ### Gewijzigd
 - **Migratie naar zelfstandig uitvoerbaar bestand (de "All-in-One"-update):** De tool is volledig herbouwd van een hybride Batch/Python-architectuur naar een volledig zelfstandige Python-applicatie, ontworpen om als één gecompileerd `.exe`-bestand te worden verspreid. Gebruikers hoeven Python of afhankelijkheden niet langer handmatig te installeren. `Restore.bat` is verouderd verklaard en verwijderd.

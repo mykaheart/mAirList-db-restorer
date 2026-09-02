@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.52.00 Beta] - 2026-09-02
+### Added
+- **Duplicate Detection (Maintenance):** Added a new, highly requested maintenance option [6] to find tracks with identical Artist/Title combinations. To ensure absolute database integrity, the tool does not move items but safely tags them with a new `DOPPELUNG` attribute set to `JA`, allowing users to easily filter and manage them within the mAirList GUI.
+- **Discogs Master Release Logic:** API queries to Discogs now prioritize `type=master`. This explicitly fetches the true original release year ("erste bekannte Veröffentlichung") instead of the dates of later compilation re-releases.
+- **Track Language Fetching:** Prepared the MusicBrainz API integration to retrieve the track language field (if provided by the database) to automatically populate the language attribute during the review phase.
+
+### Changed
+- **Google Drive Update Routing:** The built-in update checker now directly provides the Google Drive link to download the compiled, ready-to-use `.exe` ZIP package, bypassing the raw GitHub code repository.
+- **Advanced Workspace Cleanup:** The `config.json` file is now automatically migrated to and loaded from the `Data` directory, ensuring the root folder remains completely clean (containing only the `.exe`).
+- **Menu Ergonomics:** Clarified the prompt text when the fetch process pauses after 50 tracks to better guide the user. Swapped menu options [8] and [9] for a more intuitive layout.
+
+### Fixed
+- **Fetch Restoration Sync Bug:** Fixed a logic flaw where the tool prioritized old `_vorschlaege.csv` progress over the actual `.mldb` database state. Tracks already marked as `RESTAURIERT: JA` in the database are now strictly ignored, even if they appear as pending in an old session file.
+- **Dummy Element Filtering:** The tool now explicitly ignores system-level mAirList items like `Dummy`, `Stream`, `Command`, `Silence`, and `Other` during the initial fetch phase to prevent useless API queries.
+- **Case-Insensitive SQL Mapping:** Fixed a crash in the Maintenance menu (`no such column: ID`) by implementing a robust, case-insensitive `PRAGMA` table scanner. The tool now dynamically identifies the correct primary keys (`idx`/`ID` and `Item`/`ItemIdx`) across all different mAirList database versions.
+
 ## [0.51.01 Beta] - 2026-09-02
 ### Changed
 - **Standalone Executable Migration (The "All-in-One" Update):** The tool has been completely refactored from a hybrid Batch/Python architecture into a fully self-contained Python application, designed to be distributed as a single compiled `.exe` file. Users no longer need to install Python or dependencies manually. `Restore.bat` has been deprecated and removed.
