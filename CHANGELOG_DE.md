@@ -4,19 +4,19 @@ Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert
 
 ## [0.52.00 Beta] - 2026-09-02
 ### Hinzugefügt
-- **Duplikaterkennung (Wartung):** Neue, stark nachgefragte Wartungsoption [6] hinzugefügt, um Tracks mit identischen Artist/Title-Kombinationen zu finden[cite: 9]. Um die Datenbankintegrität absolut zu gewährleisten, verschiebt das Tool keine Elemente, sondern markiert sie sicher mit einem neuen `DOPPELUNG`-Attribut (auf `JA` gesetzt)[cite: 9]. So können Nutzer sie einfach in der mAirList-GUI filtern und verwalten[cite: 9].
-- **Discogs Master Release-Logik:** API-Abfragen bei Discogs priorisieren nun `type=master`[cite: 9]. Dadurch wird explizit das echte ursprüngliche Veröffentlichungsjahr ("erste bekannte Veröffentlichung") abgerufen, anstatt der Daten späterer Compilation-Re-Releases[cite: 9].
-- **Abruf der Track-Sprache:** Die MusicBrainz-API-Integration wurde vorbereitet, um das Feld für die Track-Sprache abzurufen (falls von der Datenbank bereitgestellt), um das Sprachattribut in der Review-Phase automatisch auszufüllen[cite: 9].
+- **Duplikaterkennung (Wartung):** Neue, stark nachgefragte Wartungsoption [6] hinzugefügt, um Tracks mit identischen Artist/Title-Kombinationen zu finden. Um die Datenbankintegrität absolut zu gewährleisten, verschiebt das Tool keine Elemente, sondern markiert sie sicher mit einem neuen `DOPPELUNG`-Attribut (auf `JA` gesetzt). So können Nutzer sie einfach in der mAirList-GUI filtern und verwalten.
+- **Discogs Master Release-Logik:** API-Abfragen bei Discogs priorisieren nun `type=master`. Dadurch wird explizit das echte ursprüngliche Veröffentlichungsjahr ("erste bekannte Veröffentlichung") abgerufen, anstatt der Daten späterer Compilation-Re-Releases.
+- **Abruf der Track-Sprache:** Die MusicBrainz-API-Integration wurde vorbereitet, um das Feld für die Track-Sprache abzurufen (falls von der Datenbank bereitgestellt), um das Sprachattribut in der Review-Phase automatisch auszufüllen.
 
 ### Geändert
-- **Google Drive Update-Routing:** Der integrierte Update-Checker liefert nun direkt den Google Drive-Link zum Herunterladen des kompilierten, direkt ausführbaren `.exe`-ZIP-Pakets und umgeht das reine GitHub-Code-Repository[cite: 9].
-- **Erweitertes Workspace-Cleanup:** Die `config.json` wird nun automatisch in das `Data`-Verzeichnis migriert und von dort geladen, um sicherzustellen, dass der Hauptordner absolut sauber bleibt (und nur noch die `.exe` enthält)[cite: 9].
-- **Menü-Ergonomie:** Der Hinweistext, wenn der Fetch-Vorgang nach 50 Tracks pausiert, wurde präzisiert, um den Nutzer besser zu führen[cite: 9]. Die Menüoptionen [8] und [9] wurden für ein intuitiveres Layout getauscht[cite: 9].
+- **Google Drive Update-Routing:** Der integrierte Update-Checker liefert nun direkt den Google Drive-Link zum Herunterladen des kompilierten, direkt ausführbaren `.exe`-ZIP-Pakets und umgeht das reine GitHub-Code-Repository.
+- **Erweitertes Workspace-Cleanup:** Die `config.json` wird nun automatisch in das `Data`-Verzeichnis migriert und von dort geladen, um sicherzustellen, dass der Hauptordner absolut sauber bleibt (und nur noch die `.exe` enthält).
+- **Menü-Ergonomie:** Der Hinweistext, wenn der Fetch-Vorgang nach 50 Tracks pausiert, wurde präzisiert, um den Nutzer besser zu führen. Die Menüoptionen [8] und [9] wurden für ein intuitiveres Layout getauscht.
 
 ### Behoben
-- **Fetch-Restaurations-Sync-Bug:** Ein Logikfehler wurde behoben, bei dem das Tool alten `_vorschlaege.csv`-Fortschritt gegenüber dem tatsächlichen `.mldb`-Datenbankstatus priorisierte[cite: 9]. Tracks, die in der Datenbank bereits als `RESTAURIERT: JA` markiert sind, werden nun strikt ignoriert, selbst wenn sie in einer alten Session-Datei noch als ausstehend auftauchen[cite: 9].
-- **Dummy-Element-Filterung:** Das Tool ignoriert nun während der initialen Fetch-Phase explizit systeminterne mAirList-Elemente wie `Dummy`, `Stream`, `Command`, `Silence` und `Other`, um sinnlose API-Abfragen zu verhindern[cite: 9].
-- **Case-Insensitive SQL-Zuordnung:** Ein Absturz im Wartungsmenü (`no such column: ID`) wurde behoben, indem ein robuster, case-insensitiver `PRAGMA`-Tabellenscanner implementiert wurde[cite: 9]. Das Tool identifiziert nun dynamisch die korrekten Primärschlüssel (`idx`/`ID` und `Item`/`ItemIdx`) über alle verschiedenen mAirList-Datenbankversionen hinweg[cite: 9].
+- **Fetch-Restaurations-Sync-Bug:** Ein Logikfehler wurde behoben, bei dem das Tool alten `_vorschlaege.csv`-Fortschritt gegenüber dem tatsächlichen `.mldb`-Datenbankstatus priorisierte. Tracks, die in der Datenbank bereits als `RESTAURIERT: JA` markiert sind, werden nun strikt ignoriert, selbst wenn sie in einer alten Session-Datei noch als ausstehend auftauchen.
+- **Dummy-Element-Filterung:** Das Tool ignoriert nun während der initialen Fetch-Phase explizit systeminterne mAirList-Elemente wie `Dummy`, `Stream`, `Command`, `Silence` und `Other`, um sinnlose API-Abfragen zu verhindern.
+- **Case-Insensitive SQL-Zuordnung:** Ein Absturz im Wartungsmenü (`no such column: ID`) wurde behoben, indem ein robuster, case-insensitiver `PRAGMA`-Tabellenscanner implementiert wurde. Das Tool identifiziert nun dynamisch die korrekten Primärschlüssel (`idx`/`ID` und `Item`/`ItemIdx`) über alle verschiedenen mAirList-Datenbankversionen hinweg.
 
 ## [0.51.01 Beta] - 2026-09-02
 ### Geändert
