@@ -147,7 +147,9 @@ def fetch_musicbrainz_details(artist, title, target_year=None, target_album=None
 
     confidence = "hoch" if best_score >= 90 else ("mittel" if best_score >= 70 else "niedrig")
     year = utils.filter_valid_years(years)
-    return year, confidence, isrc, (orig_album or fallback_album or "")
+    
+    # NEU: Das leere Feld für die Sprache als 5. Parameter angehängt!
+    return year, confidence, isrc, (orig_album or fallback_album or ""), ""
 
 def fetch_discogs_details(artist, title, target_year=None, target_album=None):
     years, mapped_genre, discogs_id, styles_list = [], None, "", []
@@ -155,7 +157,9 @@ def fetch_discogs_details(artist, title, target_year=None, target_album=None):
     confidence = "niedrig"
     try:
         pure_title = utils.get_pure_search_title(title)
-        params = {'artist': artist, 'track': pure_title, 'key': utils.DISCOGS_KEY, 'secret': utils.DISCOGS_SECRET, 'per_page': 15}
+        
+        # NEU: Master Release in der primären Suche priorisieren
+        params = {'artist': artist, 'track': pure_title, 'type': 'master', 'key': utils.DISCOGS_KEY, 'secret': utils.DISCOGS_SECRET, 'per_page': 15}
         
         if target_album: params['release_title'] = target_album
         if target_year: params['year'] = target_year
@@ -163,11 +167,13 @@ def fetch_discogs_details(artist, title, target_year=None, target_album=None):
         res = discogs_get("https://api.discogs.com/database/search", params, timeout=8)
         results = res.json().get('results', []) if res.status_code == 200 else []
 
-        if not results and (target_album or target_year):
+        # Fallback 1: Falls Ziel-Album/Jahr nicht gefunden wurde ODER es kein Master-Release gibt
+        if not results:
             params_fb = {'artist': artist, 'track': pure_title, 'key': utils.DISCOGS_KEY, 'secret': utils.DISCOGS_SECRET, 'per_page': 15}
             res = discogs_get("https://api.discogs.com/database/search", params_fb, timeout=8)
             results = res.json().get('results', []) if res.status_code == 200 else []
 
+        # Fallback 2: Grobe Freitext-Suche (falls Felder durcheinander sind)
         if not results:
             res_fb = discogs_get("https://api.discogs.com/database/search",
                                  {'q': f"{artist} {pure_title}", 'key': utils.DISCOGS_KEY, 'secret': utils.DISCOGS_SECRET, 'per_page': 15}, timeout=8)

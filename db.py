@@ -348,3 +348,67 @@ def run_maintenance_types(db_path):
         
     conn.close()
     return len(inserts)
+def run_maintenance_duplicates(db_path):
+    import sqlite3
+    import logging
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # 1. mAirList Spaltennamen absolut kugelsicher und CASE-INSENSITIVE auslesen
+    cursor.execute("PRAGMA table_info(items)")
+    # Wandelt alle gefundenen Spaltennamen für die Suche in Kleinbuchstaben um
+    items_cols = [row[1].lower() for row in cursor.fetchall()]
+    id_col = next((c for c in ['idx', 'id', 'itemidx'] if c in items_cols), None)
+    
+    cursor.execute("PRAGMA table_info(item_attributes)")
+    attr_cols = [row[1].lower() for row in cursor.fetchall()]
+    
+    # Falls die Tabelle 'item_attributes' leer ist/nicht existiert, probiere 'attributes'
+    if not attr_cols:
+        cursor.execute("PRAGMA table_info(attributes)")
+        attr_cols = [row[1].lower() for row in cursor.fetchall()]
+        attr_table = "attributes"
+    else:
+        attr_table = "item_attributes"
+        
+    attr_id_col = next((c for c in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c in attr_cols), None)
+    
+    if not id_col or not attr_id_col:
+        conn.close()
+        raise sqlite3.OperationalError(f"Konnte Spalten nicht finden! items: {items_cols}, attr_table ({attr_table}): {attr_cols}")
+    
+    # 2. Dopplungen suchen
+    query = f"""
+    SELECT {id_col} FROM items 
+    WHERE (LOWER(TRIM(Artist)), LOWER(TRIM(Title))) IN (
+        SELECT LOWER(TRIM(Artist)), LOWER(TRIM(Title))
+        FROM items
+        WHERE Artist IS NOT NULL AND Title IS NOT NULL AND Artist != '' AND Title != ''
+        GROUP BY LOWER(TRIM(Artist)), LOWER(TRIM(Title))
+        HAVING COUNT(*) > 1
+    )
+    """
+    cursor.execute(query)
+    duplicate_ids = [row[0] for row in cursor.fetchall()]
+    
+    if not duplicate_ids:
+        conn.close()
+        return 0
+        
+    # 3. Attribut DOPPELUNG = JA setzen
+    updated_count = 0
+    for item_id in duplicate_ids:
+        cursor.execute(f"SELECT 1 FROM {attr_table} WHERE {attr_id_col} = ? AND Name = 'DOPPELUNG'", (item_id,))
+        exists = cursor.fetchone()
+        if exists:
+            cursor.execute(f"UPDATE {attr_table} SET Value = 'JA' WHERE {attr_id_col} = ? AND Name = 'DOPPELUNG'", (item_id,))
+        else:
+            cursor.execute(f"INSERT INTO {attr_table} ({attr_id_col}, Name, Value) VALUES (?, 'DOPPELUNG', 'JA')", (item_id,))
+        updated_count += cursor.rowcount
+        
+    conn.commit()
+    conn.close()
+    
+    logging.info(f"MAINTENANCE: {len(duplicate_ids)} Dopplungen markiert.")
+    return len(duplicate_ids)

@@ -57,15 +57,13 @@ def check_for_updates(interactive=False):
                 if line.startswith("APP_VERSION ="):
                     remote_version = line.split("=")[1].strip().strip('"').strip("'")
                     if remote_version != utils.APP_VERSION:
-                        if utils.CURRENT_LANG == 'de':
-                            console.print(f"[yellow]⚡ Update verfügbar! Neue Version {remote_version} ist auf GitHub (Du nutzt {utils.APP_VERSION}).[/yellow]")
-                        elif utils.CURRENT_LANG == 'nl':
-                            console.print(f"[yellow]⚡ Update beschikbaar! Nieuwe versie {remote_version} staat op GitHub (Je gebruikt {utils.APP_VERSION}).[/yellow]")
-                        else:
-                            console.print(f"[yellow]⚡ Update available! New version {remote_version} is on GitHub (You are using {utils.APP_VERSION}).[/yellow]")
+                        # NEU: Direkter Hinweis auf den ZIP Download in Google Drive
+                        console.print(f"[bold yellow]⚡ Update verfügbar! Neue Version {remote_version} wurde veröffentlicht (Du nutzt {utils.APP_VERSION}).[/bold yellow]")
+                        console.print(f"[bold cyan]👉 Download als fertige ZIP-Datei (inkl. Handbüchern) hier:[/bold cyan]")
+                        console.print(f"[white]https://drive.google.com/file/d/1lV2qG7nSj28BKC2W5FoPn4bgfqqsDjdM/view?usp=sharing[/white]")
                         
                         if interactive:
-                            console.input("\nDrücke Enter zum Fortfahren (oder schließe das Programm)...")
+                            console.input("\nDrücke Enter zum Fortfahren (oder schließe das Programm, um zu updaten)...")
                             return False
                         sys.exit(2)
                     else:
@@ -92,7 +90,6 @@ def setup_logging(db_path):
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
     dynamic_log_file = os.path.join(data_dir, f"{db_base_name}_{timestamp_str}.log")
     
-    # Reset logging if already configured
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
         
@@ -109,7 +106,7 @@ def perform_migration():
     data_dir = "Data"
     os.makedirs(data_dir, exist_ok=True)
     for f in os.listdir('.'):
-        if f.endswith('_vorschlaege.csv') or f.endswith('_restauriert.csv') or f.endswith('.log'):
+        if f.endswith('_vorschlaege.csv') or f.endswith('_restauriert.csv') or f.endswith('.log') or f == 'config.json':
             if os.path.isfile(f):
                 target_path = os.path.join(data_dir, f)
                 try:
@@ -131,6 +128,11 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
 
     ignored_folders = utils.setup_ignored_folders(db_path)
     input_df = db.load_dataframe_from_mldb(db_path, ignored_folders)
+    
+    # NEU: Filtere System- und Dummy-Typen rigoros raus
+    forbidden_types = ['Dummy', 'Stream', 'Command', 'Silence', 'Other']
+    if 'ItemType' in input_df.columns:
+        input_df = input_df[~input_df['ItemType'].isin(forbidden_types)].copy()
     
     if os.path.exists(fetch_csv):
         df = pd.read_csv(fetch_csv, dtype=str)
@@ -164,25 +166,6 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
             db_tdur = input_df.set_index('ID')['TotalDuration'].to_dict()
             df['TotalDuration'] = df['ID'].map(db_tdur).fillna(0.0)
             
-        db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
-        db_artists = input_df.set_index('ID')['Artist'].to_dict()
-        db_titles = input_df.set_index('ID')['Title'].to_dict()
-        
-        reset_count = 0
-        for idx, row in df.iterrows():
-            item_id = str(row.get('ID'))
-            if item_id in db_restauriert:
-                db_status = str(db_restauriert[item_id]).strip().upper()
-                csv_review = str(row.get('REVIEW_STATUS', '')).strip().upper()
-                if db_status != 'JA' and csv_review == 'JA':
-                    df.at[idx, 'VORSCHLAG_STATUS'] = ''
-                    df.at[idx, 'REVIEW_STATUS'] = ''
-                    df.at[idx, 'Artist'] = db_artists.get(item_id, row.get('Artist'))
-                    df.at[idx, 'Title'] = db_titles.get(item_id, row.get('Title'))
-                    reset_count += 1
-                    
-        if reset_count > 0: console.print(utils.t('fetch_reset', count=reset_count))
-
     else:
         console.print(utils.t('fetch_first', db=db_path))
         df = input_df.copy()
@@ -190,11 +173,18 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     for col in PROPOSAL_COLUMNS + utils.MLDB_ATTRIBUTE_FIELDS:
         if col not in df.columns: df[col] = ''
 
-    if 'RESTAURIERT' in df.columns:
-        already_done = df['RESTAURIERT'].astype(str).str.upper() == 'JA'
-        df.loc[already_done & (df['VORSCHLAG_STATUS'] != 'FERTIG'), 'VORSCHLAG_STATUS'] = 'FERTIG'
+    # BUGFIX: Lese das RESTAURIERT-Flag JEDES MAL frisch aus der Datenbank aus
+    # und zwinge die CSV, sich der Datenbank zu beugen!
+    if 'RESTAURIERT' in input_df.columns:
+        db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
+        df['RESTAURIERT'] = df['ID'].map(db_restauriert).fillna('')
 
-    if full:
+    if not full:
+        already_done = df['RESTAURIERT'].astype(str).str.upper() == 'JA'
+        df.loc[already_done, 'VORSCHLAG_STATUS'] = 'FERTIG'
+        if 'REVIEW_STATUS' in df.columns:
+            df.loc[already_done, 'REVIEW_STATUS'] = 'JA'
+    else:
         console.print(utils.t('fetch_full'))
         df['VORSCHLAG_STATUS'] = ''
         if 'REVIEW_STATUS' in df.columns: df['REVIEW_STATUS'] = ''
@@ -237,7 +227,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                         future_mb = executor.submit(api.fetch_musicbrainz_details, art_sugg, tit_sugg, None, None, local_dur)
                         future_discogs = executor.submit(api.fetch_discogs_details, art_sugg, tit_sugg, None, None)
                         
-                        mb_year, mb_conf, isrc, mb_album = future_mb.result()
+                        mb_year, mb_conf, isrc, mb_album, mb_lang = future_mb.result()
                         discogs_res = future_discogs.result()
 
                     all_years = [mb_year] if mb_year else []
@@ -260,7 +250,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     df.at[idx, 'Label_Vorschlag'] = discogs_res['label']
                     df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
                     df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
-                    df.at[idx, 'Sprache_Vorschlag'] = ''
+                    df.at[idx, 'Sprache_Vorschlag'] = mb_lang or '' # Kann durch NLP / API später sauber gefüllt werden
                     
                     current_typ = str(row.get('Typ', '')).strip()
                     if not current_typ:
@@ -406,7 +396,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         future_mb = executor.submit(api.fetch_musicbrainz_details, c_art, c_tit, target_y, target_a, local_dur)
                         future_discogs = executor.submit(api.fetch_discogs_details, c_art, c_tit, target_y, target_a)
                         
-                        mb_year, mb_conf, isrc, mb_album = future_mb.result()
+                        mb_year, mb_conf, isrc, mb_album, mb_lang = future_mb.result()
                         discogs_res = future_discogs.result()
 
                     df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
@@ -415,6 +405,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
                     df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style'] or ''
                     df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
+                    if mb_lang: df.at[idx, 'Sprache_Vorschlag'] = mb_lang
 
                 # 5. Genre
                 genre_sugg = utils.clean_nan(df.at[idx, 'Genre_Vorschlag'])
@@ -566,17 +557,19 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt3'))
         console.print(utils.t('maint_opt4'))
         console.print(utils.t('maint_opt5'))
+        console.print(utils.t('maint_opt6')) # NEU: Dopplungen
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4', '5']:
+        elif choice in ['1', '2', '3', '4', '5', '6']:
             do_genres = choice in ['1', '5']
             do_case = choice in ['2', '5']
             do_clear = choice in ['3', '5']
             do_types = choice in ['4', '5']
+            do_dupes = choice == '6'
             
             try:
                 if do_genres:
@@ -606,6 +599,14 @@ def phase_maintenance(db_path):
                         console.print(utils.t('maint_done_types', count=count))
                     else:
                         console.print(utils.t('maint_no_changes'))
+                        
+                if do_dupes:
+                    count = db.run_maintenance_duplicates(db_path)
+                    if count > 0:
+                        console.print(utils.t('maint_done_dupes', count=count))
+                    else:
+                        console.print(utils.t('maint_no_changes'))
+                        
             except sqlite3.OperationalError as e:
                 console.print(utils.t('apply_err_lock', err=str(e)))
             break
@@ -681,10 +682,10 @@ def run_interactive_menu():
 
         wahl = console.input(f"[cyan]{utils.t('menu_prompt')} [/cyan]").strip()
 
-        if wahl == '8':
+        if wahl == '9':
             break
 
-        elif wahl == '9':
+        elif wahl == '8':
             select_language()
             continue
 
@@ -732,7 +733,6 @@ def run_interactive_menu():
 # MAIN ENTRY POINT
 # ---------------------------------------------------------------------------
 def main():
-    # Wenn Argumente übergeben werden (z.B. für Cronjobs oder Tests)
     if len(sys.argv) > 1:
         parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{utils.APP_VERSION}")
         parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'maintenance', 'check_update'])
@@ -765,8 +765,6 @@ def main():
         elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
         elif args.phase == 'maintenance': phase_maintenance(args.db)
         else: phase_apply(args.db, final_csv)
-
-    # Normaler Doppelklick-Modus (Interaktives Menü)
     else:
         run_interactive_menu()
 
@@ -779,5 +777,4 @@ if __name__ == '__main__':
         console.print(traceback.format_exc())
         input("\nProgramm wurde unerwartet beendet. Drücke Enter, um das Fenster zu schließen...")
     except KeyboardInterrupt:
-        # Falls der User das Programm mit Strg+C abwürgt, einfach leise beenden
         pass

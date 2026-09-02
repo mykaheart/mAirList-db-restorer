@@ -15,8 +15,12 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.51.01 Beta"
-CONFIG_FILE = 'config.json'
+APP_VERSION = "0.52.00 Beta"
+
+# --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
+DATA_DIR = "Data"
+os.makedirs(DATA_DIR, exist_ok=True)
+CONFIG_FILE = os.path.join(DATA_DIR, 'config.json')
 
 # Globale Variablen für die Session
 CURRENT_LANG = 'de'
@@ -28,7 +32,7 @@ CUSTOM_LANGS = []
 
 MLDB_ATTRIBUTE_FIELDS = [
     'Jahr', 'Genre', 'Album', 'STYLE', 'DISCOGS_RELEASE_ID',
-    'Label', 'Labelcode', 'ISRC', 'Sprache', 'Typ', 'RESTAURIERT'
+    'Label', 'Labelcode', 'ISRC', 'Sprache', 'Typ', 'RESTAURIERT', 'DOPPELUNG'
 ]
 
 # ---------------------------------------------------------------------------
@@ -66,11 +70,11 @@ T = {
         'menu_opt4': "Kontrolle   - Alle Vorschläge manuell prüfen",
         'menu_opt5': "Kontrolle   - Sichere Treffer automatisch übernehmen",
         'menu_h3': "--- WARTUNG ---",
-        'menu_opt6': "Wartung     - Massenbearbeitung (Genres, Typen, Schreibweisen, Attribute)",
+        'menu_opt6': "Wartung     - Massenbearbeitung (Genres, Typen, Schreibweisen, Dopplungen)",
         'menu_h4': "--- SCHRITT 3: IN MAIRLIST SPEICHERN ---",
         'menu_opt7': "Speichern   - Geprüfte Werte in .mldb-Kopie schreiben",
-        'menu_opt8': "Beenden",
-        'menu_opt9': "Sprache ändern / Change Language",
+        'menu_opt8': "Sprache ändern / Change Language",
+        'menu_opt9': "Beenden",
         'menu_prompt': "Auswahl [0-9]:",
         'menu_err': "Ungültige Auswahl. Bitte erneut versuchen.",
         'menu_err_db': "Fehler: Keine Datenbank ausgewählt! Bitte wähle zuerst Option 0.",
@@ -82,7 +86,7 @@ T = {
         'menu_warn_apply1': "ACHTUNG: Dieser Vorgang schreibt alle geprüften Werte in die oben",
         'menu_warn_apply2': "ausgewählte .mldb-Datei. Nutze hierfür IMMER EINE KOPIE!",
         'menu_continue': "Drücke Enter, um ins Hauptmenü zurückzukehren...",
-        'setup_title': "[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden lokal maskiert in 'config.json' gespeichert.",
+        'setup_title': "[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden sicher im 'Data'-Ordner gespeichert.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
         'setup_email': "  Deine Kontakt-E-Mail: ",
@@ -95,7 +99,7 @@ T = {
         'ign_prompt': "  [cyan]Drag & Drop Ordner hierher[/cyan] ODER tippe [cyan]virtuellen Ordnernamen[/cyan] (Enter = Fertig): ",
         'ign_added_phys': "  [green]✓ Physikalischer Pfad ignoriert:[/green] {path}",
         'ign_added_virt': "  [green]✓ Virtueller/Teil-Ordner ignoriert:[/green] {name}",
-        'ign_saved': "[green]✓ Ausnahmen für diese DB in config.json gespeichert![/green]\n",
+        'ign_saved': "[green]✓ Ausnahmen für diese DB gespeichert![/green]\n",
         'ign_skip_count': "\n[bold green]✓ SUCCESS: {count} ignorierte Elemente (OAD/Jingles/News) erfolgreich übersprungen![/bold green]",
         'fetch_load_prog': "[cyan]Fortschritt geladen aus '{csv}' ({count} Zeilen).[/cyan]",
         'fetch_sync_del': "[yellow]-> {count} Track(s) wurden in mAirList gelöscht und aus CSV entfernt.[/yellow]",
@@ -109,8 +113,8 @@ T = {
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jahr: [bold cyan]{jahr}[/bold cyan], Konfidenz: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Abruf unterbrochen. Fortschritt sicher gespeichert.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]Option [4] oder [5] im Hauptmenü (Review)[/bold cyan]",
-        'fetch_chunk_pause': "\n[bold yellow]☕ {count} Tracks geladen! Wir empfehlen jetzt ein kurzes Review, um den Überblick zu behalten.[/bold yellow]",
-        'fetch_chunk_prompt': "Tippe [cyan]'r'[/cyan] für Review oder [green]Enter[/green] für die nächsten 50 Tracks: ",
+        'fetch_chunk_pause': "\n[bold yellow]☕ {count} Tracks geladen![/bold yellow]\nMöchtest du diese jetzt kontrollieren (Review)? \n[dim]Tipp: Du kannst den Fetch später im Hauptmenü (Option 1) jederzeit fortsetzen.[/dim]",
+        'fetch_chunk_prompt': "Tippe [cyan]'r'[/cyan] für Review oder [green]Enter[/green], um weitere 50 Tracks zu laden: ",
         'err_file_not_found': "[bold red][Fehler][/bold red] '{file}' nicht gefunden.",
         'err_need_fetch': " Erst 'fetch' ausführen.",
         'rev_mode': "[bold cyan]Review Modus[/bold cyan]\nOffene Prüfungen: [bold yellow]{todo}[/bold yellow]{auto}\n[dim]Tipp: Tippe '<' oder 'b' und Enter, um einen Track zurückzuspringen![/dim]",
@@ -147,11 +151,13 @@ T = {
         'maint_opt3': "  [[green]3[/green]] 'Platinum Notes' & 'Lyrics' löschen (DB verkleinern)",
         'maint_opt4': "  [[green]4[/green]] Elementtypen (Music -> Musik) in mAirList übersetzen",
         'maint_opt5': "  [[green]5[/green]] ALLE Wartungsaufgaben nacheinander ausführen",
+        'maint_opt6': "  [[green]6[/green]] Dopplungen finden (Setzt sicheres Attribut 'DOPPELUNG' auf 'JA')",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-5]: ",
+        'maint_prompt': "Auswahl [0-6]: ",
         'maint_done_case': "[bold green]✓ Fertig! {count} Tracks (Artist/Title) korrigiert.[/bold green]",
         'maint_done_clear': "[bold green]✓ Fertig! {count} alte Attribute (Lyrics/Platinum Notes) gelöscht.[/bold green]",
         'maint_done_types': "[bold green]✓ Fertig! {count} Elementtypen (Typ) wurden erfolgreich übersetzt.[/bold green]",
+        'maint_done_dupes': "[bold green]✓ Fertig! {count} Dopplungen in der Datenbank gefunden und markiert.[/bold green]",
         'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
         'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
     },
@@ -169,11 +175,11 @@ T = {
         'menu_opt4': "Review      - Manually inspect all proposals",
         'menu_opt5': "Review      - Auto-accept safe matches (ask for unsure ones)",
         'menu_h3': "--- MAINTENANCE ---",
-        'menu_opt6': "Maintenance - Mass editing (Genres, Item Types, Text Case, Attributes)",
+        'menu_opt6': "Maintenance - Mass editing (Genres, Item Types, Text Case, Duplicates)",
         'menu_h4': "--- STEP 3: SAVE TO MAIRLIST ---",
         'menu_opt7': "Apply       - Write verified values to .mldb copy",
-        'menu_opt8': "Exit",
-        'menu_opt9': "Change Language / Sprache ändern",
+        'menu_opt8': "Change Language / Sprache ändern",
+        'menu_opt9': "Exit",
         'menu_prompt': "Choice [0-9]:",
         'menu_err': "Invalid choice. Please try again.",
         'menu_err_db': "Error: No database selected! Please choose Option 0 first.",
@@ -185,7 +191,7 @@ T = {
         'menu_warn_apply1': "WARNING: This operation writes all verified values to the",
         'menu_warn_apply2': "selected .mldb file. ALWAYS USE A COPY for this!",
         'menu_continue': "Press Enter to return to the main menu...",
-        'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails will be safely masked locally in 'config.json'.",
+        'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails will be safely masked locally in the 'Data' folder.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
         'setup_email': "  Your Contact Email: ",
@@ -198,7 +204,7 @@ T = {
         'ign_prompt': "  [cyan]Drag & Drop folder here[/cyan] OR type [cyan]virtual folder name[/cyan] (Enter = Done): ",
         'ign_added_phys': "  [green]✓ Physical path ignored:[/green] {path}",
         'ign_added_virt': "  [green]✓ Virtual/Partial folder ignored:[/green] {name}",
-        'ign_saved': "[green]✓ Exceptions for this DB saved to config.json![/green]\n",
+        'ign_saved': "[green]✓ Exceptions for this DB saved![/green]\n",
         'ign_skip_count': "\n[bold green]✓ SUCCESS: Skipped {count} ignored elements (OAD/Jingles/News etc.)![/bold green]",
         'fetch_load_prog': "[cyan]Progress loaded from '{csv}' ({count} rows).[/cyan]",
         'fetch_sync_del': "[yellow]-> {count} track(s) were deleted in mAirList and removed from CSV.[/yellow]",
@@ -212,7 +218,7 @@ T = {
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Year: [bold cyan]{jahr}[/bold cyan], Confidence: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Fetch interrupted. Progress safely saved.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]Option [4] or [5] in the main menu (Review)[/bold cyan]",
-        'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks fetched! We recommend a quick review now to keep things manageable.[/bold yellow]",
+        'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks fetched![/bold yellow]\nDo you want to review them now?\n[dim]Tip: You can safely resume the fetch process later from the main menu (Option 1).[/dim]",
         'fetch_chunk_prompt': "Type [cyan]'r'[/cyan] for Review or [green]Enter[/green] for the next 50 tracks: ",
         'err_file_not_found': "[bold red][Error][/bold red] '{file}' not found.",
         'err_need_fetch': " Run 'fetch' first.",
@@ -250,11 +256,13 @@ T = {
         'maint_opt3': "  [[green]3[/green]] Delete 'Platinum Notes' & 'Lyrics' (shrink DB)",
         'maint_opt4': "  [[green]4[/green]] Translate Item Types (e.g. Music -> Musik)",
         'maint_opt5': "  [[green]5[/green]] Execute ALL maintenance tasks sequentially",
+        'maint_opt6': "  [[green]6[/green]] Find duplicates (Safely sets 'DOPPELUNG' attribute to 'JA')",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-5]: ",
+        'maint_prompt': "Choice [0-6]: ",
         'maint_done_case': "[bold green]✓ Done! Corrected {count} tracks (Artist/Title).[/bold green]",
         'maint_done_clear': "[bold green]✓ Done! Deleted {count} old attributes (Lyrics/Platinum Notes).[/bold green]",
         'maint_done_types': "[bold green]✓ Done! Translated {count} internal item types.[/bold green]",
+        'maint_done_dupes': "[bold green]✓ Done! Found and marked {count} duplicate tracks in the DB.[/bold green]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
         'maint_no_changes': "[yellow]No changes needed.[/yellow]"
     },
@@ -272,11 +280,11 @@ T = {
         'menu_opt4': "Controle    - Alle suggesties handmatig controleren",
         'menu_opt5': "Controle    - Veilige matches automatisch accepteren",
         'menu_h3': "--- ONDERHOUD ---",
-        'menu_opt6': "Onderhoud   - Massabewerking (Genres, Typen, Tekst, Attributen)",
+        'menu_opt6': "Onderhoud   - Massabewerking (Genres, Typen, Tekst, Dubbele Tracks)",
         'menu_h4': "--- STAP 3: OPSLAAN IN MAIRLIST ---",
         'menu_opt7': "Opslaan     - Gecontroleerde waarden in .mldb-kopie schrijven",
-        'menu_opt8': "Afsluiten",
-        'menu_opt9': "Taal wijzigen / Change Language",
+        'menu_opt8': "Taal wijzigen / Change Language",
+        'menu_opt9': "Afsluiten",
         'menu_prompt': "Keuze [0-9]:",
         'menu_err': "Ongeldige keuze. Probeer het opnieuw.",
         'menu_err_db': "Fout: Geen database geselecteerd! Kies eerst optie 0.",
@@ -288,7 +296,7 @@ T = {
         'menu_warn_apply1': "WAARSCHUWING: Dit proces schrijft alle gecontroleerde waarden naar het",
         'menu_warn_apply2': "bovenstaande .mldb bestand. Gebruik hiervoor ALTIJD EEN KOPIE!",
         'menu_continue': "Druk op Enter om terug te keren naar het hoofdmenu...",
-        'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal gemaskeerd in 'config.json' opgeslagen.",
+        'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden veilig opgeslagen in de map 'Data'.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
         'setup_email': "  Jouw contact e-mail: ",
@@ -315,7 +323,7 @@ T = {
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jaar: [bold cyan]{jahr}[/bold cyan], Betrouwbaarheid: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Ophalen onderbroken. Voortgang veilig opgeslagen.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]Optie [4] of [5] in het hoofdmenu (Review)[/bold cyan]",
-        'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks opgehaald! We raden een snelle review aan om het overzicht te bewaren.[/bold yellow]",
+        'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks opgehaald![/bold yellow]\nWil je deze nu controleren (Review)?\n[dim]Tip: Je kunt de fetch later altijd hervatten via optie 1 in het hoofdmenu.[/dim]",
         'fetch_chunk_prompt': "Typ [cyan]'r'[/cyan] voor Review of [green]Enter[/green] voor de volgende 50 tracks: ",
         'err_file_not_found': "[bold red][Fout][/bold red] '{file}' niet gevonden.",
         'err_need_fetch': " Voer eerst 'fetch' uit.",
@@ -353,11 +361,13 @@ T = {
         'maint_opt3': "  [[green]3[/green]] 'Platinum Notes' & 'Lyrics' verwijderen (DB verkleinen)",
         'maint_opt4': "  [[green]4[/green]] Item Types vertalen (bijv. Music -> Musik)",
         'maint_opt5': "  [[green]5[/green]] ALLE onderhoudstaken achter elkaar uitvoeren",
+        'maint_opt6': "  [[green]6[/green]] Dubbele tracks vinden (Zet veilig het 'DOPPELUNG' attribuut op 'JA')",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-9]: ",
+        'maint_prompt': "Keuze [0-6]: ",
         'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
         'maint_done_clear': "[bold green]✓ Klaar! {count} oude attributen (Lyrics/Platinum Notes) verwijderd.[/bold green]",
         'maint_done_types': "[bold green]✓ Klaar! {count} interne item types vertaald.[/bold green]",
+        'maint_done_dupes': "[bold green]✓ Klaar! {count} dubbele tracks gevonden en gemarkeerd in de DB.[/bold green]",
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
         'maint_no_changes': "[yellow]Geen wijzigingen nodig.[/yellow]"
     }
