@@ -580,10 +580,30 @@ def main():
         sys.exit(1)
     
     db.verify_db_compatibility(args.db)
+
+    # --- NEU: Ordnerstruktur aufraeumen (Data-Ordner) ---
+    data_dir = "Data"
+    os.makedirs(data_dir, exist_ok=True)
+    
+    # Alte Logs und CSVs aus dem Hauptverzeichnis migrieren
+    for f in os.listdir('.'):
+        if f.endswith('_vorschlaege.csv') or f.endswith('_restauriert.csv') or f.endswith('.log'):
+            if os.path.isfile(f):
+                target_path = os.path.join(data_dir, f)
+                try:
+                    # Überschreiben verhindern, falls die Datei schon mal verschoben wurde
+                    if not os.path.exists(target_path):
+                        shutil.move(f, target_path)
+                    else:
+                        os.remove(f) # Wenn sie schon in Data existiert, das alte root-Duplikat loeschen
+                except Exception:
+                    pass
     
     db_base_name = os.path.splitext(os.path.basename(args.db))[0]
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-    dynamic_log_file = f"{db_base_name}_{timestamp_str}.log"
+    
+    # Pfade jetzt in den Unterordner routen
+    dynamic_log_file = os.path.join(data_dir, f"{db_base_name}_{timestamp_str}.log")
     
     logging.basicConfig(
         filename=dynamic_log_file,
@@ -595,8 +615,8 @@ def main():
     
     utils.init_credentials()
 
-    fetch_csv = f"{db_base_name}_vorschlaege.csv"
-    final_csv = f"{db_base_name}_restauriert.csv"
+    fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
+    final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
 
     if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full, no_breaks=args.no_breaks)
     elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
