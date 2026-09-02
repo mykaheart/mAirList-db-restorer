@@ -5,8 +5,16 @@ import argparse
 import logging
 import shutil
 import sqlite3
+import time
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+
+# --- ARBEITSVERZEICHNIS FIX ---
+if getattr(sys, 'frozen', False):
+    APP_DIR = os.path.dirname(sys.executable)
+else:
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+os.chdir(APP_DIR)
 
 from rich.console import Console
 from rich.panel import Panel
@@ -30,6 +38,9 @@ PROPOSAL_COLUMNS = [
 class StepBackException(Exception):
     pass
 
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 def ask_input(prompt_text):
     utils.clear_input_buffer()
     val = console.input(prompt_text).strip()
@@ -37,7 +48,7 @@ def ask_input(prompt_text):
         raise StepBackException()
     return val
 
-def check_for_updates():
+def check_for_updates(interactive=False):
     try:
         url = "https://raw.githubusercontent.com/mykaheart/mAirList-db-restorer/main/utils.py"
         res = requests.get(url, timeout=1.5)
@@ -52,6 +63,10 @@ def check_for_updates():
                             console.print(f"[yellow]⚡ Update beschikbaar! Nieuwe versie {remote_version} staat op GitHub (Je gebruikt {utils.APP_VERSION}).[/yellow]")
                         else:
                             console.print(f"[yellow]⚡ Update available! New version {remote_version} is on GitHub (You are using {utils.APP_VERSION}).[/yellow]")
+                        
+                        if interactive:
+                            console.input("\nDrücke Enter zum Fortfahren (oder schließe das Programm)...")
+                            return False
                         sys.exit(2)
                     else:
                         if utils.CURRENT_LANG == 'de':
@@ -60,9 +75,50 @@ def check_for_updates():
                             console.print(f"[dim]Versie is up-to-date ({utils.APP_VERSION}).[/dim]")
                         else:
                             console.print(f"[dim]Version is up to date ({utils.APP_VERSION}).[/dim]")
+                        
+                        if interactive:
+                            time.sleep(1.5)
+                            return True
                         sys.exit(0)
     except Exception:
+        if interactive: return True
         sys.exit(0)
+    return True
+
+def setup_logging(db_path):
+    data_dir = "Data"
+    os.makedirs(data_dir, exist_ok=True)
+    db_base_name = os.path.splitext(os.path.basename(db_path))[0]
+    timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    dynamic_log_file = os.path.join(data_dir, f"{db_base_name}_{timestamp_str}.log")
+    
+    # Reset logging if already configured
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+        
+    logging.basicConfig(
+        filename=dynamic_log_file,
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        encoding='utf-8'
+    )
+    return db_base_name, data_dir
+
+def perform_migration():
+    data_dir = "Data"
+    os.makedirs(data_dir, exist_ok=True)
+    for f in os.listdir('.'):
+        if f.endswith('_vorschlaege.csv') or f.endswith('_restauriert.csv') or f.endswith('.log'):
+            if os.path.isfile(f):
+                target_path = os.path.join(data_dir, f)
+                try:
+                    if not os.path.exists(target_path):
+                        shutil.move(f, target_path)
+                    else:
+                        os.remove(f) 
+                except Exception:
+                    pass
 
 # ---------------------------------------------------------------------------
 # PHASE 1: fetch
@@ -71,7 +127,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     db.verify_db_compatibility(db_path)
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
-        sys.exit(1)
+        return
 
     ignored_folders = utils.setup_ignored_folders(db_path)
     input_df = db.load_dataframe_from_mldb(db_path, ignored_folders)
@@ -239,7 +295,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
         except KeyboardInterrupt:
             console.print(utils.t('fetch_interrupt'))
             utils.save_safe_csv(df, fetch_csv)
-            sys.exit(0)
+            return
 
     utils.save_safe_csv(df, fetch_csv)
     console.print(utils.t('fetch_success', db=db_path))
@@ -253,7 +309,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
         orig_df = df.copy() 
     except FileNotFoundError:
         console.print(utils.t('err_file_not_found', file=fetch_csv) + utils.t('err_need_fetch'))
-        sys.exit(1)
+        return
 
     if 'REVIEW_STATUS' not in df.columns: df['REVIEW_STATUS'] = ''
     for col in utils.MLDB_ATTRIBUTE_FIELDS:
@@ -441,7 +497,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
     except KeyboardInterrupt:
         console.print(utils.t('rev_interrupt'))
         utils.save_safe_csv(df, fetch_csv)
-        sys.exit(0)
+        return
 
     utils.save_safe_csv(df, fetch_csv)
     utils.save_safe_csv(df, final_csv)
@@ -454,23 +510,23 @@ def phase_apply(db_path, final_csv):
     db.verify_db_compatibility(db_path)
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
-        sys.exit(1)
+        return
     if not os.path.exists(final_csv):
         console.print(utils.t('err_file_not_found', file=final_csv) + utils.t('err_need_fetch_rev'))
-        sys.exit(1)
+        return
 
     console.print(Panel(utils.t('apply_warn'), box=box.HEAVY))
 
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
-        sys.exit(1)
+        return
 
     utils.clear_input_buffer()
     confirm_word = utils.t('apply_confirm_word')
     confirm = console.input(utils.t('apply_confirm')).strip()
     if confirm.lower() not in [confirm_word.lower(), 'j', 'ja', 'y', 'yes']:
         console.print(utils.t('apply_abort'))
-        sys.exit(0)
+        return
 
     backup_path = f"{db_path}.backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     shutil.copy2(db_path, backup_path)
@@ -484,7 +540,7 @@ def phase_apply(db_path, final_csv):
         updated = db.apply_dataframe_to_mldb(df, db_path)
     except sqlite3.OperationalError as e:
         console.print(utils.t('apply_err_lock', err=str(e)))
-        sys.exit(1)
+        return
 
     console.print(utils.t('apply_success', count=updated, db=db_path))
 
@@ -495,11 +551,11 @@ def phase_maintenance(db_path):
     db.verify_db_compatibility(db_path)
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
-        sys.exit(1)
+        return
 
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
-        sys.exit(1)
+        return
         
     while True:
         utils.clear_input_buffer()
@@ -557,71 +613,171 @@ def phase_maintenance(db_path):
             continue
 
 # ---------------------------------------------------------------------------
-# MAIN
+# INTERAKTIVES HAUPTMENÜ (Ersetzt die Restore.bat)
 # ---------------------------------------------------------------------------
-def main():
-    parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{utils.APP_VERSION}")
-    parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'maintenance', 'check_update'])
-    parser.add_argument('--auto-hoch', action='store_true')
-    parser.add_argument('--full', action='store_true')
-    parser.add_argument('--db', help="Pfad zur mAirList .mldb-Datei")
-    parser.add_argument('--lang', choices=['de', 'en', 'nl'], default='de')
-    parser.add_argument('--no-breaks', action='store_true', help="Schaltet die 50-Track-Pausen ab")
-    args = parser.parse_args()
+def select_language():
+    clear_screen()
+    console.print(f"[cyan]==================================================[/cyan]")
+    console.print(f"[magenta]   mAirList DB Restorer v{utils.APP_VERSION} - Language Setup[/magenta]")
+    console.print(f"[cyan]==================================================[/cyan]\n")
+    console.print("  [green]1[/green] Deutsch\n  [green]2[/green] English\n  [green]3[/green] Nederlands\n")
+    
+    while True:
+        lang_choice = console.input("[cyan]Select / Auswahl / Keuze [1-3]: [/cyan]").strip()
+        if lang_choice == '1': 
+            utils.save_language('de')
+            break
+        elif lang_choice == '2': 
+            utils.save_language('en')
+            break
+        elif lang_choice == '3': 
+            utils.save_language('nl')
+            break
 
-    utils.CURRENT_LANG = args.lang
-    
-    if args.phase == 'check_update':
-        check_for_updates()
-        return
-        
-    if not args.db:
-        console.print("[red]Fehler: --db Argument fehlt![/red]")
-        sys.exit(1)
-    
-    db.verify_db_compatibility(args.db)
+def run_interactive_menu():
+    # 1. Sprache laden oder abfragen, falls nicht vorhanden
+    if not utils.load_language():
+        select_language()
 
-    # --- NEU: Ordnerstruktur aufraeumen (Data-Ordner) ---
-    data_dir = "Data"
-    os.makedirs(data_dir, exist_ok=True)
-    
-    # Alte Logs und CSVs aus dem Hauptverzeichnis migrieren
-    for f in os.listdir('.'):
-        if f.endswith('_vorschlaege.csv') or f.endswith('_restauriert.csv') or f.endswith('.log'):
-            if os.path.isfile(f):
-                target_path = os.path.join(data_dir, f)
-                try:
-                    # Überschreiben verhindern, falls die Datei schon mal verschoben wurde
-                    if not os.path.exists(target_path):
-                        shutil.move(f, target_path)
-                    else:
-                        os.remove(f) # Wenn sie schon in Data existiert, das alte root-Duplikat loeschen
-                except Exception:
-                    pass
-    
-    db_base_name = os.path.splitext(os.path.basename(args.db))[0]
-    timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
-    # Pfade jetzt in den Unterordner routen
-    dynamic_log_file = os.path.join(data_dir, f"{db_base_name}_{timestamp_str}.log")
-    
-    logging.basicConfig(
-        filename=dynamic_log_file,
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        encoding='utf-8'
-    )
-    
+    # 2. Update Check & Initialisierung
+    clear_screen()
+    check_for_updates(interactive=True)
+    perform_migration()
     utils.init_credentials()
 
-    fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
-    final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
+    # 3. Haupt-Schleife
+    mldbpfad = ""
+    while True:
+        clear_screen()
+        console.print(f"[cyan]==================================================[/cyan]")
+        console.print(f"[magenta]   {utils.t('menu_title')} v{utils.APP_VERSION}[/magenta]\n")
+        console.print(f"[magenta]       {utils.t('menu_copyright')}[/magenta]")
+        console.print(f"[cyan]==================================================[/cyan]\n")
 
-    if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full, no_breaks=args.no_breaks)
-    elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
-    elif args.phase == 'maintenance': phase_maintenance(args.db)
-    else: phase_apply(args.db, final_csv)
+        if not mldbpfad:
+            console.print(f"[yellow] {utils.t('menu_db_none')}[/yellow]")
+        else:
+            console.print(f"[green] {utils.t('menu_db_act')} {mldbpfad}[/green]")
+
+        console.print(f"\n  [[cyan]0[/cyan]] {utils.t('menu_opt0')}\n")
+        
+        console.print(f"[yellow] {utils.t('menu_h1')}[/yellow]")
+        console.print(f"  [[green]1[/green]] {utils.t('menu_opt1')}")
+        console.print(f"  [[green]2[/green]] {utils.t('menu_opt2')}")
+        console.print(f"  [[green]3[/green]] {utils.t('menu_opt3')}\n")
+        
+        console.print(f"[yellow] {utils.t('menu_h2')}[/yellow]")
+        console.print(f"  [[green]4[/green]] {utils.t('menu_opt4')}")
+        console.print(f"  [[green]5[/green]] {utils.t('menu_opt5')}\n")
+        
+        console.print(f"[yellow] {utils.t('menu_h3')}[/yellow]")
+        console.print(f"  [[green]6[/green]] {utils.t('menu_opt6')}\n")
+        
+        console.print(f"[yellow] {utils.t('menu_h4')}[/yellow]")
+        console.print(f"  [[green]7[/green]] {utils.t('menu_opt7')}\n")
+        
+        console.print(f"  [[green]8[/green]] {utils.t('menu_opt8')}")
+        console.print(f"  [[green]9[/green]] {utils.t('menu_opt9')}\n")
+
+        wahl = console.input(f"[cyan]{utils.t('menu_prompt')} [/cyan]").strip()
+
+        if wahl == '8':
+            break
+
+        elif wahl == '9':
+            select_language()
+            continue
+
+        elif wahl == '0':
+            console.print(f"\n[cyan]{utils.t('menu_path_hint1')}[/cyan]")
+            console.print(f"[yellow]{utils.t('menu_path_hint2')}[/yellow]")
+            mldbpfad = console.input(f"{utils.t('menu_path_prompt')}").strip().strip('"').strip("'")
+            if mldbpfad:
+                db_base_name, data_dir = setup_logging(mldbpfad)
+                fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
+                final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
+            continue
+
+        # Prüfe bei allen anderen Optionen, ob eine DB da ist
+        if not mldbpfad:
+            console.print(f"\n[bold red]{utils.t('menu_err_db')}[/bold red]")
+            console.input(f"\n[cyan]{utils.t('menu_continue')}[/cyan]")
+            continue
+
+        # Aktionen ausführen
+        if wahl == '1':
+            phase_fetch(mldbpfad, fetch_csv, full=False, no_breaks=False)
+        elif wahl == '2':
+            phase_fetch(mldbpfad, fetch_csv, full=False, no_breaks=True)
+        elif wahl == '3':
+            console.print(f"\n[bold yellow]{utils.t('menu_warn_full')}[/bold yellow]")
+            bestaetigung = console.input(f"{utils.t('menu_sure')}").strip().lower()
+            if bestaetigung in ['j', 'y', 'ja', 'yes']:
+                phase_fetch(mldbpfad, fetch_csv, full=True, no_breaks=True)
+        elif wahl == '4':
+            phase_review(fetch_csv, final_csv, auto_hoch=False)
+        elif wahl == '5':
+            phase_review(fetch_csv, final_csv, auto_hoch=True)
+        elif wahl == '6':
+            phase_maintenance(mldbpfad)
+        elif wahl == '7':
+            console.print(f"\n[bold yellow]{utils.t('menu_warn_apply1')}\n{utils.t('menu_warn_apply2')}[/bold yellow]\n")
+            phase_apply(mldbpfad, final_csv)
+        else:
+            console.print(f"[bold red]{utils.t('menu_err')}[/bold red]")
+
+        console.input(f"\n[cyan]{utils.t('menu_continue')}[/cyan]")
+
+# ---------------------------------------------------------------------------
+# MAIN ENTRY POINT
+# ---------------------------------------------------------------------------
+def main():
+    # Wenn Argumente übergeben werden (z.B. für Cronjobs oder Tests)
+    if len(sys.argv) > 1:
+        parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{utils.APP_VERSION}")
+        parser.add_argument('phase', choices=['fetch', 'review', 'apply', 'maintenance', 'check_update'])
+        parser.add_argument('--auto-hoch', action='store_true')
+        parser.add_argument('--full', action='store_true')
+        parser.add_argument('--db', help="Pfad zur mAirList .mldb-Datei")
+        parser.add_argument('--lang', choices=['de', 'en', 'nl'], default='de')
+        parser.add_argument('--no-breaks', action='store_true', help="Schaltet die 50-Track-Pausen ab")
+        args = parser.parse_args()
+
+        utils.save_language(args.lang)
+        
+        if args.phase == 'check_update':
+            check_for_updates()
+            return
+            
+        if not args.db:
+            console.print("[red]Fehler: --db Argument fehlt![/red]")
+            sys.exit(1)
+        
+        db.verify_db_compatibility(args.db)
+        perform_migration()
+        db_base_name, data_dir = setup_logging(args.db)
+        utils.init_credentials()
+
+        fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
+        final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
+
+        if args.phase == 'fetch': phase_fetch(args.db, fetch_csv, full=args.full, no_breaks=args.no_breaks)
+        elif args.phase == 'review': phase_review(fetch_csv, final_csv, auto_hoch=args.auto_hoch)
+        elif args.phase == 'maintenance': phase_maintenance(args.db)
+        else: phase_apply(args.db, final_csv)
+
+    # Normaler Doppelklick-Modus (Interaktives Menü)
+    else:
+        run_interactive_menu()
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        console.print(f"\n[bold red]Ein unerwarteter Fehler ist aufgetreten:[/bold red]")
+        console.print(traceback.format_exc())
+        input("\nProgramm wurde unerwartet beendet. Drücke Enter, um das Fenster zu schließen...")
+    except KeyboardInterrupt:
+        # Falls der User das Programm mit Strg+C abwürgt, einfach leise beenden
+        pass

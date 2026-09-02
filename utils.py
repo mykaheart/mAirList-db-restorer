@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.50.28 Beta"
+APP_VERSION = "0.51.01 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -53,6 +53,35 @@ ITEM_TYPE_MAPPING = {
 # ---------------------------------------------------------------------------
 T = {
     'de': {
+        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and Google Gemini (Programming)",
+        'menu_title': "mAirList Datenbank-Assistent",
+        'menu_db_none': "Aktive Datenbank: KEINE (Bitte zuerst auswählen!)",
+        'menu_db_act': "Aktive Datenbank:",
+        'menu_opt0': "Aktive Datenbank auswählen / wechseln",
+        'menu_h1': "--- SCHRITT 1: METADATEN LADEN ---",
+        'menu_opt1': "Smart-Abruf - Standard (Pausiert alle 50 Tracks / Fortsetzbar)",
+        'menu_opt2': "Smart-Abruf - Overnight (Läuft ohne Pausen durch / Fortsetzbar)",
+        'menu_opt3': "Voll-Abruf  - Reset und Overnight (Alle Tracks komplett neu)",
+        'menu_h2': "--- SCHRITT 2: DATEN KONTROLLIEREN ---",
+        'menu_opt4': "Kontrolle   - Alle Vorschläge manuell prüfen",
+        'menu_opt5': "Kontrolle   - Sichere Treffer automatisch übernehmen",
+        'menu_h3': "--- WARTUNG ---",
+        'menu_opt6': "Wartung     - Massenbearbeitung (Genres, Typen, Schreibweisen, Attribute)",
+        'menu_h4': "--- SCHRITT 3: IN MAIRLIST SPEICHERN ---",
+        'menu_opt7': "Speichern   - Geprüfte Werte in .mldb-Kopie schreiben",
+        'menu_opt8': "Beenden",
+        'menu_opt9': "Sprache ändern / Change Language",
+        'menu_prompt': "Auswahl [0-9]:",
+        'menu_err': "Ungültige Auswahl. Bitte erneut versuchen.",
+        'menu_err_db': "Fehler: Keine Datenbank ausgewählt! Bitte wähle zuerst Option 0.",
+        'menu_path_hint1': "Hinweis: Bitte den Pfad zu einer KOPIE deiner Datenbank angeben.",
+        'menu_path_hint2': "(Tipp: Einfach die .mldb-Datei in dieses Fenster ziehen und Enter drücken)",
+        'menu_path_prompt': "Pfad: ",
+        'menu_warn_full': "ACHTUNG: Dies ruft ALLE Tracks erneut ab, auch bereits verarbeitete.",
+        'menu_sure': "Wirklich fortfahren? [j/N]: ",
+        'menu_warn_apply1': "ACHTUNG: Dieser Vorgang schreibt alle geprüften Werte in die oben",
+        'menu_warn_apply2': "ausgewählte .mldb-Datei. Nutze hierfür IMMER EINE KOPIE!",
+        'menu_continue': "Drücke Enter, um ins Hauptmenü zurückzukehren...",
         'setup_title': "[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden lokal maskiert in 'config.json' gespeichert.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
@@ -127,6 +156,35 @@ T = {
         'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
     },
     'en': {
+        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and Google Gemini (Programming)",
+        'menu_title': "mAirList Database Assistant",
+        'menu_db_none': "Active Database: NONE (Please select first!)",
+        'menu_db_act': "Active Database:",
+        'menu_opt0': "Select / change active database",
+        'menu_h1': "--- STEP 1: FETCH METADATA ---",
+        'menu_opt1': "Smart Fetch - Standard (Pauses every 50 tracks / Resumable)",
+        'menu_opt2': "Smart Fetch - Overnight (Runs continuously / Resumable)",
+        'menu_opt3': "Full Fetch  - Reset and Overnight (Re-fetch all tracks)",
+        'menu_h2': "--- STEP 2: REVIEW DATA ---",
+        'menu_opt4': "Review      - Manually inspect all proposals",
+        'menu_opt5': "Review      - Auto-accept safe matches (ask for unsure ones)",
+        'menu_h3': "--- MAINTENANCE ---",
+        'menu_opt6': "Maintenance - Mass editing (Genres, Item Types, Text Case, Attributes)",
+        'menu_h4': "--- STEP 3: SAVE TO MAIRLIST ---",
+        'menu_opt7': "Apply       - Write verified values to .mldb copy",
+        'menu_opt8': "Exit",
+        'menu_opt9': "Change Language / Sprache ändern",
+        'menu_prompt': "Choice [0-9]:",
+        'menu_err': "Invalid choice. Please try again.",
+        'menu_err_db': "Error: No database selected! Please choose Option 0 first.",
+        'menu_path_hint1': "Note: Please provide the path to a COPY of your database.",
+        'menu_path_hint2': "(Tip: Just drag and drop the .mldb file into this window and press Enter)",
+        'menu_path_prompt': "Path: ",
+        'menu_warn_full': "WARNING: This will re-fetch ALL tracks, including already processed ones.",
+        'menu_sure': "Really continue? [y/N]: ",
+        'menu_warn_apply1': "WARNING: This operation writes all verified values to the",
+        'menu_warn_apply2': "selected .mldb file. ALWAYS USE A COPY for this!",
+        'menu_continue': "Press Enter to return to the main menu...",
         'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails will be safely masked locally in 'config.json'.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
@@ -201,6 +259,35 @@ T = {
         'maint_no_changes': "[yellow]No changes needed.[/yellow]"
     },
     'nl': {
+        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and Google Gemini (Programming)",
+        'menu_title': "mAirList Database Assistent",
+        'menu_db_none': "Actieve database: GEEN (Selecteer eerst!)",
+        'menu_db_act': "Actieve database:",
+        'menu_opt0': "Actieve database selecteren / wijzigen",
+        'menu_h1': "--- STAP 1: METADATA OPHALEN ---",
+        'menu_opt1': "Smart-Fetch - Standaard (Pauzeert elke 50 tracks / Hervatbaar)",
+        'menu_opt2': "Smart-Fetch - Overnight (Draait continu / Hervatbaar)",
+        'menu_opt3': "Full-Fetch  - Reset en Overnight (Alle tracks volledig opnieuw)",
+        'menu_h2': "--- STAP 2: DATA CONTROLEREN ---",
+        'menu_opt4': "Controle    - Alle suggesties handmatig controleren",
+        'menu_opt5': "Controle    - Veilige matches automatisch accepteren",
+        'menu_h3': "--- ONDERHOUD ---",
+        'menu_opt6': "Onderhoud   - Massabewerking (Genres, Typen, Tekst, Attributen)",
+        'menu_h4': "--- STAP 3: OPSLAAN IN MAIRLIST ---",
+        'menu_opt7': "Opslaan     - Gecontroleerde waarden in .mldb-kopie schrijven",
+        'menu_opt8': "Afsluiten",
+        'menu_opt9': "Taal wijzigen / Change Language",
+        'menu_prompt': "Keuze [0-9]:",
+        'menu_err': "Ongeldige keuze. Probeer het opnieuw.",
+        'menu_err_db': "Fout: Geen database geselecteerd! Kies eerst optie 0.",
+        'menu_path_hint1': "Let op: Geef het pad op naar een KOPIE van je database.",
+        'menu_path_hint2': "(Tip: Sleep het .mldb bestand gewoon in dit venster en druk op Enter)",
+        'menu_path_prompt': "Pad: ",
+        'menu_warn_full': "WAARSCHUWING: Dit haalt ALLE tracks opnieuw op, inclusief reeds verwerkte tracks.",
+        'menu_sure': "Weet je het zeker? [j/N]: ",
+        'menu_warn_apply1': "WAARSCHUWING: Dit proces schrijft alle gecontroleerde waarden naar het",
+        'menu_warn_apply2': "bovenstaande .mldb bestand. Gebruik hiervoor ALTIJD EEN KOPIE!",
+        'menu_continue': "Druk op Enter om terug te keren naar het hoofdmenu...",
         'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal gemaskeerd in 'config.json' opgeslagen.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
@@ -267,7 +354,7 @@ T = {
         'maint_opt4': "  [[green]4[/green]] Item Types vertalen (bijv. Music -> Musik)",
         'maint_opt5': "  [[green]5[/green]] ALLE onderhoudstaken achter elkaar uitvoeren",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-5]: ",
+        'maint_prompt': "Keuze [0-9]: ",
         'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
         'maint_done_clear': "[bold green]✓ Klaar! {count} oude attributen (Lyrics/Platinum Notes) verwijderd.[/bold green]",
         'maint_done_types': "[bold green]✓ Klaar! {count} interne item types vertaald.[/bold green]",
@@ -345,6 +432,33 @@ def get_best_duration(dur, tot_dur):
 # ---------------------------------------------------------------------------
 # Konfiguration & Setup
 # ---------------------------------------------------------------------------
+def load_language():
+    global CURRENT_LANG
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                saved_lang = config.get('LANG')
+                if saved_lang in ['de', 'en', 'nl']:
+                    CURRENT_LANG = saved_lang
+                    return True
+        except Exception:
+            pass
+    return False
+
+def save_language(lang):
+    global CURRENT_LANG
+    CURRENT_LANG = lang
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception: pass
+    config['LANG'] = lang
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4)
+
 def init_credentials():
     global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS, CUSTOM_LANGS
     config = {}
@@ -377,13 +491,14 @@ def init_credentials():
             if _is_valid_email(MB_CONTACT): break
             console.print(t('setup_email_err'))
 
-    config_data = {
-        'DISCOGS_KEY': encode_b64(DISCOGS_KEY),
-        'DISCOGS_SECRET': encode_b64(DISCOGS_SECRET),
-        'MB_CONTACT': encode_b64(MB_CONTACT),
-        'DB_IGNORES': config.get('DB_IGNORES', {}),
-        'CUSTOM_LANGS': CUSTOM_LANGS
-    }
+    config_data = config.copy()
+    config_data['DISCOGS_KEY'] = encode_b64(DISCOGS_KEY)
+    config_data['DISCOGS_SECRET'] = encode_b64(DISCOGS_SECRET)
+    config_data['MB_CONTACT'] = encode_b64(MB_CONTACT)
+    config_data['DB_IGNORES'] = config.get('DB_IGNORES', {})
+    config_data['CUSTOM_LANGS'] = CUSTOM_LANGS
+    if 'LANG' not in config_data: config_data['LANG'] = CURRENT_LANG
+    
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config_data, f, indent=4)
 

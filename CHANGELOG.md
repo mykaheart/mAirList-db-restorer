@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.51.01 Beta] - 2026-09-02
+### Changed
+- **Standalone Executable Migration (The "All-in-One" Update):** The tool has been completely refactored from a hybrid Batch/Python architecture into a fully self-contained Python application, designed to be distributed as a single compiled `.exe` file. Users no longer need to install Python or dependencies manually. `Restore.bat` has been deprecated and removed.
+- **Integrated Interactive Menu:** The legacy Windows batch startup menu has been entirely replaced with a native, trilingual, `rich`-powered terminal interface directly embedded within `main.py`, offering a much cleaner and more robust user experience.
+
+### Added
+- **Persistent Language Selection:** The user's preferred interface language is now automatically saved to `config.json`. The initial language prompt is skipped on subsequent startups. A new Option `[9]` has been added to the main menu to change the language at any time.
+- **Execution "Airbag" (Crash Prevention):** Implemented a global error handler at the application entry point. If the tool encounters a critical error when launched via double-click, it will no longer silently close the terminal window. Instead, it displays the full error traceback and waits for user input.
+- **Dynamic Working Directory Detection:** The tool now intelligently detects its runtime environment (frozen `.exe` vs. standard `.py` script) and explicitly sets the correct working directory. This prevents `PermissionError` (e.g., `[WinError 5]`) when creating the `Data` folder if the tool is launched from a system context.
+
 ## [0.50.28 Beta] - 2026-09-02
 ### Added
 - **Workspace Cleanup (Data Directory):** The script now automatically creates a `Data` subfolder and seamlessly migrates all session files (`.csv` and `.log`) into it upon execution. This keeps the root directory clean and organized without losing any prior progress.
