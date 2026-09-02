@@ -1,115 +1,79 @@
-# 📖 User Manual: mAirList DB Restorer
+# 📖 Manual: mAirList DB Restorer[cite: 6]
 
-Welcome to the official manual for the **mAirList DB Restorer**! This tool was designed to save you hundreds of hours of tedious manual work in the cue editor by automatically searching for and adding missing metadata (years, genres, albums, labels) via the MusicBrainz and Discogs APIs.
+Welcome to the official manual for the **mAirList DB Restorer**![cite: 6] This tool was developed to save you hundreds of hours of tedious manual work in the cue editor by fully automatically searching for and adding missing metadata (years, genres, albums, labels) via the MusicBrainz and Discogs APIs.[cite: 6]
 
-To ensure everything runs smoothly, please complete the following brief setup once.
-
----
-
-## 1. Preparation & Installation
-
-Since this tool is a Python script, your computer requires the appropriate environment to run it. The setup only takes about 5 minutes.
-
-### Step 1.1: Install Python
-1. Download the latest version of **Python** for Windows: [python.org/downloads](https://www.python.org/downloads/)
-2. Run the downloaded `.exe` file.
-3. ⚠️ **EXTREMELY IMPORTANT:** Before clicking "Install Now", make sure to check the box at the bottom that says **"Add Python to PATH"**! If this box is unchecked, the script will fail to start later.
-4. Click "Install Now" and wait for the installation to finish.
-
-### Step 1.2: Install Required Libraries
-The script relies on external libraries (e.g., for the colorful terminal menu or CSV export). These must be installed once.
-1. Press `Windows Key + R` on your keyboard.
-2. Type `cmd` into the small window and press `Enter`. (The black Windows Command Prompt will open).
-3. Copy the following command, paste it into the black window, and press `Enter`:
-   `pip install pandas requests rich`
-4. Windows will now download the required packages. Once finished, you can close the window.
-
-### Step 1.3: Generate Discogs API Keys
-To access the massive Discogs database, the script requires a (free) API key.
-1. Create a free account on [discogs.com](https://www.discogs.com) (if you don't have one) and log in.
-2. Click on your profile picture in the top right corner and select **Settings**.
-3. In the left menu, go all the way down to **Developers**.
-4. Click the **"Create an App"** button (or Generate Token).
-5. Enter any name for the app (e.g., "mAirList Restorer").
-6. You will receive two important cryptographic strings: The **Consumer Key** and the **Consumer Secret**.
-7. Copy both values. The very first time you run `Restore.bat`, the script will ask for them and save them securely and masked.
+Thanks to the "All-in-One" architecture, the program is ready to use immediately – without any complicated installation![cite: 6] To ensure everything runs smoothly, please perform the following brief setup once.[cite: 6]
 
 ---
 
-## 2. The Golden Rule: Backups! 🛡️
+## 1. Preparation & Installation[cite: 6]
 
-The most important aspect of working with databases is data security. The mAirList DB Restorer dives deep into the structure and modifies metadata fully automatically.
+The tool is a completely standalone application (`.exe`).[cite: 6] You do not need to install Python or any code libraries.[cite: 6] Simply download the current ZIP file, extract it to a location of your choice, and start the file **`mAirList-DB-Restorer.exe`**.[cite: 6]
 
-⚠️ **NEVER work with the active database file (`.mldb`) that mAirList currently has open!**
-
-When mAirList is running, it locks the database file. If the Python script attempts to write new genres or release years to this file at the same time, the database can be irreparably corrupted in the worst-case scenario.
-
-### The Secure Workflow:
-1. Close mAirList or open Windows Explorer and navigate to the folder where your `.mldb` file is located.
-2. Copy the file (e.g., `Archive.mldb`) and paste it in a safe place, such as your **Desktop**.
-3. Start `Restore.bat`.
-4. When the script asks for the path to the database, **do not type it out manually**!
-5. 💡 **Pro Tip:** Simply click and hold the copied `.mldb` file on your desktop, and **drag & drop it directly into the black console window**. Press `Enter`. The path is now perfectly configured.
-6. Once you are finished with the tool and all new metadata is saved in the copy, close mAirList, replace the old file with your new, edited copy, and relaunch mAirList.
+### Step 1.1: Generate Discogs API Keys[cite: 6]
+To be allowed to access the huge Discogs database, the script requires a free API key.[cite: 6]
+1. Create a free account on [discogs.com](https://www.discogs.com) (if you don't already have one) and log in.[cite: 6]
+2. Click on your profile picture in the top right and select **Settings**.[cite: 6]
+3. Go to the very bottom of the left menu to **Developers**.[cite: 6]
+4. Click on the **"Create an App"** (or Generate Token) button.[cite: 6]
+5. Enter any name for the app (e.g., "mAirList Restorer").[cite: 6]
+6. You will now receive two important cryptic character strings: The **Consumer Key** and the **Consumer Secret**.[cite: 6]
+7. Copy these two values.[cite: 6] When starting the `.exe` for the very first time, the program will ask you for them and save them securely locally.[cite: 6]
 
 ---
 
-## 3. The Workflow: Restoring Metadata
+## 2. The Golden Rule: Backups! 🛡️[cite: 6]
 
-Once you have launched `Restore.bat` and selected your database copy, the main menu will guide you logically through the entire process.
+The most important thing when working with databases is data security.[cite: 6] The mAirList DB Restorer intervenes deeply in the structure and rewrites metadata fully automatically.[cite: 6]
 
-### Step 3.1: Define Folder Exceptions (Ignore List)
-Before the script begins searching during the initial fetch, it asks you for folders that should be **consistently ignored** (e.g., folders for jingles, news, drops, or commercials).
-*   **Child’s play input:** You can simply drag and drop the physical folder from Windows Explorer into the window or type the exact name of a virtual mAirList folder. Press `Enter` on an empty line when you are finished with the list.
-*   **Individual per database:** The script is smart and saves this exception list individually for precisely that loaded `.mldb` file!
-*   **Customizable at any time:** If you launch the tool later with the same database, it will display the current ignore list and ask whether you want to keep it or recreate it.
+⚠️ **NEVER work with the active database file (`.mldb`) that mAirList has open at this moment!**[cite: 6]
+When mAirList is running, it locks the database file.[cite: 6] If the tool now tries to simultaneously write new genres or years into this file, the database can, in the worst case, be irreparably damaged.[cite: 6] Although the script has a built-in protection that detects locked files, it is better to be safe than sorry.[cite: 6]
 
-### Step 3.2: Fetch Metadata (Fetch)
-In this phase, the script uses the MusicBrainz and Discogs APIs to search for matching metadata for your tracks. Your original values remain completely untouched! You have three options:
-
-*   **[1] Smart Fetch (Standard):** The tool checks only tracks that have *not* been restored yet. To prevent overwhelming you with a massive list, the script automatically pauses after loading 50 tracks. You can then jump straight to the review or load the next 50.
-*   **[2] Smart Fetch (Overnight):** Perfect for huge databases. The script loads all new tracks in one go without pauses. Ideal for letting your PC run overnight.
-*   **[3] Full Fetch (Reset & Overnight):** The script ignores the "RESTAURIERT" flag and completely re-fetches data for **ALL** tracks in the database.
-
-> **Tip:** You can abort the fetch process at any time by pressing `Ctrl + C`. The script safely saves your current progress, allowing you to resume exactly where you left off the next time you start it!
-
-### Step 3.3: Review Data (Review)
-Here, the tool presents you with each track individually and proposes the metadata found on the internet.
-
-*   **Confirm:** If you like a suggestion (e.g., the year), simply press `Enter`. The tool adopts the value and moves to the next field.
-*   **Keep Original (`O` Key):** Next to the suggestion, you will always see your original database value displayed in gray. Is your own value better? Simply type `o` (for Original) and press `Enter`.
-*   **Custom Text:** The suggestion is wrong, but your original value is too? Just type your desired text.
-*   **Live Re-Fetch:** If you type a custom correction for Artist, Title, Year, or Album (e.g., correcting a typo in the artist's name), the script instantly triggers a new API search in the background and dynamically updates labels, genres, and ISRCs to match your correction!
-*   **Oops, typo?** Type `<` or `b` (for Back) and press `Enter` to jump back one track.
-
-### Step 3.4: Save to mAirList (Apply)
-Once you have reviewed all tracks, select option **[7] Apply** in the main menu. Only then does the script open your database copy and write the new, clean metadata into it.
-
-*   The script automatically sets the internal attribute `RESTAURIERT` to `JA` for each processed track.
-*   Tracks with this flag will be automatically skipped during future runs.
-*   Did you notice during live broadcasting later that a track still has incorrect tags? Simply delete the "RESTAURIERT" attribute for that track in mAirList. On the next script run, the tool will recognize the track as "new" and fetch it again.
+### The Safe Workflow:[cite: 6]
+1. Close mAirList or open the Windows Explorer and navigate to the folder where your `.mldb` file is located.[cite: 6]
+2. Copy the file (e.g., `Archiv.mldb`) and paste it in a safe place, like your **Desktop**.[cite: 6]
+3. Start the `Restorer.exe`.[cite: 6]
+4. When the script asks you for the path to the database in the menu, **do not painstakingly type it in**![cite: 6]
+5. 💡 **Pro-Tip:** Simply click on the copied `.mldb` file on your desktop, hold down the mouse button, and **drag and drop the file directly into the window**.[cite: 6] Press `Enter`.[cite: 6] The path is now perfectly entered![cite: 6]
+6. When you are finished with the tool and have saved all new metadata in the copy, close mAirList, replace the old file with your new, edited copy, and restart mAirList.[cite: 6]
 
 ---
 
-## 4. The Maintenance Menu (Mass Editing)
+## 3. The Workflow: Restoring Metadata[cite: 6]
 
-Via option **[6] Maintenance** in the main menu, you access a powerful special utility for deep database operations.
+At the first start, the tool asks you for your preferred language (German, English, Dutch).[cite: 6] The script remembers this setting for the future.[cite: 6] You can change it at any time via Option **[9]** in the main menu.[cite: 6]
+As soon as you have loaded your database copy, the interactive menu guides you logically through the entire process.[cite: 6] *Note: The script automatically creates a folder called `Data` in which it neatly stores all logs and intermediate saves.*[cite: 6]
 
-⚠️ **WARNING:** All functions in this menu write **directly** to the database. There is no preceding review step and no "Undo"!
+### Step 3.1: Define Folder Exceptions (Ignore-List)[cite: 6]
+Before the script begins its search during the first fetch, it asks you for folders that should be **consistently ignored** (e.g., folders for Jingles, News, Drops, or Advertising).[cite: 6]
+*   **Child's play input:** You can simply drag and drop the physical folder from the Windows Explorer in here or type the exact name of a virtual mAirList folder.[cite: 6] Press `Enter` with an empty input when you are done with the list.[cite: 6]
+*   **Individual per database:** The script is smart and remembers this exception list individually for exactly this loaded `.mldb` file![cite: 6]
+*   **Customizable at any time:** If you start the tool later again with the same database, it shows you the current ignore list and asks you whether you want to keep it or create a new one.[cite: 6]
 
-*   **[1] Standardize Genres:** Scans the entire database and aligns messy genres (e.g., "Deep House" or "Trance") to a clean core category (e.g., "EDM").
-*   **[2] Fix Case & Apostrophes:** Repairs incorrect quotation marks (´, `, ‘ become ') in artist and title names. Additionally, "Title Case" is applied (every word starts with a capital letter). Exceptions like "AC/DC" or "a-ha" are protected by a VIP list.
-*   **[3] Delete 'Platinum Notes' & 'Lyrics':** DJ software often clutters mAirList with invisible attributes like lengthy lyrics. This option deletes this data completely and noticeably shrinks your database file size.
+### Step 3.2: Fetch Metadata (Fetch)[cite: 6]
+In this phase, the script searches for the matching metadata for your tracks via the APIs of MusicBrainz and Discogs.[cite: 6] Your original values remain completely untouched![cite: 6]
 
----
+*   **[1] Smart Fetch (Standard):** The tool only checks tracks that have *not* yet been restored.[cite: 6] To avoid overwhelming you with a huge list, the script automatically pauses after 50 loaded tracks.[cite: 6] You can then switch directly to the review or load the next 50.[cite: 6]
+*   **[2] Smart Fetch (Overnight):** Perfect for massive databases.[cite: 6] The script loads all new tracks in one go without pausing.[cite: 6] Ideal for letting the PC work overnight.[cite: 6]
+*   **[3] Full Fetch (Reset & Overnight):** The script ignores the "RESTAURIERT" (RESTORED) flag and completely re-fetches the data for **ALL** tracks in the database.[cite: 6]
 
-## 5. FAQ & Troubleshooting
+> **Tip:** You can cancel the fetch process at any time with the key combination `Ctrl + C`.[cite: 6] The script securely saves your progress up to that point, and you can continue at exactly this point the next time you start![cite: 6]
 
-**Why is the tool not jumping to the next track during the review?**
-The tool is waiting for input. For empty fields, simply press `Enter` to move to the next step.
+### Step 3.3: Review Data (Review)[cite: 6]
+Choose Option **[4]** or **[5]**.[cite: 6] Here, the tool presents you with each track individually and suggests the metadata found on the internet.[cite: 6]
 
-**Why is the script not finding my jingle packages?**
-That is intentional! The script features a built-in OAD protection (On Air Design). It automatically ignores all tracks located in folders present on your ignore list.
+*   **Confirm:** If you like a suggestion (e.g., the year), simply press `Enter`.[cite: 6] The tool accepts the value and jumps to the next field.[cite: 6]
+*   **Keep original (`O` key):** Next to the suggestion, you will always see your original database value in gray.[cite: 6] Is your own value better?[cite: 6] Simply type an `o` (for original) and press `Enter`.[cite: 6]
+*   **Custom text:** The suggestion is wrong, but so is your original value?[cite: 6] Simply type in your desired text.[cite: 6]
+*   **Live Re-Fetch:** If you type your own text for Artist, Title, Year, or Album (e.g., to correct a typo in the artist name), the script immediately fires off a new API search in the background and adjusts Labels, Genres, and ISRC live to your correction![cite: 6]
+*   **Oops, typo?** Type a `<` or `b` (for Back) and press `Enter` to jump back one track.[cite: 6]
 
-**The script is showing colorful error messages (timeouts) during fetching!**
-Don't panic, the "airbag" has deployed. If the Discogs or MusicBrainz servers fail to respond temporarily (timeout), the script will not crash. It logs the error, skips that single track, and proceeds seamlessly with the next one.
+### Step 3.4: Maintenance[cite: 6]
+Under Option **[6]** you will find powerful tools for mass editing.[cite: 6] Here you can, among other things, standardize messy genres, repair incorrect capitalization (Title Case), delete old attributes like "Lyrics" (to shrink the database), or have the English mAirList Item Types (e.g., "Music") fully automatically translated into your local language.[cite: 6]
+
+### Step 3.5: Save in mAirList (Apply)[cite: 6]
+When you have checked all tracks, select Option **[7] Save** in the main menu.[cite: 6] Only now does the script open your database copy and write the new, clean metadata into it using a fast bulk process.[cite: 6]
+
+*   The script automatically sets the internal attribute `RESTAURIERT` to `JA` (YES) for each track.[cite: 6]
+*   Tracks with this flag will be automatically skipped during future runs.[cite: 6]
+*   If you notice later during live operation that a track has wrong tags after all?[cite: 6] Simply delete the "RESTAURIERT" attribute for this track in mAirList.[cite: 6] The next time the script runs, the tool will recognize the track as "new" and load it again.[cite: 6]
