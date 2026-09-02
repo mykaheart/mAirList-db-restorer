@@ -79,6 +79,7 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
         items['ID'] = items['idx'].astype(str)
         items['Title'] = items['title'] if 'title' in items.columns else ''
         items['Artist'] = items['artist'] if 'artist' in items.columns else ''
+        items['ItemType'] = items['type'] if 'type' in items.columns else ''
         items['Filename'] = items['filename'] if 'filename' in items.columns else ''
         items['Duration'] = items['duration'] if 'duration' in items.columns else 0.0
         items['TotalDuration'] = items['totalduration'] if 'totalduration' in items.columns else 0.0
@@ -141,11 +142,12 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
     try:
         attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
         
-        # --- NEU: Wir mappen alle internationalen Attribute intern auf Deutsch ---
+        # --- Wir mappen alle internationalen Attribute intern auf Deutsch ---
         def map_read_attr(n):
             nl = str(n).lower()
             if nl in ['year', 'jaar']: return 'Jahr'
             if nl in ['language', 'taal']: return 'Sprache'
+            if nl in ['type', 'soort']: return 'Typ'
             return n
             
         attrs['name'] = attrs['name'].apply(map_read_attr)
@@ -203,9 +205,11 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
         if db_lang == 'en':
             if n == 'Jahr': return 'Year'
             if n == 'Sprache': return 'Language'
+            if n == 'Typ': return 'Type'
         elif db_lang == 'nl':
             if n == 'Jahr': return 'Jaar'
             if n == 'Sprache': return 'Taal'
+            if n == 'Typ': return 'Soort'
         return n
 
     conn = sqlite3.connect(db_path)
@@ -317,3 +321,30 @@ def run_maintenance_clear_fields(db_path):
         utils.log_change("MAINTENANCE", f"{deleted} alte Attribute (Lyrics/Platinum Notes) entfernt.")
     conn.close()
     return deleted
+
+def run_maintenance_types(db_path):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    
+    cur.execute("SELECT item, value FROM item_attributes WHERE name = 'Typ'")
+    existing_types = {row[0]: str(row[1]).strip() for row in cur.fetchall()}
+    
+    cur.execute("SELECT idx, type FROM items")
+    items = cur.fetchall()
+    
+    inserts = []
+    for idx, item_type in items:
+        if not item_type: continue
+        
+        if idx not in existing_types or not existing_types[idx]:
+            translated = utils.ITEM_TYPE_MAPPING.get(item_type, '')
+            if translated:
+                inserts.append((idx, 'Typ', translated))
+                
+    if inserts:
+        cur.executemany("INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, ?, ?)", inserts)
+        conn.commit()
+        utils.log_change("MAINTENANCE", f"{len(inserts)} Elementtypen (Typ) übersetzt.")
+        
+    conn.close()
+    return len(inserts)

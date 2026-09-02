@@ -23,7 +23,8 @@ console = Console(highlight=False)
 PROPOSAL_COLUMNS = [
     'Artist_Vorschlag', 'Title_Vorschlag', 'Jahr_Vorschlag', 'Jahr_Konfidenz',
     'Genre_Vorschlag', 'Album_Vorschlag', 'STYLE_Vorschlag', 'DISCOGS_RELEASE_ID_Vorschlag',
-    'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'Sprache_Vorschlag', 'VORSCHLAG_STATUS',
+    'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'Sprache_Vorschlag', 
+    'Typ_Vorschlag', 'VORSCHLAG_STATUS',
 ]
 
 class StepBackException(Exception):
@@ -204,6 +205,14 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
                     df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
                     df.at[idx, 'Sprache_Vorschlag'] = ''
+                    
+                    current_typ = str(row.get('Typ', '')).strip()
+                    if not current_typ:
+                        raw_type = str(row.get('ItemType', '')).strip()
+                        df.at[idx, 'Typ_Vorschlag'] = utils.ITEM_TYPE_MAPPING.get(raw_type, '')
+                    else:
+                        df.at[idx, 'Typ_Vorschlag'] = ''
+                        
                     df.at[idx, 'VORSCHLAG_STATUS'] = 'FERTIG'
 
                     conf_color = "green" if combined_conf == "hoch" else ("yellow" if combined_conf == "mittel" else "red")
@@ -218,7 +227,6 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                 progress.update(task, advance=1)
                 if processed_counter % 20 == 0: utils.save_safe_csv(df, fetch_csv)
 
-                # --- NEU: BLOCK-PAUSE (CHUNKING) ---
                 if not no_breaks and processed_counter % 50 == 0 and processed_counter < offen:
                     utils.save_safe_csv(df, fetch_csv)
                     progress.stop()
@@ -404,10 +412,11 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     if inp not in utils.CUSTOM_LANGS and inp not in [lang_map['1'], lang_map['2'], lang_map['3']]:
                         utils.add_custom_lang(inp)
 
-                # Restliche Attribute
+                # Restliche Attribute (Inklusive Auto-Übernahme für Element-Typen)
                 for target_col, sugg_col in [
                     ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
                     ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
+                    ('Typ', 'Typ_Vorschlag')
                 ]:
                     s_val = utils.clean_nan(df.at[idx, sugg_col] if sugg_col in df.columns else row.get(sugg_col))
                     if s_val: df.at[idx, target_col] = s_val
@@ -500,16 +509,18 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt2'))
         console.print(utils.t('maint_opt3'))
         console.print(utils.t('maint_opt4'))
+        console.print(utils.t('maint_opt5'))
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4']:
-            do_genres = choice in ['1', '4']
-            do_case = choice in ['2', '4']
-            do_clear = choice in ['3', '4']
+        elif choice in ['1', '2', '3', '4', '5']:
+            do_genres = choice in ['1', '5']
+            do_case = choice in ['2', '5']
+            do_clear = choice in ['3', '5']
+            do_types = choice in ['4', '5']
             
             try:
                 if do_genres:
@@ -530,6 +541,13 @@ def phase_maintenance(db_path):
                     count = db.run_maintenance_clear_fields(db_path)
                     if count > 0:
                         console.print(utils.t('maint_done_clear', count=count))
+                    else:
+                        console.print(utils.t('maint_no_changes'))
+                        
+                if do_types:
+                    count = db.run_maintenance_types(db_path)
+                    if count > 0:
+                        console.print(utils.t('maint_done_types', count=count))
                     else:
                         console.print(utils.t('maint_no_changes'))
             except sqlite3.OperationalError as e:

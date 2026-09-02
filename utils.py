@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.50.27 Beta"
+APP_VERSION = "0.50.28 Beta"
 CONFIG_FILE = 'config.json'
 
 # Globale Variablen für die Session
@@ -28,8 +28,25 @@ CUSTOM_LANGS = []
 
 MLDB_ATTRIBUTE_FIELDS = [
     'Jahr', 'Genre', 'Album', 'STYLE', 'DISCOGS_RELEASE_ID',
-    'Label', 'Labelcode', 'ISRC', 'Sprache', 'RESTAURIERT'
+    'Label', 'Labelcode', 'ISRC', 'Sprache', 'Typ', 'RESTAURIERT'
 ]
+
+# ---------------------------------------------------------------------------
+# Elementtypen-Übersetzung (mAirList Internal -> Deutsch)
+# ---------------------------------------------------------------------------
+ITEM_TYPE_MAPPING = {
+    'Unknown': 'nicht gesetzt', 'Music': 'Musik', 'Voice': 'Moderation',
+    'News': 'Nachrichten', 'Weather': 'Wetter', 'Traffic': 'Verkehr',
+    'Advertising': 'Werbung', 'Package': 'Beitrag', 'Jingle': 'Jingle',
+    'Sound': 'Geräusch', 'Trailer': 'Trailer', 'Promo': 'Promo',
+    'Sponsorship': 'Sponsor-Jingle', 'Sweeper': 'Sweeper', 'Drop': 'Drop',
+    'StationID': 'Station-ID', 'Bed': 'Bett', 'Instrumental': 'Instrumental',
+    'Show': 'Sendung', 'Stream': 'Stream', 'Container': 'Container',
+    'Playlist': 'Playlist', 'Command': 'Befehl', 'CartwallPage': 'Cartwall-Seite',
+    'Break': 'Unterbrechung', 'Dummy': 'Platzhalter', 'Silence': 'Stille',
+    'Error': 'Fehler', 'Other': 'Andere', 'Custom1': 'Benutzerdefiniert 1',
+    'Custom2': 'Benutzerdefiniert 2', 'Custom3': 'Benutzerdefiniert 3'
+}
 
 # ---------------------------------------------------------------------------
 # Language Dictionary
@@ -62,7 +79,7 @@ T = {
         'fetch_progress': "[bold magenta]Fetching Metadaten...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jahr: [bold cyan]{jahr}[/bold cyan], Konfidenz: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Abruf unterbrochen. Fortschritt sicher gespeichert.[/bold yellow]",
-        'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]Option [4] oder [5] im Hauptmenü (Review)[/bold cyan]",
         'fetch_chunk_pause': "\n[bold yellow]☕ {count} Tracks geladen! Wir empfehlen jetzt ein kurzes Review, um den Überblick zu behalten.[/bold yellow]",
         'fetch_chunk_prompt': "Tippe [cyan]'r'[/cyan] für Review oder [green]Enter[/green] für die nächsten 50 Tracks: ",
         'err_file_not_found': "[bold red][Fehler][/bold red] '{file}' nicht gefunden.",
@@ -83,7 +100,7 @@ T = {
         'no_sugg': "- (Kein Vorschlag) -",
         'rev_interim': "[dim]  (Zwischenstand gespeichert)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review unterbrochen. Bisherige Entscheidungen sind gespeichert.[/bold yellow]",
-        'rev_success': "\n[bold green]✓ Review abgeschlossen![/bold green] Finales Ergebnis in [bold cyan]'{csv}'[/bold cyan].",
+        'rev_success': "\n[bold green]✓ Review abgeschlossen![/bold green] Finales Ergebnis in [bold cyan]'{csv}'[/bold cyan]. Nächster Schritt: [bold cyan]Option [7] im Hauptmenü (Speichern)[/bold cyan]",
         'err_need_fetch_rev': " Erst 'fetch' und 'review' durchführen.",
         'apply_warn': "[bold red]ACHTUNG: Schreibvorgang in .mldb-Datei[/bold red]\nNiemals auf eine aktiv von mAirList geöffnete Datei anwenden!",
         'apply_locked': "[bold red]Datenbank ist aktuell gesperrt![/bold red]\nVermutlich hat mAirList (oder ein anderes Programm) diese Datei\ngerade geöffnet. Schließe das Programm bzw. wähle eine echte\nKopie der Datei aus und versuche es erneut.",
@@ -99,11 +116,13 @@ T = {
         'maint_opt1': "  [[green]1[/green]] Genres standardisieren",
         'maint_opt2': "  [[green]2[/green]] Groß-/Kleinschreibung & Apostrophe korrigieren (Artist/Title)",
         'maint_opt3': "  [[green]3[/green]] 'Platinum Notes' & 'Lyrics' löschen (DB verkleinern)",
-        'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben nacheinander ausführen",
+        'maint_opt4': "  [[green]4[/green]] Elementtypen (Music -> Musik) in mAirList übersetzen",
+        'maint_opt5': "  [[green]5[/green]] ALLE Wartungsaufgaben nacheinander ausführen",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-4]: ",
+        'maint_prompt': "Auswahl [0-5]: ",
         'maint_done_case': "[bold green]✓ Fertig! {count} Tracks (Artist/Title) korrigiert.[/bold green]",
         'maint_done_clear': "[bold green]✓ Fertig! {count} alte Attribute (Lyrics/Platinum Notes) gelöscht.[/bold green]",
+        'maint_done_types': "[bold green]✓ Fertig! {count} Elementtypen (Typ) wurden erfolgreich übersetzt.[/bold green]",
         'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
         'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
     },
@@ -134,7 +153,7 @@ T = {
         'fetch_progress': "[bold magenta]Fetching metadata...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Year: [bold cyan]{jahr}[/bold cyan], Confidence: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Fetch interrupted. Progress safely saved.[/bold yellow]",
-        'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]Option [4] or [5] in the main menu (Review)[/bold cyan]",
         'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks fetched! We recommend a quick review now to keep things manageable.[/bold yellow]",
         'fetch_chunk_prompt': "Type [cyan]'r'[/cyan] for Review or [green]Enter[/green] for the next 50 tracks: ",
         'err_file_not_found': "[bold red][Error][/bold red] '{file}' not found.",
@@ -155,7 +174,7 @@ T = {
         'no_sugg': "- (No suggestion) -",
         'rev_interim': "[dim]  (Intermediate progress saved)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review interrupted. Previous decisions are saved.[/bold yellow]",
-        'rev_success': "\n[bold green]✓ Review completed![/bold green] Final result in [bold cyan]'{csv}'[/bold cyan].",
+        'rev_success': "\n[bold green]✓ Review completed![/bold green] Final result in [bold cyan]'{csv}'[/bold cyan]. Next step: [bold cyan]Option [7] in the main menu (Apply)[/bold cyan]",
         'err_need_fetch_rev': " Run 'fetch' and 'review' first.",
         'apply_warn': "[bold red]WARNING: Write operation to .mldb file[/bold red]\nNever apply to a file currently open in mAirList!",
         'apply_locked': "[bold red]Database is currently locked![/bold red]\nmAirList (or another program) likely has this file\nopen right now. Close the program or select a true\ncopy of the file and try again.",
@@ -171,11 +190,13 @@ T = {
         'maint_opt1': "  [[green]1[/green]] Standardize Genres",
         'maint_opt2': "  [[green]2[/green]] Fix Case & Apostrophes (Artist/Title)",
         'maint_opt3': "  [[green]3[/green]] Delete 'Platinum Notes' & 'Lyrics' (shrink DB)",
-        'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks sequentially",
+        'maint_opt4': "  [[green]4[/green]] Translate Item Types (e.g. Music -> Musik)",
+        'maint_opt5': "  [[green]5[/green]] Execute ALL maintenance tasks sequentially",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-4]: ",
+        'maint_prompt': "Choice [0-5]: ",
         'maint_done_case': "[bold green]✓ Done! Corrected {count} tracks (Artist/Title).[/bold green]",
         'maint_done_clear': "[bold green]✓ Done! Deleted {count} old attributes (Lyrics/Platinum Notes).[/bold green]",
+        'maint_done_types': "[bold green]✓ Done! Translated {count} internal item types.[/bold green]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
         'maint_no_changes': "[yellow]No changes needed.[/yellow]"
     },
@@ -206,7 +227,7 @@ T = {
         'fetch_progress': "[bold magenta]Metadata ophalen...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jaar: [bold cyan]{jahr}[/bold cyan], Betrouwbaarheid: [{c_color}]{conf}[/{c_color}])",
         'fetch_interrupt': "\n[bold yellow]Ophalen onderbroken. Voortgang veilig opgeslagen.[/bold yellow]",
-        'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]py main.py review --db \"{db}\"[/bold cyan]",
+        'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]Optie [4] of [5] in het hoofdmenu (Review)[/bold cyan]",
         'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks opgehaald! We raden een snelle review aan om het overzicht te bewaren.[/bold yellow]",
         'fetch_chunk_prompt': "Typ [cyan]'r'[/cyan] voor Review of [green]Enter[/green] voor de volgende 50 tracks: ",
         'err_file_not_found': "[bold red][Fout][/bold red] '{file}' niet gevonden.",
@@ -227,7 +248,7 @@ T = {
         'no_sugg': "- (Geen suggestie) -",
         'rev_interim': "[dim]  (Tussenstand opgeslagen)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review onderbroken. Eerdere beslissingen zijn opgeslagen.[/bold yellow]",
-        'rev_success': "\n[bold green]✓ Review voltooid![/bold green] Eindresultaat in [bold cyan]'{csv}'[/bold cyan].",
+        'rev_success': "\n[bold green]✓ Review voltooid![/bold green] Eindresultaat in [bold cyan]'{csv}'[/bold cyan]. Volgende stap: [bold cyan]Optie [7] in het hoofdmenu (Opslaan)[/bold cyan]",
         'err_need_fetch_rev': " Voer eerst 'fetch' en 'review' uit.",
         'apply_warn': "[bold red]WAARSCHUWING: Schrijfactie naar .mldb bestand[/bold red]\nNooit toepassen op een bestand dat momenteel open is in mAirList!",
         'apply_locked': "[bold red]Database is momenteel vergrendeld![/bold red]\nWaarschijnlijk heeft mAirList (of een ander programma) dit bestand\nmomenteel geopend. Sluit het programma of selecteer een echte\nkopie van het bestand en probeer het opnieuw.",
@@ -243,11 +264,13 @@ T = {
         'maint_opt1': "  [[green]1[/green]] Genres standaardiseren",
         'maint_opt2': "  [[green]2[/green]] Hoofdletters/kleine letters & apostrofs corrigeren (Artist/Title)",
         'maint_opt3': "  [[green]3[/green]] 'Platinum Notes' & 'Lyrics' verwijderen (DB verkleinen)",
-        'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken achter elkaar uitvoeren",
+        'maint_opt4': "  [[green]4[/green]] Item Types vertalen (bijv. Music -> Musik)",
+        'maint_opt5': "  [[green]5[/green]] ALLE onderhoudstaken achter elkaar uitvoeren",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-4]: ",
+        'maint_prompt': "Keuze [0-5]: ",
         'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
         'maint_done_clear': "[bold green]✓ Klaar! {count} oude attributen (Lyrics/Platinum Notes) verwijderd.[/bold green]",
+        'maint_done_types': "[bold green]✓ Klaar! {count} interne item types vertaald.[/bold green]",
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
         'maint_no_changes': "[yellow]Geen wijzigingen nodig.[/yellow]"
     }
