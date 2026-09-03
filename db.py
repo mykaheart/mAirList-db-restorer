@@ -14,7 +14,6 @@ console = Console(highlight=False)
 SUPPORTED_SCHEMAS = [25]  
 
 def get_schema_version(db_path):
-    """Liest die Schema-Version aus der mAirList-Datenbank aus."""
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -29,7 +28,6 @@ def get_schema_version(db_path):
         return None
 
 def verify_db_compatibility(db_path):
-    """Prüft, ob die DB-Version vom Restorer unterstützt wird und stoppt ggf. das Skript."""
     version = get_schema_version(db_path)
     if version is None:
         console.print("[bold red]Fehler: Konnte die Schema-Version der Datenbank nicht ermitteln. Ist das wirklich eine mAirList .mldb Datei?[/bold red]")
@@ -42,7 +40,6 @@ def verify_db_compatibility(db_path):
     return version
 
 def detect_db_language(db_path, fallback_lang):
-    """Liest ein paar Attribut-Namen aus und erkennt, welche Sprache in mAirList eingestellt ist."""
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -262,22 +259,61 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
     return updated
 
 def run_maintenance_genres(db_path):
+    import sqlite3
+    import utils
+    
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT item, value FROM item_attributes WHERE name = 'Genre'")
-    rows = cur.fetchall()
-    updates = []
-    for item_id, current_genre in rows:
-        if not current_genre: continue
-        mapped = utils.map_to_allowed_genre([current_genre], [])
-        if mapped and mapped != current_genre:
-            updates.append((mapped, item_id, 'Genre'))
-    if updates:
-        cur.executemany("UPDATE item_attributes SET value = ? WHERE item = ? AND name = ?", updates)
-        conn.commit()
-        utils.log_change("MAINTENANCE", f"{len(updates)} Genres bereinigt.")
+    updates_made = 0
+    
+    cur.execute("PRAGMA table_info(items)")
+    items_cols = [row[1].lower() for row in cur.fetchall()]
+    has_native_genre = 'genre' in items_cols
+    id_col = next((c for c in ['idx', 'id', 'itemidx'] if c in items_cols), None)
+    
+    if has_native_genre and id_col:
+        cur.execute(f"SELECT {id_col}, genre FROM items")
+        rows = cur.fetchall()
+        updates = []
+        for item_id, current_genre in rows:
+            if not current_genre: continue
+            mapped = utils.map_to_allowed_genre([current_genre], [])
+            if mapped and mapped != current_genre:
+                updates.append((mapped, item_id))
+        if updates:
+            cur.executemany(f"UPDATE items SET genre = ? WHERE {id_col} = ?", updates)
+            updates_made += len(updates)
+            
+    cur.execute("PRAGMA table_info(item_attributes)")
+    attr_cols = [row[1].lower() for row in cur.fetchall()]
+    
+    if not attr_cols:
+        cur.execute("PRAGMA table_info(attributes)")
+        attr_cols = [row[1].lower() for row in cur.fetchall()]
+        attr_table = "attributes"
+    else:
+        attr_table = "item_attributes"
+        
+    if attr_cols:
+        attr_id_col = next((c for c in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c in attr_cols), None)
+        if attr_id_col:
+            cur.execute(f"SELECT {attr_id_col}, name, value FROM {attr_table} WHERE LOWER(name) = 'genre'")
+            rows = cur.fetchall()
+            updates = []
+            for item_id, attr_name, current_genre in rows:
+                if not current_genre: continue
+                mapped = utils.map_to_allowed_genre([current_genre], [])
+                if mapped and mapped != current_genre:
+                    updates.append((mapped, item_id, attr_name))
+            if updates:
+                cur.executemany(f"UPDATE {attr_table} SET value = ? WHERE {attr_id_col} = ? AND name = ?", updates)
+                updates_made += len(updates)
+                
+    conn.commit()
+    if updates_made > 0:
+        utils.log_change("MAINTENANCE", f"{updates_made} Genres bereinigt.")
     conn.close()
-    return len(updates)
+    return updates_made
 
 def run_maintenance_case(db_path):
     conn = sqlite3.connect(db_path)
@@ -310,17 +346,6 @@ def run_maintenance_case(db_path):
     conn.close()
     return len(updates)
 
-def run_maintenance_clear_fields(db_path):
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("DELETE FROM item_attributes WHERE name IN ('Platinum Notes', 'PLATINUMNOTES', 'Lyrics', 'LYRICS')")
-    deleted = cur.rowcount
-    conn.commit()
-    if deleted > 0:
-        utils.log_change("MAINTENANCE", f"{deleted} alte Attribute (Lyrics/Platinum Notes) entfernt.")
-    conn.close()
-    return deleted
-
 def run_maintenance_types(db_path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -348,66 +373,6 @@ def run_maintenance_types(db_path):
     conn.close()
     return len(inserts)
 
-def run_maintenance_duplicates(db_path):
-    import sqlite3
-    import logging
-    
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    cursor.execute("PRAGMA table_info(items)")
-    items_cols = [row[1].lower() for row in cursor.fetchall()]
-    id_col = next((c for c in ['idx', 'id', 'itemidx'] if c in items_cols), None)
-    
-    cursor.execute("PRAGMA table_info(item_attributes)")
-    attr_cols = [row[1].lower() for row in cursor.fetchall()]
-    
-    if not attr_cols:
-        cursor.execute("PRAGMA table_info(attributes)")
-        attr_cols = [row[1].lower() for row in cursor.fetchall()]
-        attr_table = "attributes"
-    else:
-        attr_table = "item_attributes"
-        
-    attr_id_col = next((c for c in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c in attr_cols), None)
-    
-    if not id_col or not attr_id_col:
-        conn.close()
-        raise sqlite3.OperationalError(f"Konnte Spalten nicht finden! items: {items_cols}, attr_table ({attr_table}): {attr_cols}")
-    
-    query = f"""
-    SELECT {id_col} FROM items 
-    WHERE (LOWER(TRIM(Artist)), LOWER(TRIM(Title))) IN (
-        SELECT LOWER(TRIM(Artist)), LOWER(TRIM(Title))
-        FROM items
-        WHERE Artist IS NOT NULL AND Title IS NOT NULL AND Artist != '' AND Title != ''
-        GROUP BY LOWER(TRIM(Artist)), LOWER(TRIM(Title))
-        HAVING COUNT(*) > 1
-    )
-    """
-    cursor.execute(query)
-    duplicate_ids = [row[0] for row in cursor.fetchall()]
-    
-    if not duplicate_ids:
-        conn.close()
-        return 0
-        
-    updated_count = 0
-    for item_id in duplicate_ids:
-        cursor.execute(f"SELECT 1 FROM {attr_table} WHERE {attr_id_col} = ? AND Name = 'DOPPELUNG'", (item_id,))
-        exists = cursor.fetchone()
-        if exists:
-            cursor.execute(f"UPDATE {attr_table} SET Value = 'JA' WHERE {attr_id_col} = ? AND Name = 'DOPPELUNG'", (item_id,))
-        else:
-            cursor.execute(f"INSERT INTO {attr_table} ({attr_id_col}, Name, Value) VALUES (?, 'DOPPELUNG', 'JA')", (item_id,))
-        updated_count += cursor.rowcount
-        
-    conn.commit()
-    conn.close()
-    
-    logging.info(f"MAINTENANCE: {len(duplicate_ids)} Dopplungen markiert.")
-    return len(duplicate_ids)
-
 def run_maintenance_file_tagger(db_path):
     try:
         import mutagen
@@ -425,7 +390,6 @@ def run_maintenance_file_tagger(db_path):
     from rich.console import Console
     c = Console(highlight=False)
 
-    # --- SMART BASE DIRECTORY FINDER ---
     c.print("\n[cyan]=== Lokale Pfad-Zuordnung ===[/cyan]")
     c.print("Da mAirList Speicherorte (Storage Locations) nutzt, stehen in der DB oft nur relative Pfade")
     c.print("(z.B. 'Filler/Song.mp3'). Ziehe hier nacheinander die Hauptordner rein, in denen das Skript suchen soll.")
@@ -492,11 +456,9 @@ def run_maintenance_file_tagger(db_path):
         filename = str(raw_filename).replace('\\', '/')
         actual_path = None
         
-        # 1. Teste, ob es ein absoluter Pfad ist, der direkt existiert
         if os.path.exists(filename) and os.path.isfile(filename):
             actual_path = filename
         else:
-            # 2. Teste die relativen Pfade in Kombination mit allen angegebenen Basis-Ordnern
             for b_dir in base_dirs:
                 test_path = os.path.join(b_dir, filename.lstrip('/'))
                 if os.path.exists(test_path) and os.path.isfile(test_path):

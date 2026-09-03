@@ -116,9 +116,6 @@ def perform_migration():
                 except Exception:
                     pass
 
-# ---------------------------------------------------------------------------
-# PHASE 1: fetch
-# ---------------------------------------------------------------------------
 def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     db.verify_db_compatibility(db_path)
     if db.is_db_locked(db_path):
@@ -286,9 +283,6 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     utils.save_safe_csv(df, fetch_csv)
     console.print(utils.t('fetch_success', db=db_path))
 
-# ---------------------------------------------------------------------------
-# PHASE 2: review
-# ---------------------------------------------------------------------------
 def phase_review(fetch_csv, final_csv, auto_hoch=False):
     try: 
         df = pd.read_csv(fetch_csv, dtype=str)
@@ -329,7 +323,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
             custom_refetch_needed = False
 
             try:
-                # 1. Artist
                 art_sugg = utils.clean_nan(row.get('Artist_Vorschlag'))
                 if art_sugg:
                     inp = ask_input(utils.t('rev_artist', sugg=art_sugg, orig=orig_art))
@@ -339,7 +332,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         df.at[idx, 'Artist'] = inp
                         custom_refetch_needed = True
 
-                # 2. Title
                 tit_sugg = utils.clean_nan(row.get('Title_Vorschlag'))
                 if tit_sugg:
                     inp = ask_input(utils.t('rev_title', sugg=tit_sugg, orig=orig_tit))
@@ -349,7 +341,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         df.at[idx, 'Title'] = inp
                         custom_refetch_needed = True
 
-                # 3. Jahr
                 jahr_sugg = utils.clean_nan(df.at[idx, 'Jahr_Vorschlag'])
                 konf = utils.clean_nan(df.at[idx, 'Jahr_Konfidenz']) or 'niedrig'
                 conf_badge = f"[green]{utils.t('conf_hoch')}[/green]" if konf == "hoch" else (f"[yellow]{utils.t('conf_mittel')}[/yellow]" if konf == "mittel" else f"[red]{utils.t('conf_niedrig')}[/red]")
@@ -366,7 +357,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                             df.at[idx, 'Jahr'] = inp
                             custom_refetch_needed = True
 
-                # 4. Album
                 album_sugg = utils.clean_nan(df.at[idx, 'Album_Vorschlag'] if 'Album_Vorschlag' in df.columns else row.get('Album_Vorschlag'))
                 disp_album = album_sugg if album_sugg else utils.t('no_sugg')
                 inp = ask_input(utils.t('rev_album', sugg=disp_album, orig=orig_album))
@@ -378,7 +368,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     df.at[idx, 'Album'] = inp
                     custom_refetch_needed = True
 
-                # --- LIVE RE-FETCH LOGIC ---
                 if custom_refetch_needed:
                     updated_art, updated_tit = str(df.at[idx, 'Artist']), str(df.at[idx, 'Title'])
                     target_y = utils.clean_nan(df.at[idx, 'Jahr'])
@@ -403,7 +392,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
                     if mb_lang: df.at[idx, 'Sprache_Vorschlag'] = mb_lang
 
-                # 5. Genre
                 genre_sugg = utils.clean_nan(df.at[idx, 'Genre_Vorschlag'])
                 if genre_sugg:
                     if auto_hoch and konf == 'hoch' and not custom_refetch_needed:
@@ -415,7 +403,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         elif inp.lower() == 'o': df.at[idx, 'Genre'] = orig_genre
                         elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
 
-                # 6. Label
                 label_sugg = utils.clean_nan(df.at[idx, 'Label_Vorschlag'])
                 disp_label = label_sugg if label_sugg else utils.t('no_sugg')
                 inp = ask_input(utils.t('rev_label', sugg=disp_label, orig=orig_label))
@@ -425,7 +412,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     df.at[idx, 'Label'] = orig_label
                 elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Label'] = inp
 
-                # 7. Sprache & Dynamisches Menu
                 lang_sugg = utils.clean_nan(df.at[idx, 'Sprache_Vorschlag'] if 'Sprache_Vorschlag' in df.columns else row.get('Sprache_Vorschlag'))
                 disp_lang = lang_sugg if lang_sugg else utils.t('no_sugg')
                 
@@ -455,7 +441,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     if inp not in utils.CUSTOM_LANGS and inp not in [lang_map['1'], lang_map['2'], lang_map['3']]:
                         utils.add_custom_lang(inp)
 
-                # Restliche Attribute (Inklusive Auto-Übernahme für Element-Typen)
                 for target_col, sugg_col in [
                     ('STYLE', 'STYLE_Vorschlag'), ('DISCOGS_RELEASE_ID', 'DISCOGS_RELEASE_ID_Vorschlag'),
                     ('Labelcode', 'Labelcode_Vorschlag'), ('ISRC', 'ISRC_Vorschlag'),
@@ -490,9 +475,6 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
     utils.save_safe_csv(df, final_csv)
     console.print(utils.t('rev_success', csv=final_csv))
 
-# ---------------------------------------------------------------------------
-# PHASE 3: apply
-# ---------------------------------------------------------------------------
 def phase_apply(db_path, final_csv):
     db.verify_db_compatibility(db_path)
     if not os.path.exists(db_path):
@@ -519,6 +501,20 @@ def phase_apply(db_path, final_csv):
     shutil.copy2(db_path, backup_path)
     console.print(utils.t('apply_backup', path=backup_path))
 
+    # --- SMART BACKUP CLEANUP ---
+    try:
+        db_dir = os.path.dirname(os.path.abspath(db_path)) or "."
+        base_name = os.path.basename(db_path)
+        backups = [os.path.join(db_dir, f) for f in os.listdir(db_dir) if f.startswith(base_name + ".backup-")]
+        backups.sort() # Sortiert automatisch nach Datum im Dateinamen
+        
+        if len(backups) > 5:
+            for old_backup in backups[:-5]:
+                os.remove(old_backup)
+            console.print(utils.t('apply_backup_clean'))
+    except Exception:
+        pass
+
     df = pd.read_csv(final_csv, dtype=str)
     if 'REVIEW_STATUS' in df.columns:
         df = df[df['REVIEW_STATUS'] == 'JA']
@@ -531,9 +527,6 @@ def phase_apply(db_path, final_csv):
 
     console.print(utils.t('apply_success', count=updated, db=db_path))
 
-# ---------------------------------------------------------------------------
-# PHASE 4: maintenance (Wartung)
-# ---------------------------------------------------------------------------
 def phase_maintenance(db_path):
     db.verify_db_compatibility(db_path)
     if not os.path.exists(db_path):
@@ -553,64 +546,39 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt3'))
         console.print(utils.t('maint_opt4'))
         console.print(utils.t('maint_opt5'))
-        console.print(utils.t('maint_opt6')) 
-        console.print(utils.t('maint_opt7'))
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4', '5', '6', '7']:
+        elif choice in ['1', '2', '3', '4', '5']:
             do_genres = choice in ['1', '5']
-            do_case = choice in ['2', '5']
-            do_clear = choice in ['3', '5']
-            do_types = choice in ['4', '5']
-            do_dupes = choice == '6'
-            do_tags = choice == '7'
+            do_case   = choice in ['2', '5']
+            do_types  = choice in ['3', '5']
+            do_tags   = choice == '4'
             
             try:
                 if do_genres:
                     count = db.run_maintenance_genres(db_path)
-                    if count > 0:
-                        console.print(utils.t('std_done', count=count))
-                    else:
-                        console.print(utils.t('maint_no_changes'))
+                    if count > 0: console.print(utils.t('std_done', count=count))
+                    else: console.print(utils.t('maint_no_changes'))
                         
                 if do_case:
                     count = db.run_maintenance_case(db_path)
-                    if count > 0:
-                        console.print(utils.t('maint_done_case', count=count))
-                    else:
-                        console.print(utils.t('maint_no_changes'))
-                        
-                if do_clear:
-                    count = db.run_maintenance_clear_fields(db_path)
-                    if count > 0:
-                        console.print(utils.t('maint_done_clear', count=count))
-                    else:
-                        console.print(utils.t('maint_no_changes'))
+                    if count > 0: console.print(utils.t('maint_done_case', count=count))
+                    else: console.print(utils.t('maint_no_changes'))
                         
                 if do_types:
                     count = db.run_maintenance_types(db_path)
-                    if count > 0:
-                        console.print(utils.t('maint_done_types', count=count))
-                    else:
-                        console.print(utils.t('maint_no_changes'))
-                        
-                if do_dupes:
-                    count = db.run_maintenance_duplicates(db_path)
-                    if count > 0:
-                        console.print(utils.t('maint_done_dupes', count=count))
-                    else:
-                        console.print(utils.t('maint_no_changes'))
+                    if count > 0: console.print(utils.t('maint_done_types', count=count))
+                    else: console.print(utils.t('maint_no_changes'))
                         
                 if do_tags:
+                    console.print("[magenta]Lese Dateien und schreibe Tags... (Das kann je nach Archivgröße dauern)[/magenta]")
                     count = db.run_maintenance_file_tagger(db_path)
-                    if count > 0:
-                        console.print(utils.t('maint_done_tags', count=count))
-                    else:
-                        console.print(utils.t('maint_no_changes'))
+                    if count > 0: console.print(utils.t('maint_done_tags', count=count))
+                    else: console.print(utils.t('maint_no_changes'))
                         
             except sqlite3.OperationalError as e:
                 console.print(utils.t('apply_err_lock', err=str(e)))
@@ -618,9 +586,6 @@ def phase_maintenance(db_path):
         else:
             continue
 
-# ---------------------------------------------------------------------------
-# INTERAKTIVES HAUPTMENÜ (Ersetzt die Restore.bat)
-# ---------------------------------------------------------------------------
 def select_language():
     clear_screen()
     console.print(f"[cyan]==================================================[/cyan]")
@@ -641,17 +606,14 @@ def select_language():
             break
 
 def run_interactive_menu():
-    # 1. Sprache laden oder abfragen, falls nicht vorhanden
     if not utils.load_language():
         select_language()
 
-    # 2. Update Check & Initialisierung
     clear_screen()
     check_for_updates(interactive=True)
     perform_migration()
     utils.init_credentials()
 
-    # 3. Haupt-Schleife
     mldbpfad = ""
     while True:
         clear_screen()
@@ -704,13 +666,11 @@ def run_interactive_menu():
                 final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
             continue
 
-        # Prüfe bei allen anderen Optionen, ob eine DB da ist
         if not mldbpfad:
             console.print(f"\n[bold red]{utils.t('menu_err_db')}[/bold red]")
             console.input(f"\n[cyan]{utils.t('menu_continue')}[/cyan]")
             continue
 
-        # Aktionen ausführen
         if wahl == '1':
             phase_fetch(mldbpfad, fetch_csv, full=False, no_breaks=False)
         elif wahl == '2':
@@ -734,9 +694,6 @@ def run_interactive_menu():
 
         console.input(f"\n[cyan]{utils.t('menu_continue')}[/cyan]")
 
-# ---------------------------------------------------------------------------
-# MAIN ENTRY POINT
-# ---------------------------------------------------------------------------
 def main():
     if len(sys.argv) > 1:
         parser = argparse.ArgumentParser(description=f"mAirList DB Restorer v{utils.APP_VERSION}")
