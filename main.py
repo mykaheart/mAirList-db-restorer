@@ -170,6 +170,28 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
 
     if 'RESTAURIERT' in input_df.columns:
         db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
+        
+        if 'RESTAURIERT' in df.columns:
+            reset_count = 0
+            for idx, row in df.iterrows():
+                item_id = str(row.get('ID', ''))
+                old_val = str(row.get('RESTAURIERT', '')).strip().upper()
+                new_val = str(db_restauriert.get(item_id, '')).strip().upper()
+                
+                if old_val == 'JA' and new_val != 'JA':
+                    df.at[idx, 'VORSCHLAG_STATUS'] = ''
+                    if 'REVIEW_STATUS' in df.columns:
+                        df.at[idx, 'REVIEW_STATUS'] = ''
+                        
+                    db_row = input_df[input_df['ID'] == item_id]
+                    if not db_row.empty:
+                        df.at[idx, 'Artist'] = db_row.iloc[0].get('Artist', '')
+                        df.at[idx, 'Title'] = db_row.iloc[0].get('Title', '')
+                    reset_count += 1
+                    
+            if reset_count > 0:
+                console.print(utils.t('fetch_reset', count=reset_count))
+                
         df['RESTAURIERT'] = df['ID'].map(db_restauriert).fillna('')
 
     if not full:
@@ -423,7 +445,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     lang_map[str(nxt_idx)] = cl
                     nxt_idx += 1
                     
-                hint_parts = ["j", "Enter"]
+                hint_parts = []
                 for k, v in lang_map.items(): hint_parts.append(f"{k}={v}")
                 hint_parts.append("Text")
                 hint_str = "/".join(hint_parts)
@@ -501,12 +523,11 @@ def phase_apply(db_path, final_csv):
     shutil.copy2(db_path, backup_path)
     console.print(utils.t('apply_backup', path=backup_path))
 
-    # --- SMART BACKUP CLEANUP ---
     try:
         db_dir = os.path.dirname(os.path.abspath(db_path)) or "."
         base_name = os.path.basename(db_path)
         backups = [os.path.join(db_dir, f) for f in os.listdir(db_dir) if f.startswith(base_name + ".backup-")]
-        backups.sort() # Sortiert automatisch nach Datum im Dateinamen
+        backups.sort() 
         
         if len(backups) > 5:
             for old_backup in backups[:-5]:
@@ -519,13 +540,51 @@ def phase_apply(db_path, final_csv):
     if 'REVIEW_STATUS' in df.columns:
         df = df[df['REVIEW_STATUS'] == 'JA']
 
+    # --- NEU: OVERWRITE PROTECTION ---
+    # Verhindert das Überschreiben von Tracks, die in der DB bereits auf RESTAURIERT=JA stehen
     try:
-        updated = db.apply_dataframe_to_mldb(df, db_path)
-    except sqlite3.OperationalError as e:
-        console.print(utils.t('apply_err_lock', err=str(e)))
-        return
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(item_attributes)")
+        attr_cols = [row[1].lower() for row in cur.fetchall()]
+        attr_table = "item_attributes" if attr_cols else "attributes"
+        
+        cur.execute(f"PRAGMA table_info({attr_table})")
+        attr_cols = [row[1].lower() for row in cur.fetchall()]
+        attr_id_col = next((c for c in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c in attr_cols), None)
+        
+        if attr_id_col:
+            cur.execute(f"SELECT {attr_id_col} FROM {attr_table} WHERE name = 'RESTAURIERT' AND UPPER(value) = 'JA'")
+            already_restored_ids = {str(row[0]) for row in cur.fetchall()}
+            df = df[~df['ID'].astype(str).isin(already_restored_ids)]
+        conn.close()
+    except Exception:
+        pass
 
-    console.print(utils.t('apply_success', count=updated, db=db_path))
+    if df.empty:
+        console.print(utils.t('apply_no_new'))
+    else:
+        try:
+            updated = db.apply_dataframe_to_mldb(df, db_path)
+            console.print(utils.t('apply_success', count=updated, db=db_path))
+        except sqlite3.OperationalError as e:
+            console.print(utils.t('apply_err_lock', err=str(e)))
+            return
+
+    try:
+        df_full = pd.read_csv(final_csv, dtype=str)
+        if 'REVIEW_STATUS' in df_full.columns:
+            df_full.loc[df_full['REVIEW_STATUS'] == 'JA', 'RESTAURIERT'] = 'JA'
+            utils.save_safe_csv(df_full, final_csv)
+            
+        fetch_csv = final_csv.replace('_restauriert.csv', '_vorschlaege.csv')
+        if os.path.exists(fetch_csv):
+            df_fetch = pd.read_csv(fetch_csv, dtype=str)
+            if 'REVIEW_STATUS' in df_fetch.columns:
+                df_fetch.loc[df_fetch['REVIEW_STATUS'] == 'JA', 'RESTAURIERT'] = 'JA'
+                utils.save_safe_csv(df_fetch, fetch_csv)
+    except Exception:
+        pass
 
 def phase_maintenance(db_path):
     db.verify_db_compatibility(db_path)

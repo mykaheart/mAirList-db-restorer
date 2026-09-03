@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.02 Beta] - 2026-09-03
+### Fixed
+- **Cache Sync & Forced Reset:** Fixed a critical bug where manually removing the 'RESTAURIERT: JA' attribute in mAirList was ignored by the tool's cache. The Fetch phase now detects discrepancies and forces a complete re-fetch for these modified tracks.
+- **Apply Overwrite Protection:** The Apply phase now cross-references the live `.mldb` database before writing. Tracks that are already marked as 'RESTAURIERT: JA' in mAirList are strictly excluded from the write process, preventing manual app edits from being overwritten by older CSV cache data.
+
+### Changed
+- **UI Polish:** Cleaned up the language selection prompt during the Review phase by removing redundant 'j' and 'Enter' hints for a cleaner terminal output.
+
 ## [0.62.00 Beta] - 2026-09-03
 ### Added
 - **Smart Backup Cleanup:** The `Apply` phase now automatically manages the database backup files. It keeps the 5 most recent `.backup` files and silently deletes older ones to prevent the directory from cluttering over time.

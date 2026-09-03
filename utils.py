@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.62.00 Beta"
+APP_VERSION = "0.62.02 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -138,6 +138,7 @@ T = {
         'apply_backup_clean': "[dim]✓ Alte Backups aufgeräumt (die neuesten 5 wurden behalten).[/dim]",
         'apply_err_lock': "\n[bold red][Fehler] Datenbank gelockt / Zugriff verweigert:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Fertig! {count} Zeile(n) in '{db}' erfolgreich aktualisiert.[/bold green]",
+        'apply_no_new': "\n[yellow]Keine neuen Daten zum Speichern vorhanden. (Alle Einträge in der CSV sind in der DB bereits als 'RESTAURIERT' markiert).[/yellow]",
         'conf_hoch': "hoch", 'conf_mittel': "mittel", 'conf_niedrig': "niedrig",
         'maint_title': "\n[bold cyan]=== WARTUNGS-MENÜ ===[/bold cyan]",
         'maint_warn': "[bold red]ACHTUNG: ALLE AKTIONEN HIER SCHREIBEN DIREKT IN DIE DATENBANK OHNE UNDO![/bold red]\nBitte arbeite IMMER auf einer Datenbank-Kopie.",
@@ -242,6 +243,7 @@ T = {
         'apply_backup_clean': "[dim]✓ Cleaned up old backups (keeping the latest 5).[/dim]",
         'apply_err_lock': "\n[bold red][Error] Database locked / Access denied:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Done! {count} row(s) in '{db}' successfully updated.[/bold green]",
+        'apply_no_new': "\n[yellow]No new data to apply. (All entries in the CSV are already marked as 'RESTAURIERT' in the database).[/yellow]",
         'conf_hoch': "high", 'conf_mittel': "medium", 'conf_niedrig': "low",
         'maint_title': "\n[bold cyan]=== MAINTENANCE MENU ===[/bold cyan]",
         'maint_warn': "[bold red]WARNING: ALL ACTIONS HERE WRITE DIRECTLY TO THE DATABASE WITH NO UNDO![/bold red]\nPlease ensure you are working on a COPY.",
@@ -346,6 +348,7 @@ T = {
         'apply_backup_clean': "[dim]✓ Oude back-ups opgeschoond (de laatste 5 zijn bewaard).[/dim]",
         'apply_err_lock': "\n[bold red][Fout] Database vergrendeld / Toegang geweigerd:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Klaar! {count} rij(en) in '{db}' succesvol bijgewerkt.[/bold green]",
+        'apply_no_new': "\n[yellow]Geen nieuwe gegevens om op te slaan. (Alle vermeldingen in de CSV zijn al gemarkeerd als 'RESTAURIERT' in de database).[/yellow]",
         'conf_hoch': "hoog", 'conf_mittel': "gemiddeld", 'conf_niedrig': "laag",
         'maint_title': "\n[bold cyan]=== ONDERHOUDSMENU ===[/bold cyan]",
         'maint_warn': "[bold red]WAARSCHUWING: ALLE ACTIES HIER SCHRIJVEN DIRECT NAAR DE DATABASE ZONDER UNDO![/bold red]\nZorg ervoor dat je op een KOPIE werkt.",

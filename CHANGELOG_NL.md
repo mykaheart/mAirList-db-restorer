@@ -2,6 +2,14 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.62.02 Beta] - 2026-09-03
+### Opgelost
+- **Cache Sync & Geforceerde Reset:** Een kritieke fout verholpen waarbij het handmatig verwijderen van het 'RESTAURIERT: JA'-attribuut in mAirList werd genegeerd door de cache van de tool. De Fetch-fase detecteert nu discrepanties en forceert een complete nieuwe fetch voor deze bewerkte tracks.
+- **Overschrijfbeveiliging (Apply):** De Apply-fase controleert nu live de `.mldb`-database voordat er geschreven wordt. Tracks die in mAirList al zijn gemarkeerd als 'RESTAURIERT: JA', worden strikt uitgesloten van het schrijfproces. Dit voorkomt dat handmatige bewerkingen in de app worden overschreven door oude CSV-cachegegevens.
+
+### Gewijzigd
+- **UI-verfijning:** De prompt voor taalselectie tijdens de Review-fase is opgeschoond. Overtollige 'j'- en 'Enter'-hints zijn verwijderd voor een overzichtelijkere terminalweergave.
+
 ## [0.62.00 Beta] - 2026-09-03
 ### Toegevoegd
 - **Slimme back-up opschoning:** De `Apply`-fase beheert nu automatisch de databaseback-ups. Het script bewaart altijd de 5 meest recente `.backup`-bestanden en verwijdert oudere versies stilletjes om de harde schijf op de lange termijn schoon te houden.
