@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.52.00 Beta"
+APP_VERSION = "0.52.01 Beta"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -571,12 +571,13 @@ def setup_ignored_folders(db_path):
     console.print(t('ign_saved'))
     return ignored
 
+
 # ---------------------------------------------------------------------------
 # Cleaning & Genre-Dictionaries
 # ---------------------------------------------------------------------------
 ALLOWED_GENRES = [
     "Pop", "EDM", "Blues", "Hiphop", "Rap", "Rock", "Classic Rock", 
-    "R and B", "Soul", "Reggae"
+    "Pop-Rock", "R and B", "Soul", "Reggae"
 ]
 
 GENRE_SYNONYMS = {
@@ -586,9 +587,10 @@ GENRE_SYNONYMS = {
     "progressive house": "EDM", "psytrance": "EDM", "tech house": "EDM", 
     "trap": "EDM", "tropical house": "EDM", "electronic": "EDM", "euro house": "EDM",
     "hard rock": "Rock", "indie rock": "Rock", "punk rock": "Rock", 
-    "gothic rock": "Rock", "alternative rock": "Rock", "pop-rock": "Rock", 
+    "gothic rock": "Rock", "alternative rock": "Rock", 
     "metal": "Rock", "heavy metal": "Rock", "nu metal": "Rock", "industrial": "Rock", 
     "rock n roll": "Rock", "rock & roll": "Rock", "rock 'n' roll": "Rock", "deutsch-rock": "Rock",
+    "pop rock": "Pop-Rock", "pop/rock": "Pop-Rock", "pop-rock": "Pop-Rock",
     "synth-pop": "Pop", "synthpop": "Pop", "deutsch-pop": "Pop", "indie pop": "Pop",
     "hip hop": "Hiphop", "hip-hop": "Hiphop", "deutsch-hiphop": "Hiphop",
     "r&b": "R and B", "r&b / soul": "R and B",
