@@ -2,6 +2,14 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.60.00 Beta] - 2026-09-03
+### Hinzugefügt
+- **FLAC-Tagger (Audio-Metadaten-Injektion):** Eine mächtige neue Wartungsoption [7] wurde hinzugefügt, die Metadaten (Artist, Titel, Jahr, Genre, Album, Label) direkt aus der Datenbank in die physischen Audio-Dateien (FLAC, MP3, AIFF) schreibt (benötigt die `mutagen`-Bibliothek). Dies dient als ultimatives Backup, falls die `.mldb`-Datenbank jemals beschädigt wird.
+- **Smarte lokale Pfad-Zuordnung:** Der FLAC-Tagger enthält einen intelligenten On-the-Fly-Pfadübersetzer. Wenn mAirList relative Pfade über Speicherorte (Storage Locations) verwendet, können Nutzer ihre lokalen Basis-Ordner einfach per Drag & Drop ins Terminal ziehen. Das Tool findet und taggt die Dateien automatisch, ohne die in der Datenbank hinterlegten Pfade zu verändern.
+
+### Geändert
+- **Genre-Erweiterung:** `Pop-Rock` wurde zur Liste der `ALLOWED_GENRES` hinzugefügt, um Crossover-Planungen besser zu unterstützen. Synonyme wie "pop rock" oder "pop/rock" werden nun korrekt auf diese neue Kategorie abgebildet, anstatt standardmäßig als "Rock" deklariert zu werden.
+
 ## [0.52.00 Beta] - 2026-09-02
 ### Hinzugefügt
 - **Duplikaterkennung (Wartung):** Neue, stark nachgefragte Wartungsoption [6] hinzugefügt, um Tracks mit identischen Artist/Title-Kombinationen zu finden. Um die Datenbankintegrität absolut zu gewährleisten, verschiebt das Tool keine Elemente, sondern markiert sie sicher mit einem neuen `DOPPELUNG`-Attribut (auf `JA` gesetzt). So können Nutzer sie einfach in der mAirList-GUI filtern und verwalten.

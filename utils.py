@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.52.01 Beta"
+APP_VERSION = "0.60.00 Beta"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -152,12 +152,14 @@ T = {
         'maint_opt4': "  [[green]4[/green]] Elementtypen (Music -> Musik) in mAirList übersetzen",
         'maint_opt5': "  [[green]5[/green]] ALLE Wartungsaufgaben nacheinander ausführen",
         'maint_opt6': "  [[green]6[/green]] Dopplungen finden (Setzt sicheres Attribut 'DOPPELUNG' auf 'JA')",
+        'maint_opt7': "  [[green]7[/green]] FLAC-Tagger (Metadaten aus der DB direkt in Audio-Dateien schreiben)",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-6]: ",
+        'maint_prompt': "Auswahl [0-7]: ",
         'maint_done_case': "[bold green]✓ Fertig! {count} Tracks (Artist/Title) korrigiert.[/bold green]",
         'maint_done_clear': "[bold green]✓ Fertig! {count} alte Attribute (Lyrics/Platinum Notes) gelöscht.[/bold green]",
         'maint_done_types': "[bold green]✓ Fertig! {count} Elementtypen (Typ) wurden erfolgreich übersetzt.[/bold green]",
         'maint_done_dupes': "[bold green]✓ Fertig! {count} Dopplungen in der Datenbank gefunden und markiert.[/bold green]",
+        'maint_done_tags': "[bold green]✓ Fertig! {count} Audio-Dateien (FLAC/AIFF/MP3) wurden erfolgreich getaggt.[/bold green]",
         'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
         'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
     },
@@ -257,12 +259,14 @@ T = {
         'maint_opt4': "  [[green]4[/green]] Translate Item Types (e.g. Music -> Musik)",
         'maint_opt5': "  [[green]5[/green]] Execute ALL maintenance tasks sequentially",
         'maint_opt6': "  [[green]6[/green]] Find duplicates (Safely sets 'DOPPELUNG' attribute to 'JA')",
+        'maint_opt7': "  [[green]7[/green]] FLAC-Tagger (Write DB metadata directly into physical audio files)",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-6]: ",
+        'maint_prompt': "Choice [0-7]: ",
         'maint_done_case': "[bold green]✓ Done! Corrected {count} tracks (Artist/Title).[/bold green]",
         'maint_done_clear': "[bold green]✓ Done! Deleted {count} old attributes (Lyrics/Platinum Notes).[/bold green]",
         'maint_done_types': "[bold green]✓ Done! Translated {count} internal item types.[/bold green]",
         'maint_done_dupes': "[bold green]✓ Done! Found and marked {count} duplicate tracks in the DB.[/bold green]",
+        'maint_done_tags': "[bold green]✓ Done! Successfully tagged {count} audio files (FLAC/AIFF/MP3).[/bold green]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
         'maint_no_changes': "[yellow]No changes needed.[/yellow]"
     },
@@ -362,12 +366,14 @@ T = {
         'maint_opt4': "  [[green]4[/green]] Item Types vertalen (bijv. Music -> Musik)",
         'maint_opt5': "  [[green]5[/green]] ALLE onderhoudstaken achter elkaar uitvoeren",
         'maint_opt6': "  [[green]6[/green]] Dubbele tracks vinden (Zet veilig het 'DOPPELUNG' attribuut op 'JA')",
+        'maint_opt7': "  [[green]7[/green]] FLAC-Tagger (Metadata uit DB direct naar audiobestanden schrijven)",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-6]: ",
+        'maint_prompt': "Keuze [0-7]: ",
         'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
         'maint_done_clear': "[bold green]✓ Klaar! {count} oude attributen (Lyrics/Platinum Notes) verwijderd.[/bold green]",
         'maint_done_types': "[bold green]✓ Klaar! {count} interne item types vertaald.[/bold green]",
         'maint_done_dupes': "[bold green]✓ Klaar! {count} dubbele tracks gevonden en gemarkeerd in de DB.[/bold green]",
+        'maint_done_tags': "[bold green]✓ Klaar! {count} audiobestanden (FLAC/AIFF/MP3) succesvol getagd.[/bold green]",
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
         'maint_no_changes': "[yellow]Geen wijzigingen nodig.[/yellow]"
     }

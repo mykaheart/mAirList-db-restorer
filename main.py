@@ -57,7 +57,6 @@ def check_for_updates(interactive=False):
                 if line.startswith("APP_VERSION ="):
                     remote_version = line.split("=")[1].strip().strip('"').strip("'")
                     if remote_version != utils.APP_VERSION:
-                        # NEU: Direkter Hinweis auf den ZIP Download in Google Drive
                         console.print(f"[bold yellow]⚡ Update verfügbar! Neue Version {remote_version} wurde veröffentlicht (Du nutzt {utils.APP_VERSION}).[/bold yellow]")
                         console.print(f"[bold cyan]👉 Download als fertige ZIP-Datei (inkl. Handbüchern) hier:[/bold cyan]")
                         console.print(f"[white]https://drive.google.com/file/d/1lV2qG7nSj28BKC2W5FoPn4bgfqqsDjdM/view?usp=sharing[/white]")
@@ -129,7 +128,6 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     ignored_folders = utils.setup_ignored_folders(db_path)
     input_df = db.load_dataframe_from_mldb(db_path, ignored_folders)
     
-    # NEU: Filtere System- und Dummy-Typen rigoros raus
     forbidden_types = ['Dummy', 'Stream', 'Command', 'Silence', 'Other']
     if 'ItemType' in input_df.columns:
         input_df = input_df[~input_df['ItemType'].isin(forbidden_types)].copy()
@@ -173,8 +171,6 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     for col in PROPOSAL_COLUMNS + utils.MLDB_ATTRIBUTE_FIELDS:
         if col not in df.columns: df[col] = ''
 
-    # BUGFIX: Lese das RESTAURIERT-Flag JEDES MAL frisch aus der Datenbank aus
-    # und zwinge die CSV, sich der Datenbank zu beugen!
     if 'RESTAURIERT' in input_df.columns:
         db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
         df['RESTAURIERT'] = df['ID'].map(db_restauriert).fillna('')
@@ -250,7 +246,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     df.at[idx, 'Label_Vorschlag'] = discogs_res['label']
                     df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code']
                     df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
-                    df.at[idx, 'Sprache_Vorschlag'] = mb_lang or '' # Kann durch NLP / API später sauber gefüllt werden
+                    df.at[idx, 'Sprache_Vorschlag'] = mb_lang or ''
                     
                     current_typ = str(row.get('Typ', '')).strip()
                     if not current_typ:
@@ -557,19 +553,21 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt3'))
         console.print(utils.t('maint_opt4'))
         console.print(utils.t('maint_opt5'))
-        console.print(utils.t('maint_opt6')) # NEU: Dopplungen
+        console.print(utils.t('maint_opt6')) 
+        console.print(utils.t('maint_opt7'))
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4', '5', '6']:
+        elif choice in ['1', '2', '3', '4', '5', '6', '7']:
             do_genres = choice in ['1', '5']
             do_case = choice in ['2', '5']
             do_clear = choice in ['3', '5']
             do_types = choice in ['4', '5']
             do_dupes = choice == '6'
+            do_tags = choice == '7'
             
             try:
                 if do_genres:
@@ -604,6 +602,13 @@ def phase_maintenance(db_path):
                     count = db.run_maintenance_duplicates(db_path)
                     if count > 0:
                         console.print(utils.t('maint_done_dupes', count=count))
+                    else:
+                        console.print(utils.t('maint_no_changes'))
+                        
+                if do_tags:
+                    count = db.run_maintenance_file_tagger(db_path)
+                    if count > 0:
+                        console.print(utils.t('maint_done_tags', count=count))
                     else:
                         console.print(utils.t('maint_no_changes'))
                         

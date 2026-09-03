@@ -142,7 +142,6 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
     try:
         attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
         
-        # --- Wir mappen alle internationalen Attribute intern auf Deutsch ---
         def map_read_attr(n):
             nl = str(n).lower()
             if nl in ['year', 'jaar']: return 'Jahr'
@@ -348,6 +347,7 @@ def run_maintenance_types(db_path):
         
     conn.close()
     return len(inserts)
+
 def run_maintenance_duplicates(db_path):
     import sqlite3
     import logging
@@ -355,16 +355,13 @@ def run_maintenance_duplicates(db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # 1. mAirList Spaltennamen absolut kugelsicher und CASE-INSENSITIVE auslesen
     cursor.execute("PRAGMA table_info(items)")
-    # Wandelt alle gefundenen Spaltennamen für die Suche in Kleinbuchstaben um
     items_cols = [row[1].lower() for row in cursor.fetchall()]
     id_col = next((c for c in ['idx', 'id', 'itemidx'] if c in items_cols), None)
     
     cursor.execute("PRAGMA table_info(item_attributes)")
     attr_cols = [row[1].lower() for row in cursor.fetchall()]
     
-    # Falls die Tabelle 'item_attributes' leer ist/nicht existiert, probiere 'attributes'
     if not attr_cols:
         cursor.execute("PRAGMA table_info(attributes)")
         attr_cols = [row[1].lower() for row in cursor.fetchall()]
@@ -378,7 +375,6 @@ def run_maintenance_duplicates(db_path):
         conn.close()
         raise sqlite3.OperationalError(f"Konnte Spalten nicht finden! items: {items_cols}, attr_table ({attr_table}): {attr_cols}")
     
-    # 2. Dopplungen suchen
     query = f"""
     SELECT {id_col} FROM items 
     WHERE (LOWER(TRIM(Artist)), LOWER(TRIM(Title))) IN (
@@ -396,7 +392,6 @@ def run_maintenance_duplicates(db_path):
         conn.close()
         return 0
         
-    # 3. Attribut DOPPELUNG = JA setzen
     updated_count = 0
     for item_id in duplicate_ids:
         cursor.execute(f"SELECT 1 FROM {attr_table} WHERE {attr_id_col} = ? AND Name = 'DOPPELUNG'", (item_id,))
@@ -412,3 +407,189 @@ def run_maintenance_duplicates(db_path):
     
     logging.info(f"MAINTENANCE: {len(duplicate_ids)} Dopplungen markiert.")
     return len(duplicate_ids)
+
+def run_maintenance_file_tagger(db_path):
+    try:
+        import mutagen
+        from mutagen.id3 import ID3, TPE1, TIT2, TDRC, TCON, TALB, TPUB
+    except ImportError:
+        import sys
+        from rich.console import Console
+        Console().print("\n[bold red]KRITISCHER FEHLER: Das Python-Modul 'mutagen' ist nicht installiert![/bold red]")
+        Console().print("[yellow]Bitte öffne dein Terminal und tippe: pip install mutagen[/yellow]")
+        return 0
+
+    import sqlite3
+    import logging
+    import os
+    from rich.console import Console
+    c = Console(highlight=False)
+
+    # --- SMART BASE DIRECTORY FINDER ---
+    c.print("\n[cyan]=== Lokale Pfad-Zuordnung ===[/cyan]")
+    c.print("Da mAirList Speicherorte (Storage Locations) nutzt, stehen in der DB oft nur relative Pfade")
+    c.print("(z.B. 'Filler/Song.mp3'). Ziehe hier nacheinander die Hauptordner rein, in denen das Skript suchen soll.")
+    c.print("[dim](Lass das Feld leer und drücke Enter, wenn du alle Ordner hinzugefügt hast)[/dim]")
+    
+    base_dirs = []
+    while True:
+        d = c.input("Basis-Ordner reinziehen (oder Enter zum Starten): ").strip().strip('"').strip("'")
+        if not d:
+            break
+        if os.path.isdir(d):
+            base_dirs.append(d)
+            c.print(f"[green]✓ Ordner '{d}' zur Suchliste hinzugefügt.[/green]")
+        else:
+            c.print("[red]Ordner existiert nicht oder ist ungültig. Bitte erneut versuchen.[/red]")
+
+    c.print("\n[magenta]Lese Dateien und schreibe Tags... (Das kann je nach Archivgröße dauern)[/magenta]")
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute("PRAGMA table_info(items)")
+    items_cols = [row[1].lower() for row in cursor.fetchall()]
+    id_col = next((c_name for c_name in ['idx', 'id', 'itemidx'] if c_name in items_cols), None)
+    
+    cursor.execute("PRAGMA table_info(item_attributes)")
+    attr_cols = [row[1].lower() for row in cursor.fetchall()]
+    if not attr_cols:
+        cursor.execute("PRAGMA table_info(attributes)")
+        attr_cols = [row[1].lower() for row in cursor.fetchall()]
+        attr_table = "attributes"
+    else:
+        attr_table = "item_attributes"
+    attr_id_col = next((c_name for c_name in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c_name in attr_cols), None)
+    
+    if not id_col or not attr_id_col:
+        conn.close()
+        return 0
+
+    query = f"""
+    SELECT i.{id_col}, i.artist, i.title, i.filename,
+           MAX(CASE WHEN a.name IN ('Jahr', 'Year', 'Jaar') THEN a.value END) as year,
+           MAX(CASE WHEN a.name = 'Genre' THEN a.value END) as genre,
+           MAX(CASE WHEN a.name = 'Album' THEN a.value END) as album,
+           MAX(CASE WHEN a.name = 'Label' THEN a.value END) as label
+    FROM items i
+    LEFT JOIN {attr_table} a ON i.{id_col} = a.{attr_id_col}
+    WHERE i.filename IS NOT NULL AND i.filename != ''
+    GROUP BY i.{id_col}
+    """
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    conn.close()
+
+    stat_total = len(rows)
+    stat_not_found = 0
+    stat_unsupported = 0
+    stat_already_perfect = 0
+    updated_count = 0
+
+    for row in rows:
+        item_id, artist, title, raw_filename, year, genre, album, label = row
+
+        filename = str(raw_filename).replace('\\', '/')
+        actual_path = None
+        
+        # 1. Teste, ob es ein absoluter Pfad ist, der direkt existiert
+        if os.path.exists(filename) and os.path.isfile(filename):
+            actual_path = filename
+        else:
+            # 2. Teste die relativen Pfade in Kombination mit allen angegebenen Basis-Ordnern
+            for b_dir in base_dirs:
+                test_path = os.path.join(b_dir, filename.lstrip('/'))
+                if os.path.exists(test_path) and os.path.isfile(test_path):
+                    actual_path = test_path
+                    break
+
+        if not actual_path:
+            stat_not_found += 1
+            if stat_not_found <= 5:
+                c.print(f"[dim yellow]DEBUG Info: Suche erfolglos -> {filename}[/dim yellow]")
+            continue
+
+        c_artist = str(artist).strip() if artist else ""
+        c_title = str(title).strip() if title else ""
+        c_year = str(year).strip() if year else ""
+        c_genre = str(genre).strip() if genre else ""
+        c_album = str(album).strip() if album else ""
+        c_label = str(label).strip() if label else ""
+
+        try:
+            audio = mutagen.File(actual_path)
+            if audio is None: 
+                stat_unsupported += 1
+                continue
+            
+            changed = False
+            file_type = type(audio).__name__
+
+            if file_type in ['FLAC', 'OggVorbis']:
+                def set_vorbis(tag, val):
+                    nonlocal changed
+                    if val:
+                        if audio.get(tag) != [val]:
+                            audio[tag] = [val]
+                            changed = True
+                            
+                set_vorbis('artist', c_artist)
+                set_vorbis('title', c_title)
+                set_vorbis('date', c_year)
+                set_vorbis('genre', c_genre)
+                set_vorbis('album', c_album)
+                set_vorbis('organization', c_label)
+                
+                if changed:
+                    audio.save()
+                    updated_count += 1
+                else:
+                    stat_already_perfect += 1
+
+            elif file_type in ['MP3', 'AIFF']:
+                if not getattr(audio, 'tags', None):
+                    try:
+                        audio.add_tags()
+                    except:
+                        stat_unsupported += 1
+                        continue 
+
+                def set_id3(frame_class, val):
+                    nonlocal changed
+                    if val:
+                        frame_id = frame_class.__name__
+                        existing = audio.tags.getall(frame_id)
+                        if not existing or str(existing[0].text[0]) != str(val):
+                            audio.tags.setall(frame_id, [frame_class(encoding=3, text=[val])])
+                            changed = True
+
+                set_id3(TPE1, c_artist)
+                set_id3(TIT2, c_title)
+                set_id3(TDRC, c_year)
+                set_id3(TCON, c_genre)
+                set_id3(TALB, c_album)
+                set_id3(TPUB, c_label) 
+                
+                if changed:
+                    audio.save()
+                    updated_count += 1
+                else:
+                    stat_already_perfect += 1
+            else:
+                stat_unsupported += 1
+
+        except Exception as e:
+            logging.error(f"FILE-TAGGER ERROR bei Datei {actual_path}: {str(e)}")
+            stat_unsupported += 1
+            continue
+
+    logging.info(f"MAINTENANCE: {updated_count} Dateien getaggt. (Nicht gefunden: {stat_not_found})")
+    
+    c.print(f"\n[cyan]=== Tagger-Diagnose ===[/cyan]")
+    c.print(f"Tracks in Datenbank mit Pfad: [bold]{stat_total}[/bold]")
+    c.print(f"Pfade/Dateien nicht gefunden: [bold yellow]{stat_not_found}[/bold yellow]")
+    c.print(f"Nicht unterstütztes Format  : [bold yellow]{stat_unsupported}[/bold yellow]")
+    c.print(f"Tags waren bereits perfekt  : [bold green]{stat_already_perfect}[/bold green]")
+    c.print(f"Dateien erfolgreich getaggt : [bold green]{updated_count}[/bold green]\n")
+
+    return updated_count

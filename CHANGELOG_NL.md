@@ -2,6 +2,14 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.60.00 Beta] - 2026-09-03
+### Toegevoegd
+- **FLAC-Tagger (Audio Metadata Injectie):** Een krachtige nieuwe onderhoudsoptie [7] toegevoegd die metadata (Artiest, Titel, Jaar, Genre, Album, Label) direct vanuit de database naar de fysieke audiobestanden (FLAC, MP3, AIFF) schrijft via de `mutagen`-bibliotheek. Dit dient als de ultieme back-up voor het geval de database ooit corrupt raakt.
+- **Slimme lokale padtoewijzing:** De FLAC-Tagger bevat een intelligente 'on-the-fly' padvertaler. Als mAirList relatieve paden via opslaglocaties (Storage Locations) gebruikt, kunnen gebruikers hun lokale basismappen eenvoudig via drag & drop naar de terminal slepen. De tool zoekt en tagt de bestanden automatisch, zonder de databasepaden te wijzigen.
+
+### Gewijzigd
+- **Genre-uitbreiding:** `Pop-Rock` is toegevoegd aan de `ALLOWED_GENRES`-lijst om crossover-planning beter te ondersteunen. Synoniemen zoals "pop rock" of "pop/rock" worden nu correct toegewezen aan deze nieuwe categorie in plaats van standaard als "Rock" te worden gemarkeerd.
+
 ## [0.52.00 Beta] - 2026-09-02
 ### Toegevoegd
 - **Duplicaatdetectie (Onderhoud):** Een nieuwe, veelgevraagde onderhoudsoptie [6] toegevoegd om tracks met identieke Artiest/Titel-combinaties te vinden. Om de database-integriteit absoluut te waarborgen, verplaatst de tool geen elementen, maar markeert ze veilig met een nieuw `DOPPELUNG`-attribuut dat op `JA` wordt gezet. Hierdoor kunnen gebruikers ze gemakkelijk filteren en beheren binnen de mAirList-GUI.
