@@ -2,6 +2,15 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.62.00 Beta] - 2026-09-03
+### Toegevoegd
+- **Slimme back-up opschoning:** De `Apply`-fase beheert nu automatisch de databaseback-ups. Het script bewaart altijd de 5 meest recente `.backup`-bestanden en verwijdert oudere versies stilletjes om de harde schijf op de lange termijn schoon te houden.
+
+## [0.61.00 Beta] - 2026-09-03
+### Gewijzigd
+- **Onderhoudsmenu opgeschoond:** Het onderhoudsmenu is gestroomlijnd. Verouderde of zeer specifieke functies (zoals het verwijderen van "Platinum Notes" en het zoeken naar duplicaten) zijn verwijderd en de overige kernfuncties zijn logisch hernummerd.
+- **mAirList 8.1+ Compatibiliteit:** De genre-standaardisatie [1] is volledig herschreven. Het controleert nu dynamisch of mAirList de nieuwe native `genre`-kolom (sinds v8.1 Beta) of de oude `item_attributes`-tabellen gebruikt, zodat slimme mappen (Smart Folders) 100% correct synchroniseren.
+
 ## [0.60.00 Beta] - 2026-09-03
 ### Toegevoegd
 - **FLAC-Tagger (Audio Metadata Injectie):** Een krachtige nieuwe onderhoudsoptie [7] toegevoegd die metadata (Artiest, Titel, Jaar, Genre, Album, Label) direct vanuit de database naar de fysieke audiobestanden (FLAC, MP3, AIFF) schrijft via de `mutagen`-bibliotheek. Dit dient als de ultieme back-up voor het geval de database ooit corrupt raakt.

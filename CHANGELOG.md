@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.00 Beta] - 2026-09-03
+### Added
+- **Smart Backup Cleanup:** The `Apply` phase now automatically manages the database backup files. It keeps the 5 most recent `.backup` files and silently deletes older ones to prevent the directory from cluttering over time.
+
+## [0.61.00 Beta] - 2026-09-03
+### Changed
+- **Maintenance Menu Ergonomics:** Streamlined the Maintenance Menu by removing legacy, highly specific scripts (like "Platinum Notes" deletion and duplicate finder). The remaining essential options have been logically renumbered.
+- **mAirList 8.1+ Compatibility:** The Genre standardizer [1] has been fundamentally rewritten. It now dynamically checks if mAirList uses the new native `genre` column (introduced in v8.1 Beta) or the legacy `item_attributes` tables, guaranteeing that Smart Folders sync correctly.
+
 ## [0.60.00 Beta] - 2026-09-03
 ### Added
 - **FLAC-Tagger (Audio Metadata Injection):** Added a powerful new maintenance option [7] that writes verified metadata (Artist, Title, Year, Genre, Album, Label) directly from the database into the physical audio files (FLAC, MP3, AIFF) using the `mutagen` library. This serves as the ultimate backup if the database ever corrupts.

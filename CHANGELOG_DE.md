@@ -2,6 +2,15 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.62.00 Beta] - 2026-09-03
+### Hinzugefügt
+- **Smarte Backup-Bereinigung:** Die `Apply`-Phase (Speichern) verwaltet nun automatisch die Datenbank-Backups. Das Skript behält immer die 5 aktuellsten `.backup`-Dateien und löscht ältere Versionen lautlos, um die Festplatte auf Dauer sauber zu halten.
+
+## [0.61.00 Beta] - 2026-09-03
+### Geändert
+- **Wartungsmenü aufgeräumt:** Das Wartungsmenü wurde entschlackt. Veraltete oder stark nutzerspezifische Funktionen (wie das Löschen von "Platinum Notes" oder die Dopplungssuche) wurden entfernt, und die verbleibenden Kernfunktionen logisch neu durchnummeriert.
+- **mAirList 8.1+ Kompatibilität:** Die Genre-Standardisierung [1] wurde komplett neu geschrieben. Sie prüft nun dynamisch, ob mAirList die neue native `genre`-Spalte (seit v8.1 Beta) oder die alten `item_attributes`-Tabellen nutzt, damit intelligente Ordner zu 100 % korrekt synchronisieren.
+
 ## [0.60.00 Beta] - 2026-09-03
 ### Hinzugefügt
 - **FLAC-Tagger (Audio-Metadaten-Injektion):** Eine mächtige neue Wartungsoption [7] wurde hinzugefügt, die Metadaten (Artist, Titel, Jahr, Genre, Album, Label) direkt aus der Datenbank in die physischen Audio-Dateien (FLAC, MP3, AIFF) schreibt (benötigt die `mutagen`-Bibliothek). Dies dient als ultimatives Backup, falls die `.mldb`-Datenbank jemals beschädigt wird.
