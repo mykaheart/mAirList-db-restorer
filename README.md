@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.62.02 BETA
+# mAirList DB Restorer v0.62.03 BETA
 **Das intelligente Metadaten-Reparatur-Tool für lokale mAirList Datenbanken**
 
 *(Note: English and Dutch documentation / manuals are available in the repository!)*

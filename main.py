@@ -56,7 +56,21 @@ def check_for_updates(interactive=False):
             for line in res.text.splitlines():
                 if line.startswith("APP_VERSION ="):
                     remote_version = line.split("=")[1].strip().strip('"').strip("'")
-                    if remote_version != utils.APP_VERSION:
+                    
+                    # --- SMART VERSION COMPARISON ---
+                    # Verwandelt z.B. "0.62.03 Beta" in (0, 62, 3) um es mathematisch zu vergleichen
+                    def get_v_tuple(v_str):
+                        try:
+                            num_part = v_str.split()[0]
+                            return tuple(int(x) for x in num_part.split('.'))
+                        except Exception:
+                            return (0, 0, 0)
+                            
+                    remote_tuple = get_v_tuple(remote_version)
+                    local_tuple = get_v_tuple(utils.APP_VERSION)
+                    
+                    # Schlägt nur noch an, wenn die Github-Version ECHT größer ist
+                    if remote_tuple > local_tuple:
                         console.print(f"[bold yellow]⚡ Update verfügbar! Neue Version {remote_version} wurde veröffentlicht (Du nutzt {utils.APP_VERSION}).[/bold yellow]")
                         console.print(f"[bold cyan]👉 Download als fertige ZIP-Datei (inkl. Handbüchern) hier:[/bold cyan]")
                         console.print(f"[white]https://drive.google.com/file/d/1lV2qG7nSj28BKC2W5FoPn4bgfqqsDjdM/view?usp=sharing[/white]")
@@ -540,8 +554,6 @@ def phase_apply(db_path, final_csv):
     if 'REVIEW_STATUS' in df.columns:
         df = df[df['REVIEW_STATUS'] == 'JA']
 
-    # --- NEU: OVERWRITE PROTECTION ---
-    # Verhindert das Überschreiben von Tracks, die in der DB bereits auf RESTAURIERT=JA stehen
     try:
         conn = sqlite3.connect(db_path)
         cur = conn.cursor()
@@ -604,18 +616,16 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt2'))
         console.print(utils.t('maint_opt3'))
         console.print(utils.t('maint_opt4'))
-        console.print(utils.t('maint_opt5'))
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4', '5']:
-            do_genres = choice in ['1', '5']
-            do_case   = choice in ['2', '5']
-            do_types  = choice in ['3', '5']
-            do_tags   = choice == '4'
+        elif choice in ['1', '2', '3', '4']:
+            do_genres = choice in ['1', '4']
+            do_case   = choice in ['2', '4']
+            do_tags   = choice == '3'
             
             try:
                 if do_genres:
@@ -626,11 +636,6 @@ def phase_maintenance(db_path):
                 if do_case:
                     count = db.run_maintenance_case(db_path)
                     if count > 0: console.print(utils.t('maint_done_case', count=count))
-                    else: console.print(utils.t('maint_no_changes'))
-                        
-                if do_types:
-                    count = db.run_maintenance_types(db_path)
-                    if count > 0: console.print(utils.t('maint_done_types', count=count))
                     else: console.print(utils.t('maint_no_changes'))
                         
                 if do_tags:

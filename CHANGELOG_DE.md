@@ -2,6 +2,10 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.62.03 Beta] - 2026-09-04
+### Behoben
+- **Smarter Update-Checker:** Der integrierte Update-Prüfer übersetzt die Versionsnummern nun in echte mathematische Werte und vergleicht diese sauber miteinander. Dadurch werden falsche Update-Warnungen verhindert, wenn die lokal verwendete Version höher ist als die auf GitHub veröffentlichte Version (z. B. während der Entwicklung).
+
 ## [0.62.02 Beta] - 2026-09-03
 ### Behoben
 - **Cache-Sync & Zwang-Reset:** Ein kritischer Fehler wurde behoben, bei dem das manuelle Entfernen des 'RESTAURIERT: JA'-Attributs in mAirList vom Cache des Tools ignoriert wurde. Die Fetch-Phase erkennt nun Diskrepanzen und erzwingt einen kompletten Neuabruf für diese bearbeiteten Tracks.

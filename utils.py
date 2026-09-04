@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.62.02 BETA"
+APP_VERSION = "0.62.03 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -64,7 +64,7 @@ T = {
         'menu_opt4': "Kontrolle   - Alle Vorschläge manuell prüfen",
         'menu_opt5': "Kontrolle   - Sichere Treffer automatisch übernehmen",
         'menu_h3': "--- WARTUNG ---",
-        'menu_opt6': "Wartung     - Massenbearbeitung (Genres, Typen, Schreibweisen, Tagging)",
+        'menu_opt6': "Wartung     - Massenbearbeitung (Genres, Schreibweisen, Tagging)",
         'menu_h4': "--- SCHRITT 3: IN MAIRLIST SPEICHERN ---",
         'menu_opt7': "Speichern   - Geprüfte Werte in .mldb-Kopie schreiben",
         'menu_opt8': "Sprache ändern / Change Language",
@@ -144,13 +144,11 @@ T = {
         'maint_warn': "[bold red]ACHTUNG: ALLE AKTIONEN HIER SCHREIBEN DIREKT IN DIE DATENBANK OHNE UNDO![/bold red]\nBitte arbeite IMMER auf einer Datenbank-Kopie.",
         'maint_opt1': "  [[green]1[/green]] Genres standardisieren",
         'maint_opt2': "  [[green]2[/green]] Groß-/Kleinschreibung & Apostrophe korrigieren (Artist/Title)",
-        'maint_opt3': "  [[green]3[/green]] Elementtypen (Music -> Musik) in mAirList übersetzen",
-        'maint_opt4': "  [[green]4[/green]] FLAC-Tagger (Metadaten aus DB in Audio-Dateien schreiben)",
-        'maint_opt5': "  [[green]5[/green]] ALLE Wartungsaufgaben (1-3) nacheinander ausführen",
+        'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadaten aus DB in Audio-Dateien schreiben)",
+        'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben (1-2) nacheinander ausführen",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-5]: ",
+        'maint_prompt': "Auswahl [0-4]: ",
         'maint_done_case': "[bold green]✓ Fertig! {count} Tracks (Artist/Title) korrigiert.[/bold green]",
-        'maint_done_types': "[bold green]✓ Fertig! {count} Elementtypen (Typ) wurden erfolgreich übersetzt.[/bold green]",
         'maint_done_tags': "[bold green]✓ Fertig! {count} Audio-Dateien (FLAC/AIFF/MP3) wurden erfolgreich getaggt.[/bold green]",
         'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
         'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
@@ -169,7 +167,7 @@ T = {
         'menu_opt4': "Review      - Manually inspect all proposals",
         'menu_opt5': "Review      - Auto-accept safe matches (ask for unsure ones)",
         'menu_h3': "--- MAINTENANCE ---",
-        'menu_opt6': "Maintenance - Mass editing (Genres, Item Types, Text Case, Tagging)",
+        'menu_opt6': "Maintenance - Mass editing (Genres, Text Case, Tagging)",
         'menu_h4': "--- STEP 3: SAVE TO MAIRLIST ---",
         'menu_opt7': "Apply       - Write verified values to .mldb copy",
         'menu_opt8': "Change Language / Sprache ändern",
@@ -249,13 +247,11 @@ T = {
         'maint_warn': "[bold red]WARNING: ALL ACTIONS HERE WRITE DIRECTLY TO THE DATABASE WITH NO UNDO![/bold red]\nPlease ensure you are working on a COPY.",
         'maint_opt1': "  [[green]1[/green]] Standardize Genres",
         'maint_opt2': "  [[green]2[/green]] Fix Case & Apostrophes (Artist/Title)",
-        'maint_opt3': "  [[green]3[/green]] Translate Item Types (e.g. Music -> Musik)",
-        'maint_opt4': "  [[green]4[/green]] FLAC-Tagger (Write DB metadata directly into physical audio files)",
-        'maint_opt5': "  [[green]5[/green]] Execute ALL maintenance tasks (1-3) sequentially",
+        'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Write DB metadata directly into physical audio files)",
+        'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks (1-2) sequentially",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-5]: ",
+        'maint_prompt': "Choice [0-4]: ",
         'maint_done_case': "[bold green]✓ Done! Corrected {count} tracks (Artist/Title).[/bold green]",
-        'maint_done_types': "[bold green]✓ Done! Translated {count} internal item types.[/bold green]",
         'maint_done_tags': "[bold green]✓ Done! Successfully tagged {count} audio files (FLAC/AIFF/MP3).[/bold green]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
         'maint_no_changes': "[yellow]No changes needed.[/yellow]"
@@ -274,7 +270,7 @@ T = {
         'menu_opt4': "Controle    - Alle suggesties handmatig controleren",
         'menu_opt5': "Controle    - Veilige matches automatisch accepteren",
         'menu_h3': "--- ONDERHOUD ---",
-        'menu_opt6': "Onderhoud   - Massabewerking (Genres, Typen, Tekst, Tagging)",
+        'menu_opt6': "Onderhoud   - Massabewerking (Genres, Tekst, Tagging)",
         'menu_h4': "--- STAP 3: OPSLAAN IN MAIRLIST ---",
         'menu_opt7': "Opslaan     - Gecontroleerde waarden in .mldb-kopie schrijven",
         'menu_opt8': "Taal wijzigen / Change Language",
@@ -354,13 +350,11 @@ T = {
         'maint_warn': "[bold red]WAARSCHUWING: ALLE ACTIES HIER SCHRIJVEN DIRECT NAAR DE DATABASE ZONDER UNDO![/bold red]\nZorg ervoor dat je op een KOPIE werkt.",
         'maint_opt1': "  [[green]1[/green]] Genres standaardiseren",
         'maint_opt2': "  [[green]2[/green]] Hoofdletters/kleine letters & apostrofs corrigeren (Artist/Title)",
-        'maint_opt3': "  [[green]3[/green]] Item Types vertalen (bijv. Music -> Musik)",
-        'maint_opt4': "  [[green]4[/green]] FLAC-Tagger (Metadata uit DB direct naar audiobestanden schrijven)",
-        'maint_opt5': "  [[green]5[/green]] ALLE onderhoudstaken (1-3) achter elkaar uitvoeren",
+        'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadata uit DB direct naar audiobestanden schrijven)",
+        'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken (1-2) achter elkaar uitvoeren",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-5]: ",
+        'maint_prompt': "Keuze [0-4]: ",
         'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
-        'maint_done_types': "[bold green]✓ Klaar! {count} interne item types vertaald.[/bold green]",
         'maint_done_tags': "[bold green]✓ Klaar! {count} audiobestanden (FLAC/AIFF/MP3) succesvol getagd.[/bold green]",
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
         'maint_no_changes': "[yellow]Geen wijzigingen nodig.[/yellow]"

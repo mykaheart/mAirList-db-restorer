@@ -2,6 +2,10 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.62.03 Beta] - 2026-09-04
+### Opgelost
+- **Slimme update-checker:** De ingebouwde update-checker vertaalt versienummers nu naar wiskundige waarden en vergelijkt deze correct. Dit voorkomt valse update-meldingen wanneer de lokaal gebruikte versie hoger is dan de versie in de GitHub-repository (bijv. tijdens lokale ontwikkeling).
+
 ## [0.62.02 Beta] - 2026-09-03
 ### Opgelost
 - **Cache Sync & Geforceerde Reset:** Een kritieke fout verholpen waarbij het handmatig verwijderen van het 'RESTAURIERT: JA'-attribuut in mAirList werd genegeerd door de cache van de tool. De Fetch-fase detecteert nu discrepanties en forceert een complete nieuwe fetch voor deze bewerkte tracks.

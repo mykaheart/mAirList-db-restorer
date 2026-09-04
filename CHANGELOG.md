@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.03 Beta] - 2026-09-04
+### Fixed
+- **Smart Update Checker:** The internal update checker now correctly parses and compares semantic version numbers mathematically (e.g., `0.62.03` vs `0.62.02`) instead of relying on simple string inequality. This prevents false positive update alerts when running a local version that is newer than the remote GitHub repository.
+
 ## [0.62.02 Beta] - 2026-09-03
 ### Fixed
 - **Cache Sync & Forced Reset:** Fixed a critical bug where manually removing the 'RESTAURIERT: JA' attribute in mAirList was ignored by the tool's cache. The Fetch phase now detects discrepancies and forces a complete re-fetch for these modified tracks.
