@@ -32,7 +32,7 @@ PROPOSAL_COLUMNS = [
     'Artist_Vorschlag', 'Title_Vorschlag', 'Jahr_Vorschlag', 'Jahr_Konfidenz',
     'Genre_Vorschlag', 'Album_Vorschlag', 'STYLE_Vorschlag', 'DISCOGS_RELEASE_ID_Vorschlag',
     'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'Sprache_Vorschlag', 
-    'Typ_Vorschlag', 'VORSCHLAG_STATUS',
+    'Typ_Vorschlag', 'VORSCHLAG_STATUS', 'REVIEW_STATUS'
 ]
 
 class StepBackException(Exception):
@@ -57,8 +57,6 @@ def check_for_updates(interactive=False):
                 if line.startswith("APP_VERSION ="):
                     remote_version = line.split("=")[1].strip().strip('"').strip("'")
                     
-                    # --- SMART VERSION COMPARISON ---
-                    # Verwandelt z.B. "0.62.03 Beta" in (0, 62, 3) um es mathematisch zu vergleichen
                     def get_v_tuple(v_str):
                         try:
                             num_part = v_str.split()[0]
@@ -69,7 +67,6 @@ def check_for_updates(interactive=False):
                     remote_tuple = get_v_tuple(remote_version)
                     local_tuple = get_v_tuple(utils.APP_VERSION)
                     
-                    # Schlägt nur noch an, wenn die Github-Version ECHT größer ist
                     if remote_tuple > local_tuple:
                         console.print(f"[bold yellow]⚡ Update verfügbar! Neue Version {remote_version} wurde veröffentlicht (Du nutzt {utils.APP_VERSION}).[/bold yellow]")
                         console.print(f"[bold cyan]👉 Download als fertige ZIP-Datei (inkl. Handbüchern) hier:[/bold cyan]")
