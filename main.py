@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import sys
 import argparse
+import hashlib
 import logging
 import shutil
 import sqlite3
@@ -19,6 +20,7 @@ os.chdir(APP_DIR)
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeRemainingColumn
+from rich.table import Table
 from rich import box
 import requests
 
@@ -30,9 +32,9 @@ console = Console(highlight=False)
 
 PROPOSAL_COLUMNS = [
     'Artist_Vorschlag', 'Title_Vorschlag', 'Jahr_Vorschlag', 'Jahr_Konfidenz',
-    'Genre_Vorschlag', 'Album_Vorschlag', 'STYLE_Vorschlag', 'DISCOGS_RELEASE_ID_Vorschlag',
+    'Genre_Vorschlag', 'Genre_Konfidenz', 'Album_Vorschlag', 'STYLE_Vorschlag', 'DISCOGS_RELEASE_ID_Vorschlag',
     'Label_Vorschlag', 'Labelcode_Vorschlag', 'ISRC_Vorschlag', 'Sprache_Vorschlag', 
-    'Typ_Vorschlag', 'VORSCHLAG_STATUS', 'REVIEW_STATUS'
+    'Typ_Vorschlag', 'VORSCHLAG_STATUS', 'REVIEW_STATUS', 'FORCE_APPLY'
 ]
 
 class StepBackException(Exception):
@@ -47,6 +49,54 @@ def ask_input(prompt_text):
     if val.lower() == 'b' or val == '<':
         raise StepBackException()
     return val
+
+LIVE_DB_FIELDS = [
+    'Artist', 'Title', 'ItemType', 'Filename', 'Duration', 'TotalDuration',
+] + utils.MLDB_ATTRIBUTE_FIELDS
+
+
+def sync_cache_from_db(df, input_df, item_ids=None):
+    """Refresh original/cache values from the live .mldb snapshot without touching proposals."""
+    if 'ID' not in df.columns or 'ID' not in input_df.columns:
+        return
+
+    source = input_df.copy()
+    source['ID'] = source['ID'].astype(str)
+    source = source.drop_duplicates(subset=['ID']).set_index('ID')
+
+    target_ids = df['ID'].astype(str)
+    mask = target_ids.isin(source.index)
+    if item_ids is not None:
+        wanted = {str(item_id) for item_id in item_ids}
+        mask &= target_ids.isin(wanted)
+
+    if not mask.any():
+        return
+
+    for field in LIVE_DB_FIELDS:
+        if field not in source.columns or field not in df.columns:
+            continue
+        mapped = target_ids[mask].map(source[field])
+        df.loc[mask, field] = mapped.where(pd.notna(mapped), '').values
+
+
+def combine_year_confidence(mb_year, mb_conf, discogs_year, discogs_conf, final_year):
+    if not final_year:
+        return 'niedrig'
+    if mb_year and discogs_year:
+        if str(mb_year) == str(discogs_year):
+            if mb_conf == 'hoch' or discogs_conf == 'hoch':
+                return 'hoch'
+            return 'mittel'
+        # Two sources disagree: never auto-accept as high confidence.
+        if mb_conf in ['hoch', 'mittel'] or discogs_conf in ['hoch', 'mittel']:
+            return 'mittel'
+        return 'niedrig'
+    if mb_year:
+        return mb_conf
+    if discogs_year:
+        return discogs_conf
+    return 'niedrig'
 
 def check_for_updates(interactive=False):
     try:
@@ -93,12 +143,35 @@ def check_for_updates(interactive=False):
         sys.exit(0)
     return True
 
+def get_db_session_name(db_path):
+    """Create a collision-safe workspace name for a database path."""
+    base_name = os.path.splitext(os.path.basename(db_path))[0]
+    normalized = os.path.normcase(os.path.realpath(os.path.abspath(db_path)))
+    digest = hashlib.sha1(normalized.encode('utf-8')).hexdigest()[:8]
+    return f"{base_name}_{digest}"
+
+
+def _migrate_legacy_cache_for_db(db_path, session_name, data_dir):
+    """Move pre-0.62.05 cache files to the path-hashed workspace when unambiguous."""
+    legacy_base = os.path.splitext(os.path.basename(db_path))[0]
+    for suffix in ('_vorschlaege.csv', '_restauriert.csv'):
+        old_path = os.path.join(data_dir, legacy_base + suffix)
+        new_path = os.path.join(data_dir, session_name + suffix)
+        if old_path != new_path and os.path.exists(old_path) and not os.path.exists(new_path):
+            try:
+                os.replace(old_path, new_path)
+            except OSError as e:
+                utils.log_change("MIGRATION", f"Legacy-Cache konnte nicht migriert werden: {e}")
+
+
 def setup_logging(db_path):
     data_dir = "Data"
     os.makedirs(data_dir, exist_ok=True)
-    db_base_name = os.path.splitext(os.path.basename(db_path))[0]
+    session_name = get_db_session_name(db_path)
+    _migrate_legacy_cache_for_db(db_path, session_name, data_dir)
+
     timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-    dynamic_log_file = os.path.join(data_dir, f"{db_base_name}_{timestamp_str}.log")
+    dynamic_log_file = os.path.join(data_dir, f"{session_name}_{timestamp_str}.log")
     
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
@@ -110,7 +183,21 @@ def setup_logging(db_path):
         datefmt='%Y-%m-%d %H:%M:%S',
         encoding='utf-8'
     )
-    return db_base_name, data_dir
+    return session_name, data_dir
+
+
+def _migration_conflict_path(target_path):
+    directory = os.path.dirname(target_path)
+    filename = os.path.basename(target_path)
+    stem, ext = os.path.splitext(filename)
+    stamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    candidate = os.path.join(directory, f"{stem}_migration-conflict-{stamp}{ext}")
+    counter = 2
+    while os.path.exists(candidate):
+        candidate = os.path.join(directory, f"{stem}_migration-conflict-{stamp}-{counter}{ext}")
+        counter += 1
+    return candidate
+
 
 def perform_migration():
     data_dir = "Data"
@@ -120,21 +207,27 @@ def perform_migration():
             if os.path.isfile(f):
                 target_path = os.path.join(data_dir, f)
                 try:
-                    if not os.path.exists(target_path):
-                        shutil.move(f, target_path)
-                    else:
-                        os.remove(f) 
-                except Exception:
-                    pass
+                    if os.path.exists(target_path):
+                        # Never delete potentially useful workspace data. Preserve both copies.
+                        target_path = _migration_conflict_path(target_path)
+                    shutil.move(f, target_path)
+                except Exception as e:
+                    utils.log_change("MIGRATION", f"Datei '{f}' konnte nicht verschoben werden: {e}")
 
 def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
-    db.verify_db_compatibility(db_path)
+    if db.verify_db_compatibility(db_path) is None:
+        return
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
         return
 
     ignored_folders = utils.setup_ignored_folders(db_path)
-    input_df = db.load_dataframe_from_mldb(db_path, ignored_folders)
+    try:
+        input_df = db.load_dataframe_from_mldb(db_path, ignored_folders)
+    except Exception as e:
+        utils.log_change("ERROR", f"Datenbank konnte nicht gelesen werden: {e}")
+        console.print(Panel(utils.t('db_read_error', details=str(e)), box=box.HEAVY, style="red"))
+        return
     
     forbidden_types = ['Dummy', 'Stream', 'Command', 'Silence', 'Other']
     if 'ItemType' in input_df.columns:
@@ -179,34 +272,39 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
     for col in PROPOSAL_COLUMNS + utils.MLDB_ATTRIBUTE_FIELDS:
         if col not in df.columns: df[col] = ''
 
+    if full:
+        # A Full Fetch must start from the current database state, not from stale
+        # original values that may still live in an older CSV cache.
+        sync_cache_from_db(df, input_df)
+        df['FORCE_APPLY'] = 'JA'
+
     if 'RESTAURIERT' in input_df.columns:
         db_restauriert = input_df.set_index('ID')['RESTAURIERT'].to_dict()
         
-        if 'RESTAURIERT' in df.columns:
-            reset_count = 0
+        if not full and 'RESTAURIERT' in df.columns:
+            reset_ids = []
             for idx, row in df.iterrows():
                 item_id = str(row.get('ID', ''))
                 old_val = str(row.get('RESTAURIERT', '')).strip().upper()
                 new_val = str(db_restauriert.get(item_id, '')).strip().upper()
-                
+
                 if old_val == 'JA' and new_val != 'JA':
                     df.at[idx, 'VORSCHLAG_STATUS'] = ''
-                    if 'REVIEW_STATUS' in df.columns:
-                        df.at[idx, 'REVIEW_STATUS'] = ''
-                        
-                    db_row = input_df[input_df['ID'] == item_id]
-                    if not db_row.empty:
-                        df.at[idx, 'Artist'] = db_row.iloc[0].get('Artist', '')
-                        df.at[idx, 'Title'] = db_row.iloc[0].get('Title', '')
-                    reset_count += 1
-                    
-            if reset_count > 0:
-                console.print(utils.t('fetch_reset', count=reset_count))
+                    df.at[idx, 'REVIEW_STATUS'] = ''
+                    df.at[idx, 'FORCE_APPLY'] = ''
+                    reset_ids.append(item_id)
+
+            if reset_ids:
+                # The .mldb is the source of truth. Refresh every original field,
+                # not only Artist/Title, before this track is fetched again.
+                sync_cache_from_db(df, input_df, reset_ids)
+                console.print(utils.t('fetch_reset', count=len(reset_ids)))
                 
         df['RESTAURIERT'] = df['ID'].map(db_restauriert).fillna('')
 
     if not full:
-        already_done = df['RESTAURIERT'].astype(str).str.upper() == 'JA'
+        force_apply = df['FORCE_APPLY'].astype(str).str.upper() == 'JA'
+        already_done = (df['RESTAURIERT'].astype(str).str.upper() == 'JA') & ~force_apply
         df.loc[already_done, 'VORSCHLAG_STATUS'] = 'FERTIG'
         if 'REVIEW_STATUS' in df.columns:
             df.loc[already_done, 'REVIEW_STATUS'] = 'JA'
@@ -227,6 +325,9 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
         return
 
     processed_counter = 0
+    error_count = 0
+    stopped_for_review = False
+    item_type_lang = db.detect_db_language(db_path, utils.CURRENT_LANG)
     with Progress(
         SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
         BarColumn(bar_width=40, complete_style="green", finished_style="bold green"),
@@ -246,8 +347,10 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     
                     c_art, c_tit = utils.clean_artist_base(raw_artist), utils.clean_title_base(raw_title)
 
-                    art_sugg = api.suggest_artist_spelling(c_art) or c_art
-                    tit_sugg = api.suggest_title_spelling(art_sugg, c_tit, local_dur) or c_tit
+                    artist_proposal = api.suggest_artist_spelling(c_art)
+                    art_sugg = artist_proposal or c_art
+                    title_proposal = api.suggest_title_spelling(art_sugg, c_tit, local_dur)
+                    tit_sugg = title_proposal or c_tit
 
                     with ThreadPoolExecutor(max_workers=2) as executor:
                         future_mb = executor.submit(api.fetch_musicbrainz_details, art_sugg, tit_sugg, None, None, local_dur)
@@ -259,17 +362,17 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     all_years = [mb_year] if mb_year else []
                     all_years += [y for y in discogs_res['years']]
                     oldest_year = utils.filter_valid_years(all_years)
+                    discogs_year = utils.filter_valid_years(discogs_res['years'])
+                    combined_conf = combine_year_confidence(
+                        mb_year, mb_conf, discogs_year, discogs_res['confidence'], oldest_year
+                    )
 
-                    conf_rank = {'hoch': 2, 'mittel': 1, 'niedrig': 0}
-                    rank_to_conf = {2: 'hoch', 1: 'mittel', 0: 'niedrig'}
-                    best_rank = max(conf_rank.get(mb_conf, 0), conf_rank.get(discogs_res['confidence'], 0))
-                    combined_conf = rank_to_conf[best_rank] if oldest_year else 'niedrig'
-
-                    df.at[idx, 'Artist_Vorschlag'] = api.suggest_artist_spelling(c_art) or ''
-                    df.at[idx, 'Title_Vorschlag'] = api.suggest_title_spelling(art_sugg, c_tit, local_dur) or ''
+                    df.at[idx, 'Artist_Vorschlag'] = artist_proposal or ''
+                    df.at[idx, 'Title_Vorschlag'] = title_proposal or ''
                     df.at[idx, 'Jahr_Vorschlag'] = oldest_year
                     df.at[idx, 'Jahr_Konfidenz'] = combined_conf
                     df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                    df.at[idx, 'Genre_Konfidenz'] = discogs_res['confidence']
                     df.at[idx, 'Album_Vorschlag'] = discogs_res['album'] or mb_album or ''
                     df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style']
                     df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id']
@@ -281,7 +384,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     current_typ = str(row.get('Typ', '')).strip()
                     if not current_typ:
                         raw_type = str(row.get('ItemType', '')).strip()
-                        df.at[idx, 'Typ_Vorschlag'] = utils.ITEM_TYPE_MAPPING.get(raw_type, '')
+                        df.at[idx, 'Typ_Vorschlag'] = utils.map_item_type(raw_type, item_type_lang)
                     else:
                         df.at[idx, 'Typ_Vorschlag'] = ''
                         
@@ -292,8 +395,12 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     progress.console.print(utils.t('fetch_track_info', id=row.get('ID'), art=art_sugg, tit=tit_sugg, jahr=oldest_year or '?', c_color=conf_color, conf=locale_conf))
                 
                 except Exception as e:
-                    utils.log_change("ERROR", f"Track ID {row.get('ID')} gecrasht: {str(e)}")
-                    progress.console.print(f"[bold red]Fehler bei Track ID {row.get('ID')}: {e} -> Wird übersprungen![/bold red]")
+                    error_count += 1
+                    df.at[idx, 'VORSCHLAG_STATUS'] = 'FEHLER'
+                    if 'REVIEW_STATUS' in df.columns:
+                        df.at[idx, 'REVIEW_STATUS'] = ''
+                    utils.log_change("ERROR", f"Track ID {row.get('ID')} konnte nicht abgeschlossen werden: {str(e)}")
+                    progress.console.print(utils.t('fetch_track_error', id=row.get('ID')))
 
                 processed_counter += 1
                 progress.update(task, advance=1)
@@ -305,6 +412,7 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
                     console.print(utils.t('fetch_chunk_pause', count=processed_counter))
                     ans = console.input(utils.t('fetch_chunk_prompt')).strip().lower()
                     if ans == 'r':
+                        stopped_for_review = True
                         break
                     progress.start()
 
@@ -314,7 +422,12 @@ def phase_fetch(db_path, fetch_csv, full=False, no_breaks=False):
             return
 
     utils.save_safe_csv(df, fetch_csv)
-    console.print(utils.t('fetch_success', db=db_path))
+    if error_count:
+        console.print(utils.t('fetch_done_with_errors', count=error_count))
+    if stopped_for_review:
+        console.print(utils.t('fetch_paused_review'))
+    elif not error_count:
+        console.print(utils.t('fetch_success', db=db_path))
 
 def phase_review(fetch_csv, final_csv, auto_hoch=False):
     try: 
@@ -418,6 +531,7 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         discogs_res = future_discogs.result()
 
                     df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                    df.at[idx, 'Genre_Konfidenz'] = discogs_res['confidence']
                     df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
                     df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
                     df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
@@ -426,8 +540,9 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                     if mb_lang: df.at[idx, 'Sprache_Vorschlag'] = mb_lang
 
                 genre_sugg = utils.clean_nan(df.at[idx, 'Genre_Vorschlag'])
+                genre_konf = utils.clean_nan(df.at[idx, 'Genre_Konfidenz']) or 'niedrig'
                 if genre_sugg:
-                    if auto_hoch and konf == 'hoch' and not custom_refetch_needed:
+                    if auto_hoch and genre_konf == 'hoch' and not custom_refetch_needed:
                         df.at[idx, 'Genre'] = genre_sugg
                         console.print(utils.t('rev_genre_auto', sugg=genre_sugg, orig=orig_genre))
                     else:
@@ -508,8 +623,104 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
     utils.save_safe_csv(df, final_csv)
     console.print(utils.t('rev_success', csv=final_csv))
 
+def _apply_field_labels():
+    labels = {
+        'de': {
+            'Artist': 'Artist', 'Title': 'Titel', 'Jahr': 'Jahr', 'Genre': 'Genre',
+            'Album': 'Album', 'Label': 'Label', 'Labelcode': 'Labelcode', 'ISRC': 'ISRC',
+            'Sprache': 'Sprache', 'Typ': 'Typ'
+        },
+        'en': {
+            'Artist': 'Artist', 'Title': 'Title', 'Jahr': 'Year', 'Genre': 'Genre',
+            'Album': 'Album', 'Label': 'Label', 'Labelcode': 'Label code', 'ISRC': 'ISRC',
+            'Sprache': 'Language', 'Typ': 'Type'
+        },
+        'nl': {
+            'Artist': 'Artiest', 'Title': 'Titel', 'Jahr': 'Jaar', 'Genre': 'Genre',
+            'Album': 'Album', 'Label': 'Label', 'Labelcode': 'Labelcode', 'ISRC': 'ISRC',
+            'Sprache': 'Taal', 'Typ': 'Soort'
+        }
+    }
+    return labels.get(utils.CURRENT_LANG, labels['de'])
+
+
+def build_apply_change_counts(df, db_path):
+    current = db.load_dataframe_from_mldb(db_path, ignored_folders=[])
+    if 'ID' not in current.columns:
+        return {field: 0 for field in _apply_field_labels()}
+
+    current = current.copy()
+    current['ID'] = current['ID'].astype(str)
+    current = current.drop_duplicates(subset=['ID']).set_index('ID')
+    counts = {field: 0 for field in _apply_field_labels()}
+
+    for _, row in df.iterrows():
+        item_id = str(row.get('ID', ''))
+        if item_id not in current.index:
+            continue
+        live = current.loc[item_id]
+        for field in counts:
+            new_value = utils.clean_nan(row.get(field, ''))
+            old_value = utils.clean_nan(live.get(field, ''))
+            # Empty values are not written by apply_dataframe_to_mldb.
+            if new_value and new_value != old_value:
+                counts[field] += 1
+    return counts
+
+
+def print_apply_summary(df, db_path):
+    force_count = int((df['FORCE_APPLY'].astype(str).str.upper() == 'JA').sum()) if 'FORCE_APPLY' in df.columns else 0
+    summary_text = (
+        f"[bold]{utils.t('apply_summary_total')}:[/bold] [cyan]{len(df)}[/cyan]\n"
+        f"[bold]{utils.t('apply_summary_force')}:[/bold] [cyan]{force_count}[/cyan]\n"
+        f"[bold]{utils.t('apply_summary_restored')}:[/bold] [cyan]{len(df)}[/cyan]"
+    )
+    console.print(Panel(summary_text, title=utils.t('apply_summary_title'), box=box.ROUNDED))
+
+    counts = build_apply_change_counts(df, db_path)
+    labels = _apply_field_labels()
+    table = Table(box=box.SIMPLE_HEAVY, show_header=True, header_style="bold cyan")
+    table.add_column(utils.t('apply_summary_field'))
+    table.add_column(utils.t('apply_summary_count'), justify="right")
+    for field, count in counts.items():
+        table.add_row(labels[field], str(count))
+    console.print(table)
+
+
+def _filter_apply_protection(df, db_path):
+    if 'FORCE_APPLY' not in df.columns:
+        df['FORCE_APPLY'] = ''
+
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(item_attributes)")
+        attr_cols = [row[1].lower() for row in cur.fetchall()]
+        attr_table = "item_attributes" if attr_cols else "attributes"
+
+        cur.execute(f"PRAGMA table_info({attr_table})")
+        attr_cols = [row[1].lower() for row in cur.fetchall()]
+        attr_id_col = next((c for c in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c in attr_cols), None)
+
+        if attr_id_col:
+            cur.execute(f"SELECT {attr_id_col} FROM {attr_table} WHERE name = 'RESTAURIERT' AND UPPER(value) = 'JA'")
+            already_restored_ids = {str(row[0]) for row in cur.fetchall()}
+            force_mask = df['FORCE_APPLY'].astype(str).str.upper() == 'JA'
+            protected_mask = df['ID'].astype(str).isin(already_restored_ids) & ~force_mask
+            return df[~protected_mask].copy()
+    except Exception as e:
+        utils.log_change("ERROR", f"Apply-Schutzprüfung fehlgeschlagen: {e}")
+        raise
+    finally:
+        if conn is not None:
+            conn.close()
+    return df.copy()
+
+
 def phase_apply(db_path, final_csv):
-    db.verify_db_compatibility(db_path)
+    if db.verify_db_compatibility(db_path) is None:
+        return
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
         return
@@ -522,6 +733,29 @@ def phase_apply(db_path, final_csv):
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
         return
+
+    df = pd.read_csv(final_csv, dtype=str)
+    if 'REVIEW_STATUS' in df.columns:
+        df = df[df['REVIEW_STATUS'] == 'JA'].copy()
+
+    try:
+        df = _filter_apply_protection(df, db_path)
+    except Exception as e:
+        console.print(utils.t('apply_err_lock', err=str(e)))
+        return
+
+    if df.empty:
+        console.print(utils.t('apply_no_new'))
+        return
+
+    console.print(utils.t('apply_integrity_check'))
+    integrity_ok, integrity_details = db.check_integrity(db_path)
+    if not integrity_ok:
+        console.print(Panel(utils.t('apply_integrity_fail', details=integrity_details), box=box.HEAVY, style="red"))
+        return
+    console.print(utils.t('apply_integrity_ok'))
+
+    print_apply_summary(df, db_path)
 
     utils.clear_input_buffer()
     confirm_word = utils.t('apply_confirm_word')
@@ -538,65 +772,56 @@ def phase_apply(db_path, final_csv):
         db_dir = os.path.dirname(os.path.abspath(db_path)) or "."
         base_name = os.path.basename(db_path)
         backups = [os.path.join(db_dir, f) for f in os.listdir(db_dir) if f.startswith(base_name + ".backup-")]
-        backups.sort() 
-        
+        backups.sort()
+
         if len(backups) > 5:
             for old_backup in backups[:-5]:
                 os.remove(old_backup)
             console.print(utils.t('apply_backup_clean'))
-    except Exception:
-        pass
+    except Exception as e:
+        utils.log_change("BACKUP", f"Alte Backups konnten nicht vollständig bereinigt werden: {e}")
 
-    df = pd.read_csv(final_csv, dtype=str)
-    if 'REVIEW_STATUS' in df.columns:
-        df = df[df['REVIEW_STATUS'] == 'JA']
-
+    applied_ids = set(df['ID'].astype(str))
     try:
-        conn = sqlite3.connect(db_path)
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(item_attributes)")
-        attr_cols = [row[1].lower() for row in cur.fetchall()]
-        attr_table = "item_attributes" if attr_cols else "attributes"
-        
-        cur.execute(f"PRAGMA table_info({attr_table})")
-        attr_cols = [row[1].lower() for row in cur.fetchall()]
-        attr_id_col = next((c for c in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c in attr_cols), None)
-        
-        if attr_id_col:
-            cur.execute(f"SELECT {attr_id_col} FROM {attr_table} WHERE name = 'RESTAURIERT' AND UPPER(value) = 'JA'")
-            already_restored_ids = {str(row[0]) for row in cur.fetchall()}
-            df = df[~df['ID'].astype(str).isin(already_restored_ids)]
-        conn.close()
-    except Exception:
-        pass
+        updated = db.apply_dataframe_to_mldb(df, db_path)
+        console.print(utils.t('apply_success', count=updated, db=db_path))
+    except sqlite3.OperationalError as e:
+        console.print(utils.t('apply_err_lock', err=str(e)))
+        return
 
-    if df.empty:
-        console.print(utils.t('apply_no_new'))
-    else:
-        try:
-            updated = db.apply_dataframe_to_mldb(df, db_path)
-            console.print(utils.t('apply_success', count=updated, db=db_path))
-        except sqlite3.OperationalError as e:
-            console.print(utils.t('apply_err_lock', err=str(e)))
-            return
+    console.print(utils.t('apply_integrity_check'))
+    post_ok, post_details = db.check_integrity(db_path)
+    if not post_ok:
+        console.print(Panel(
+            utils.t('apply_integrity_after_fail', backup=backup_path, details=post_details),
+            box=box.HEAVY, style="red"
+        ))
+        utils.log_change("CRITICAL", f"Integrität nach Apply fehlgeschlagen: {post_details}; Backup: {backup_path}")
+        return
+    console.print(utils.t('apply_integrity_ok'))
 
     try:
         df_full = pd.read_csv(final_csv, dtype=str)
-        if 'REVIEW_STATUS' in df_full.columns:
-            df_full.loc[df_full['REVIEW_STATUS'] == 'JA', 'RESTAURIERT'] = 'JA'
-            utils.save_safe_csv(df_full, final_csv)
-            
+        final_mask = df_full['ID'].astype(str).isin(applied_ids)
+        df_full.loc[final_mask, 'RESTAURIERT'] = 'JA'
+        if 'FORCE_APPLY' in df_full.columns:
+            df_full.loc[final_mask, 'FORCE_APPLY'] = ''
+        utils.save_safe_csv(df_full, final_csv)
+
         fetch_csv = final_csv.replace('_restauriert.csv', '_vorschlaege.csv')
         if os.path.exists(fetch_csv):
             df_fetch = pd.read_csv(fetch_csv, dtype=str)
-            if 'REVIEW_STATUS' in df_fetch.columns:
-                df_fetch.loc[df_fetch['REVIEW_STATUS'] == 'JA', 'RESTAURIERT'] = 'JA'
-                utils.save_safe_csv(df_fetch, fetch_csv)
-    except Exception:
-        pass
+            fetch_mask = df_fetch['ID'].astype(str).isin(applied_ids)
+            df_fetch.loc[fetch_mask, 'RESTAURIERT'] = 'JA'
+            if 'FORCE_APPLY' in df_fetch.columns:
+                df_fetch.loc[fetch_mask, 'FORCE_APPLY'] = ''
+            utils.save_safe_csv(df_fetch, fetch_csv)
+    except Exception as e:
+        utils.log_change("ERROR", f"CSV-Status nach Apply konnte nicht synchronisiert werden: {e}")
 
 def phase_maintenance(db_path):
-    db.verify_db_compatibility(db_path)
+    if db.verify_db_compatibility(db_path) is None:
+        return
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
         return
@@ -688,25 +913,32 @@ def run_interactive_menu():
         else:
             console.print(f"[green] {utils.t('menu_db_act')} {mldbpfad}[/green]")
 
-        console.print(f"\n  [[cyan]0[/cyan]] {utils.t('menu_opt0')}\n")
-        
+        console.print(f"\n  [[cyan]0[/cyan]] [bold]{utils.t('menu_opt0')}[/bold]")
+        console.print(f"      [dim]{utils.t('menu_desc0')}[/dim]\n")
+
         console.print(f"[yellow] {utils.t('menu_h1')}[/yellow]")
-        console.print(f"  [[green]1[/green]] {utils.t('menu_opt1')}")
-        console.print(f"  [[green]2[/green]] {utils.t('menu_opt2')}")
-        console.print(f"  [[green]3[/green]] {utils.t('menu_opt3')}\n")
-        
+        for num in ('1', '2', '3'):
+            console.print(f"  [[green]{num}[/green]] [bold]{utils.t('menu_opt' + num)}[/bold]")
+            console.print(f"      [dim]{utils.t('menu_desc' + num)}[/dim]")
+        console.print()
+
         console.print(f"[yellow] {utils.t('menu_h2')}[/yellow]")
-        console.print(f"  [[green]4[/green]] {utils.t('menu_opt4')}")
-        console.print(f"  [[green]5[/green]] {utils.t('menu_opt5')}\n")
-        
+        for num in ('4', '5'):
+            console.print(f"  [[green]{num}[/green]] [bold]{utils.t('menu_opt' + num)}[/bold]")
+            console.print(f"      [dim]{utils.t('menu_desc' + num)}[/dim]")
+        console.print()
+
         console.print(f"[yellow] {utils.t('menu_h3')}[/yellow]")
-        console.print(f"  [[green]6[/green]] {utils.t('menu_opt6')}\n")
-        
+        console.print(f"  [[green]6[/green]] [bold]{utils.t('menu_opt6')}[/bold]")
+        console.print(f"      [dim]{utils.t('menu_desc6')}[/dim]\n")
+
         console.print(f"[yellow] {utils.t('menu_h4')}[/yellow]")
-        console.print(f"  [[green]7[/green]] {utils.t('menu_opt7')}\n")
-        
+        console.print(f"  [[green]7[/green]] [bold]{utils.t('menu_opt7')}[/bold]")
+        console.print(f"      [dim]{utils.t('menu_desc7')}[/dim]\n")
+
         console.print(f"  [[green]8[/green]] {utils.t('menu_opt8')}")
-        console.print(f"  [[green]9[/green]] {utils.t('menu_opt9')}\n")
+        console.print(f"  [[green]9[/green]] {utils.t('menu_opt9')}")
+        console.print(f"\n[cyan]💡 {utils.t('menu_workflow')}[/cyan]\n")
 
         wahl = console.input(f"[cyan]{utils.t('menu_prompt')} [/cyan]").strip()
 
@@ -722,6 +954,10 @@ def run_interactive_menu():
             console.print(f"[yellow]{utils.t('menu_path_hint2')}[/yellow]")
             mldbpfad = console.input(f"{utils.t('menu_path_prompt')}").strip().strip('"').strip("'")
             if mldbpfad:
+                if db.verify_db_compatibility(mldbpfad) is None:
+                    mldbpfad = ""
+                    console.input(f"\n[cyan]{utils.t('menu_continue')}[/cyan]")
+                    continue
                 db_base_name, data_dir = setup_logging(mldbpfad)
                 fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
                 final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
@@ -776,7 +1012,8 @@ def main():
             console.print("[red]Fehler: --db Argument fehlt![/red]")
             sys.exit(1)
         
-        db.verify_db_compatibility(args.db)
+        if db.verify_db_compatibility(args.db) is None:
+            sys.exit(1)
         perform_migration()
         db_base_name, data_dir = setup_logging(args.db)
         utils.init_credentials()

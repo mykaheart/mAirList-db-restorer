@@ -14,44 +14,57 @@ console = Console(highlight=False)
 SUPPORTED_SCHEMAS = [25]  
 
 def get_schema_version(db_path):
+    conn = None
     try:
-        conn = sqlite3.connect(db_path)
+        if not os.path.isfile(db_path):
+            return None
+        uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
         cur = conn.cursor()
         cur.execute("SELECT value FROM config WHERE name = 'schemaversion'")
         row = cur.fetchone()
-        conn.close()
         if row and row[0]:
             return int(row[0])
         return None
     except Exception as e:
         utils.log_change("ERROR", f"Konnte Schema-Version nicht lesen: {e}")
         return None
+    finally:
+        if conn is not None:
+            conn.close()
 
 def verify_db_compatibility(db_path):
     version = get_schema_version(db_path)
     if version is None:
-        console.print("[bold red]Fehler: Konnte die Schema-Version der Datenbank nicht ermitteln. Ist das wirklich eine mAirList .mldb Datei?[/bold red]")
-        sys.exit(1)
-        
+        console.print(Panel(utils.t('db_invalid_file'), box=box.HEAVY, style="red"))
+        return None
+
     if version not in SUPPORTED_SCHEMAS:
-        console.print(Panel(f"[bold red]Inkompatible Datenbank![/bold red]\n\nDeine mAirList-Datenbank nutzt Schema-Version [bold yellow]{version}[/bold yellow].\nDieser Restorer (v{utils.APP_VERSION}) unterstützt aktuell nur die Versionen: [bold green]{SUPPORTED_SCHEMAS}[/bold green].\n\n[dim]Bitte wende dich an die Entwickler, um ein Update für dieses Schema zu erhalten.[/dim]", box=box.HEAVY, style="red"))
-        sys.exit(1)
-        
+        console.print(Panel(
+            utils.t('db_incompatible', version=version, supported=SUPPORTED_SCHEMAS, app_version=utils.APP_VERSION),
+            box=box.HEAVY, style="red"
+        ))
+        return None
+
     return version
 
 def detect_db_language(db_path, fallback_lang):
+    conn = None
     try:
-        conn = sqlite3.connect(db_path)
+        uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
         cur = conn.cursor()
         cur.execute("SELECT DISTINCT name FROM item_attributes")
-        names = [row[0].lower() for row in cur.fetchall()]
-        conn.close()
+        names = [str(row[0]).lower() for row in cur.fetchall()]
         if 'year' in names or 'language' in names: return 'en'
         if 'jaar' in names or 'taal' in names: return 'nl'
         if 'jahr' in names or 'sprache' in names: return 'de'
         return fallback_lang
-    except:
+    except Exception:
         return fallback_lang
+    finally:
+        if conn is not None:
+            conn.close()
 
 def is_db_locked(db_path, timeout=1.0):
     try:
@@ -62,6 +75,23 @@ def is_db_locked(db_path, timeout=1.0):
         return False
     except sqlite3.OperationalError: return True
     except Exception: return False
+
+def check_integrity(db_path):
+    """Run SQLite PRAGMA integrity_check in read-only mode."""
+    conn = None
+    try:
+        uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        rows = conn.execute("PRAGMA integrity_check").fetchall()
+        messages = [str(row[0]) for row in rows if row and row[0] is not None]
+        ok = len(messages) == 1 and messages[0].strip().lower() == 'ok'
+        return ok, ("OK" if ok else "; ".join(messages) or "Unknown integrity error")
+    except Exception as e:
+        utils.log_change("ERROR", f"Integritätsprüfung fehlgeschlagen: {e}")
+        return False, str(e)
+    finally:
+        if conn is not None:
+            conn.close()
 
 def load_dataframe_from_mldb(db_path, ignored_folders=None):
     if not os.path.exists(db_path): 
@@ -81,8 +111,7 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
         items['Duration'] = items['duration'] if 'duration' in items.columns else 0.0
         items['TotalDuration'] = items['totalduration'] if 'totalduration' in items.columns else 0.0
     except Exception as e:
-        console.print(f"[red]Kritischer Fehler beim Lesen der mAirList Items: {e}[/red]")
-        sys.exit(1)
+        raise RuntimeError(f"items-Tabelle konnte nicht gelesen werden: {e}") from e
             
     try:
         folder_df = pd.read_sql_query("SELECT * FROM folders", conn)
@@ -138,6 +167,11 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
         
     try:
         attrs = pd.read_sql_query("SELECT item AS ID, name, value FROM item_attributes", conn)
+
+        # Lyrics/song texts are deliberately excluded from the temporary workspace.
+        # They remain untouched in the original mAirList database.
+        cache_excluded = {'lyrics', 'songtext', 'songtexte', 'song text'}
+        attrs = attrs[~attrs['name'].astype(str).str.strip().str.lower().isin(cache_excluded)].copy()
         
         def map_read_attr(n):
             nl = str(n).lower()

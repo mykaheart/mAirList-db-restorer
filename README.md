@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.62.03 BETA
+# mAirList DB Restorer v0.62.05 BETA
 **Das intelligente Metadaten-Reparatur-Tool für lokale mAirList Datenbanken**
 
 *(Note: English and Dutch documentation / manuals are available in the repository!)*
@@ -23,10 +23,12 @@ Dieses Skript sucht nicht einfach blind drauflos, sondern arbeitet mit mehreren 
 
 *   **Smart Cleaning & VIP-Listen:** Vor der API-Suche werden Artist und Titel bereinigt (z. B. "feat.", "ft."). Notorische Schreibweisen (wie "AC/DC") werden über ein hartcodiertes VIP-Dictionary priorisiert.
 *   **Laufzeit-Matching (Maxi-Erkennung):** Das Skript gleicht die gesuchten API-Treffer mit der *echten lokalen Track-Laufzeit* (+/- Toleranz für Cue-Punkte) ab. So erkennt es zielsicher Extended-Versions oder seltene Radio-Edits.
-*   **Ausreißer-Filter (Median & Lücken-Logik):** Da APIs oft fehlerhafte User-Einträge enthalten, berechnet das Skript den Mittelwert aller gefundenen Release-Jahre und ignoriert absurde Ausreißer (z. B. ein Release-Jahr 1945 für einen 2004er Track).
+*   **Ausreißer-Filter (Lücken-Logik):** Gefundene Release-Jahre werden sortiert und auf unplausible Einzel-Ausreißer geprüft. Liegt das älteste Jahr mehr als acht Jahre vor dem nächsten Treffer und kommt nur einmal vor, wird es verworfen. So werden typische Fehleinträge aus Community-Datenbanken abgefangen.
 *   **OAD-Schutz (Ignore-Lists):** Virtuelle und physische Ordner, die z. B. "OAD" (On Air Design) oder "Jingles" heißen, können konsequent von der Suche ausgeschlossen werden.
 *   **Ergonomischer Review-Prozess:** Alle API-Vorschläge können vor dem Speichern in die Datenbank in einem schnellen Terminal-Workflow geprüft, angepasst oder mit einem Tastendruck (Rückgriff auf den Original-Wert) abgelehnt werden.
-*   **Massenbearbeitung (Wartungs-Modus):** Ein separates Menü erlaubt tiefe Datenbank-Eingriffe wie die nachträgliche Standardisierung von hunderten Genres, das Korrigieren von Groß-/Kleinschreibung (Title Case) oder das Löschen von Alt-Attributen ("Platinum Notes", "Lyrics").
+*   **Massenbearbeitung (Wartungs-Modus):** Ein separates Menü erlaubt die nachträgliche Standardisierung von Genres, das Korrigieren von Groß-/Kleinschreibung und Apostrophen sowie das Schreiben geprüfter Metadaten in lokale FLAC-, MP3- und AIFF-Dateien.
+*   **Hardening & Wiederaufnahme:** API-Fehler werden automatisch erneut versucht und bleiben bei endgültigem Fehlschlag als offen markiert. Sitzungs-CSVs werden atomar gespeichert und pro Datenbankpfad getrennt, damit Arbeitsstände weder beschädigt noch zwischen gleichnamigen Datenbanken vermischt werden.
+*   **Sicheres Speichern:** Vor dem finalen Schreiben zeigt der Restorer eine Änderungsübersicht, prüft die SQLite-Integrität, erstellt ein Backup und prüft die Datenbank nach dem Schreiben erneut.
 
 ---
 
@@ -45,9 +47,21 @@ Die detaillierte Schritt-für-Schritt-Anleitung zur Installation und Nutzung fin
 
 ---
 
+## 🧪 Entwicklung & Tests
+
+Für Entwickler liegt eine `requirements.txt` bei. Die sicherheitskritischen Regressionstests benötigen kein zusätzliches Test-Framework und laufen mit:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Bei Pushes und Pull Requests führt GitHub Actions zusätzlich automatisch einen Compile-Check und die Regressionstests unter Windows aus.
+
+---
+
 ## 🤖 Transparenz zur Entstehung
 
-Ein offenes Wort zum Code: Das funktionale Konzept, der Workflow und die Architektur dieses Tools stammen aus menschlicher Hand (Myka Vormeng). Die reine Programmierung und das Verfassen des Python-Codes erfolgten maßgeblich durch die Künstliche Intelligenz *Google Gemini*.
+Ein offenes Wort zum Code: Das funktionale Konzept, der Workflow und die Architektur dieses Tools stammen aus menschlicher Hand (Myka Vormeng). Die reine Programmierung und das Verfassen des Python-Codes erfolgten maßgeblich durch die Künstliche Intelligenz *ChatGPT*.
 
 Der Fokus dieses Projektes liegt darauf, was das Tool für die mAirList-Community leistet und wie viele Stunden mühsamer Handarbeit (Klicken im Cue-Editor) es euch ersparen kann.
 

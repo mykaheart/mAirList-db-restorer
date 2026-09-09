@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.62.05 Beta] - 2026-09-09
+### Added
+- **Resilient API fetching:** MusicBrainz and Discogs requests are retried up to three times for transient network errors, HTTP 429 and common 5xx responses. Tracks that still fail receive `FEHLER` status, remain pending and are retried on a later fetch.
+- **Per-database workspace isolation:** CSV caches and logs now include a short hash of the full database path so identically named `.mldb` files in different folders can never share a workspace. Legacy 0.62.04 caches are migrated when that database is first selected.
+- **Atomic CSV writes:** Session files are written completely to a temporary file and then atomically replaced, reducing the risk of half-written progress files after crashes or power loss.
+- **SQLite integrity checks & Apply summary:** Planned field changes are counted before writing, and the database is checked with `PRAGMA integrity_check` both before and after Apply.
+- **Regression tests:** A new `tests/` package validates safety-critical behavior with Python `unittest`.
+- **Automated GitHub tests:** A GitHub Actions workflow runs `compileall` and the regression suite on Windows for pushes and pull requests. A `requirements.txt` documents the Python dependencies.
+
+### Changed
+- **GitHub safety:** A `.gitignore` prevents the local `Data/` folder, databases, backups and build artifacts from being committed to the public repository accidentally.
+- **Friendlier database selection:** Invalid or incompatible database files no longer terminate the interactive program; the user can simply choose another file.
+- **Beginner-friendly main menu:** Menu options now describe the actual action in plain language instead of leading with implementation terms such as Smart Fetch, Overnight or Apply. Option 5 explicitly states that automatic acceptance applies to safe Year/Genre matches.
+- **Lyrics/song text excluded from workspace cache:** These attributes remain untouched in mAirList but are no longer copied into temporary CSV files.
+- **Conflict-safe workspace migration:** Existing files in `Data` are no longer deleted during migration; conflicting copies are preserved with timestamped names.
+
+
+## [0.62.04 Beta] - 2026-09-09
+### Fixed
+- **Full Fetch / Apply collision:** Full Fetch rows are now explicitly marked with `FORCE_APPLY`, allowing reviewed Full Fetch results to be written even when the `.mldb` still contains `RESTAURIERT: JA`. Normal Smart Fetch overwrite protection remains intact.
+- **Complete cache reset:** When `RESTAURIERT` is manually removed in mAirList, all original fields are now refreshed from the `.mldb` (including Artist, Title, Year, Genre, Album, Label, Language, and Type) instead of refreshing only Artist/Title.
+- **Discogs Master/Release IDs:** `master` search hits are now resolved through `main_release` to a real release ID before release details or label-code fallbacks are queried.
+- **Thread-safe API throttling:** MusicBrainz and Discogs rate-limit state is now protected against parallel access.
+
+### Optimized
+- **Fewer MusicBrainz requests:** Artist and title spelling suggestions are fetched only once per track and then reused.
+- **Confidence logic:** Year confidence now considers agreement between MusicBrainz and Discogs. Genre confidence is tracked separately so Auto Review no longer reuses year confidence for genre decisions.
+- **Localized item types:** `Typ` suggestions now follow the detected German, English, or Dutch database language.
+- **API diagnostics:** API exceptions and HTTP errors are now written to the log instead of being silently discarded.
+
+### Documentation
+- README files and manuals were synchronized with the current maintenance menu, language option [8], actual year-outlier logic, and Full Fetch workflow.
+- Project credits were updated to ChatGPT.
+
 ## [0.62.03 Beta] - 2026-09-04
 ### Fixed
 - **Smart Update Checker:** The internal update checker now correctly parses and compares semantic version numbers mathematically (e.g., `0.62.03` vs `0.62.02`) instead of relying on simple string inequality. This prevents false positive update alerts when running a local version that is newer than the remote GitHub repository.

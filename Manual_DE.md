@@ -18,7 +18,7 @@ Um auf die riesige Datenbank von Discogs zugreifen zu dürfen, benötigt das Skr
 4. Klicke auf den Button **"Create an App"** (oder Generate Token).
 5. Gib einen beliebigen Namen für die App ein (z. B. "mAirList Restorer").
 6. Du erhältst nun zwei wichtige kryptische Zeichenketten: Den **Consumer Key** und das **Consumer Secret**.
-7. Kopiere dir diese beiden Werte. Beim allerersten Start der `.exe` wird dich das Programm danach fragen und sie sicher lokal abspeichern.
+7. Kopiere dir diese beiden Werte. Beim allerersten Start der `.exe` wird dich das Programm danach fragen und sie lokal im `Data`-Ordner speichern. Die Werte werden dort lediglich Base64-verschleiert und nicht kryptografisch verschlüsselt.
 
 ---
 
@@ -41,8 +41,8 @@ Wenn mAirList läuft, sperrt (lockt) es die Datenbank-Datei. Wenn das Tool nun v
 
 ## 3. Der Workflow: Metadaten restaurieren
 
-Beim ersten Start fragt dich das Tool nach deiner bevorzugten Sprache (Deutsch, Englisch, Nederlands). Diese Einstellung merkt sich das Skript für die Zukunft. Über Option **[9]** im Hauptmenü kannst du sie jederzeit wieder ändern. 
-Sobald du deine Datenbank-Kopie geladen hast, führt dich das interaktive Menü logisch durch den gesamten Prozess. *Hinweis: Das Skript legt automatisch einen Ordner namens `Data` an, in dem es alle Logs und Zwischenspeicherungen sauber ablegt.*
+Beim ersten Start fragt dich das Tool nach deiner bevorzugten Sprache (Deutsch, Englisch, Nederlands). Diese Einstellung merkt sich das Skript für die Zukunft. Über Option **[8]** im Hauptmenü kannst du sie jederzeit wieder ändern; Option **[9]** beendet das Programm. 
+Sobald du deine Datenbank-Kopie geladen hast, führt dich das interaktive Menü logisch durch den gesamten Prozess. Direkt im Hauptmenü steht als Orientierung der empfohlene Ablauf **1 → 4/5 → 7**. *Hinweis: Das Skript legt automatisch einen Ordner namens `Data` an. Arbeitsstände werden dort atomar gespeichert und anhand des vollständigen Datenbankpfads getrennt, sodass auch zwei gleichnamige `.mldb`-Dateien nicht denselben Cache benutzen.*
 
 ### Schritt 3.1: Ordner-Ausnahmen definieren (Ignore-List)
 Bevor das Skript beim ersten Abruf mit der Suche beginnt, fragt es dich nach Ordnern, die **konsequent ignoriert** werden sollen (z. B. Ordner für Jingles, News, Drops oder Werbung).
@@ -53,14 +53,16 @@ Bevor das Skript beim ersten Abruf mit der Suche beginnt, fragt es dich nach Ord
 ### Schritt 3.2: Metadaten laden (Fetch)
 In dieser Phase sucht das Skript über die APIs von MusicBrainz und Discogs nach den passenden Metadaten für deine Tracks. Deine Original-Werte bleiben dabei völlig unangetastet! 
 
-*   **[1] Smart-Abruf (Standard):** Das Tool prüft nur Tracks, die noch *nicht* restauriert wurden. Um dich nicht mit einer riesigen Liste zu überfordern, pausiert das Skript automatisch nach 50 geladenen Tracks. Du kannst dann direkt zum Review wechseln oder die nächsten 50 laden.
-*   **[2] Smart-Abruf (Overnight):** Perfekt für riesige Datenbanken. Das Skript lädt alle neuen Tracks in einem Rutsch ohne Pausen durch. Ideal, um den PC über Nacht arbeiten zu lassen.
-*   **[3] Voll-Abruf (Reset & Overnight):** Das Skript ignoriert das "RESTAURIERT"-Flag und ruft die Daten für **ALLE** Tracks in der Datenbank komplett neu ab.
+*   **[1] Neue/unbearbeitete Tracks suchen:** Prüft nur Tracks, die noch nicht restauriert wurden, und pausiert nach jeweils 50 geladenen Tracks. Der Arbeitsstand ist jederzeit fortsetzbar.
+*   **[2] Alle offenen Tracks ohne Pause suchen:** Macht dasselbe wie Option 1, läuft aber ohne 50er-Pause bis zum Ende durch – praktisch für große Datenbanken oder über Nacht.
+*   **[3] Alle Tracks komplett neu prüfen:** Ignoriert das `RESTAURIERT`-Flag und holt für **ALLE** Tracks neue Vorschläge. Nach dem Review dürfen diese bewusst neu geprüften Werte auch bereits restaurierte Datensätze überschreiben; der normale Überschreib-Schutz bleibt für Option 1/2 erhalten.
+
+Wenn MusicBrainz oder Discogs vorübergehend nicht erreichbar sind, versucht der Restorer den Request automatisch mehrfach. Bleibt der Fehler bestehen, wird der betreffende Track **nicht als fertig markiert**, sondern bleibt offen und wird bei einem späteren Abruf erneut versucht.
 
 > **Tipp:** Du kannst den Fetch-Vorgang jederzeit mit der Tastenkombination `Strg + C` abbrechen. Das Skript speichert deinen bisherigen Fortschritt sicher ab, und du kannst beim nächsten Start exakt an dieser Stelle weitermachen!
 
 ### Schritt 3.3: Daten kontrollieren (Review)
-Wähle Option **[4]** oder **[5]**. Hier präsentiert dir das Tool jeden Track einzeln und schlägt dir die im Internet gefundenen Metadaten vor. 
+Wähle Option **[4] Alle Vorschläge selbst kontrollieren** oder **[5] Prüfung mit Automatik**. Option 4 zeigt dir alle Vorschläge manuell. Option 5 übernimmt ausschließlich sichere **Jahr-/Genre-Treffer** automatisch; die übrigen Felder bleiben weiterhin kontrollierbar.
 
 *   **Bestätigen:** Wenn dir ein Vorschlag (z. B. das Jahr) gefällt, drücke einfach `Enter`. Das Tool übernimmt den Wert und springt zum nächsten Feld.
 *   **Original behalten (`O`-Taste):** Neben dem Vorschlag siehst du in Grau immer deinen ursprünglichen Datenbank-Wert. Ist dein eigener Wert besser? Tippe einfach ein `o` (für Original) und drücke `Enter`.
@@ -69,10 +71,10 @@ Wähle Option **[4]** oder **[5]**. Hier präsentiert dir das Tool jeden Track e
 *   **Oops, vertippt?** Tippe ein `<` oder `b` (für Back) und drücke `Enter`, um einen Track zurückzuspringen.
 
 ### Schritt 3.4: Wartung (Maintenance)
-Unter Option **[6]** findest du kraftvolle Werkzeuge zur Massenbearbeitung. Hier kannst du unter anderem unsaubere Genres standardisieren, fehlerhafte Groß-/Kleinschreibung reparieren, alte Attribute wie "Lyrics" löschen (um die Datenbank zu verkleinern) oder die englischen mAirList Elementtypen (z. B. "Music") vollautomatisch in deine Landessprache übersetzen lassen.
+Unter Option **[6]** findest du die Wartungswerkzeuge. Du kannst Genres standardisieren, Groß-/Kleinschreibung und Apostrophe in Artist/Title korrigieren oder mit dem Datei-Tagger geprüfte Metadaten aus der Datenbank in lokale FLAC-, MP3- und AIFF-Dateien schreiben. Die Sammeloption **[4]** führt die Genre- und Schreibweisenkorrektur nacheinander aus.
 
 ### Schritt 3.5: In mAirList speichern (Apply)
-Wenn du alle Tracks geprüft hast, wählst du im Hauptmenü Option **[7] Speichern**. Erst jetzt öffnet das Skript deine Datenbank-Kopie und schreibt die neuen, sauberen Metadaten in einem schnellen Bulk-Verfahren hinein.
+Wenn du alle Tracks geprüft hast, wählst du im Hauptmenü Option **[7] Geprüfte Änderungen in die Datenbank-Kopie schreiben**. Vor dem Schreiben zeigt der Restorer eine Zusammenfassung der geplanten Feldänderungen und führt eine SQLite-Integritätsprüfung durch. Erst nach deiner Bestätigung wird ein Backup erstellt und in einem schnellen Bulk-Verfahren geschrieben. Anschließend wird die Datenbankintegrität erneut geprüft.
 
 *   Das Skript setzt dabei für jeden Track automatisch das interne Attribut `RESTAURIERT` auf `JA`. 
 *   Tracks mit diesem Flag werden bei zukünftigen Durchläufen automatisch übersprungen. 

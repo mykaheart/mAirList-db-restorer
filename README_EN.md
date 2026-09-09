@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.62.03 BETA
+# mAirList DB Restorer v0.62.05 BETA
 **The intelligent metadata repair tool for local mAirList databases**
 
 *(Note: German and Dutch documentation / manuals are available in the repository!)*
@@ -23,10 +23,12 @@ This script doesn't just search blindly; it uses multiple safety nets and logic 
 
 *   **Smart Cleaning & VIP Lists:** Artist and title are cleaned before the API search (e.g., "feat.", "ft."). Notorious spellings (like "AC/DC") are prioritized via a hardcoded VIP dictionary.
 *   **Duration Matching (Maxi Detection):** The script compares the retrieved API hits with the *actual local track duration* (+/- tolerance for cue points). This accurately detects extended versions or rare radio edits.
-*   **Outlier Filter (Median & Gap Logic):** Since APIs often contain erroneous user entries, the script calculates the median of all found release years and ignores absurd outliers (e.g., a release year of 1945 for a 2004 track).
+*   **Outlier Filter (Gap Logic):** Retrieved release years are sorted and checked for implausible single outliers. If the oldest year is more than eight years earlier than the next result and occurs only once, it is discarded. This catches typical bad entries in community-maintained databases.
 *   **OAD Protection (Ignore Lists):** Virtual and physical folders named, for example, "OAD" (On Air Design) or "Jingles" can be strictly excluded from the search.
 *   **Ergonomic Review Process:** All API suggestions can be reviewed, adjusted, or rejected with a single keystroke (reverting to the original value) in a fast terminal workflow before being saved to the database.
-*   **Mass Editing (Maintenance Mode):** A separate menu allows for deep database interventions, such as retrospectively standardizing hundreds of genres, correcting capitalization (Title Case), or deleting old attributes ("Platinum Notes", "Lyrics").
+*   **Mass Editing (Maintenance Mode):** A separate menu can standardize genres, correct capitalization and apostrophes, and write verified metadata into local FLAC, MP3, and AIFF files.
+*   **Hardening & Resume Safety:** API failures are retried automatically and remain pending if they still fail. Session CSV files are written atomically and separated per database path so workspaces cannot be corrupted or mixed between identically named databases.
+*   **Safer Apply:** Before final writing, the Restorer shows a change summary, checks SQLite integrity, creates a backup, and checks the database again after writing.
 
 ---
 
@@ -45,9 +47,21 @@ Detailed step-by-step instructions for installation and use can be found separat
 
 ---
 
+## 🧪 Development & Tests
+
+A `requirements.txt` is included for developers. The safety-critical regression suite needs no additional test framework and can be run with:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+On pushes and pull requests, GitHub Actions automatically runs a compile check and the regression tests on Windows.
+
+---
+
 ## 🤖 Transparency Regarding Origin
 
-A frank word about the code: The functional concept, workflow, and architecture of this tool were created by human hands (Myka Vormeng). The pure programming and writing of the Python code were largely done by the Artificial Intelligence *Google Gemini*. 
+A frank word about the code: The functional concept, workflow, and architecture of this tool were created by human hands (Myka Vormeng). The pure programming and writing of the Python code were largely done by the Artificial Intelligence *ChatGPT*. 
 
 The focus of this project is on what the tool does for the mAirList community and how many hours of tedious manual work (clicking in the cue editor) it can save you.
 

@@ -2,6 +2,40 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.62.05 Beta] - 2026-09-09
+### Toegevoegd
+- **Fouttolerante API-ophaling:** MusicBrainz- en Discogs-aanvragen worden bij tijdelijke netwerkfouten, HTTP 429 en veelvoorkomende 5xx-fouten automatisch maximaal drie keer opnieuw geprobeerd. Tracks die definitief mislukken krijgen status `FEHLER`, blijven openstaan en worden bij een latere fetch opnieuw geprobeerd.
+- **Afzonderlijke werkstand per database:** CSV-cache en logs bevatten nu een korte hash van het volledige databasepad. Gelijknamige `.mldb`-bestanden in verschillende mappen kunnen daardoor nooit dezelfde werkstand gebruiken. Oude 0.62.04-caches worden bij de eerste selectie automatisch gemigreerd.
+- **Atomaire CSV-opslag:** Sessiebestanden worden eerst volledig naar een tijdelijk bestand geschreven en daarna atomair vervangen.
+- **SQLite-integriteitscontrole & overzicht vóór opslaan:** Geplande veldwijzigingen worden vóór het schrijven geteld en getoond. De database wordt vóór en na Opslaan gecontroleerd met `PRAGMA integrity_check`.
+- **Regressietests:** Een nieuw `tests/`-pakket controleert de veiligheidskritische functies automatisch met Python `unittest`.
+- **Automatische GitHub-tests:** Een GitHub Actions-workflow voert bij pushes en pull requests op Windows automatisch `compileall` en de regressietests uit. Een `requirements.txt` documenteert de Python-afhankelijkheden.
+
+### Gewijzigd
+- **GitHub-veiligheid:** Een `.gitignore` voorkomt dat de lokale map `Data/`, databases, back-ups en buildbestanden per ongeluk in de openbare repository terechtkomen.
+- **Gebruiksvriendelijkere databasekeuze:** Ongeldige of incompatibele databasebestanden sluiten het interactieve programma niet meer af; de gebruiker kan direct een ander bestand kiezen.
+- **Hoofdmenu duidelijker voor beginners:** De opties beschrijven nu eerst in gewone taal wat er gebeurt. Optie 5 vermeldt expliciet dat de automatische acceptatie veilige Jaar/Genre-matches betreft.
+- **Lyrics/songtekst uit de werkcache verwijderd:** Deze attributen blijven in mAirList onaangetast, maar worden niet meer naar tijdelijke CSV-bestanden gekopieerd.
+- **Conflictveilige datamigratie:** Bestaande bestanden in `Data` worden niet meer verwijderd; conflicterende kopieën blijven met een tijdstempel bewaard.
+
+
+## [0.62.04 Beta] - 2026-09-09
+### Opgelost
+- **Full-Fetch / Opslaan-conflict:** Full-Fetch-items worden nu intern gemarkeerd met `FORCE_APPLY`. Daardoor mogen gecontroleerde Full-Fetch-resultaten worden opgeslagen, ook wanneer de `.mldb` nog `RESTAURIERT: JA` bevat. De normale overschrijfbeveiliging van Smart-Fetch blijft behouden.
+- **Volledige cache-reset:** Wanneer `RESTAURIERT` handmatig in mAirList wordt verwijderd, vernieuwt de Restorer nu alle oorspronkelijke velden vanuit de `.mldb` (o.a. Artiest, Titel, Jaar, Genre, Album, Label, Taal en Type) in plaats van alleen Artiest/Titel.
+- **Discogs Master-/Release-ID:** Zoekresultaten van het type `master` worden nu via `main_release` naar een echte release-ID vertaald voordat releasegegevens of labelcodes worden opgevraagd.
+- **Thread-safe API-throttling:** De MusicBrainz- en Discogs-rate-limits zijn nu beschermd tegen gelijktijdige toegang.
+
+### Geoptimaliseerd
+- **Minder MusicBrainz-aanvragen:** Suggesties voor artiest- en titelspelling worden per track slechts één keer opgehaald en daarna hergebruikt.
+- **Betrouwbaarheidslogica:** Jaarbetrouwbaarheid houdt nu rekening met overeenstemming tussen MusicBrainz en Discogs. Genrebetrouwbaarheid wordt apart bijgehouden zodat Auto Review niet langer de jaarbetrouwbaarheid gebruikt voor genrekeuzes.
+- **Gelokaliseerde itemtypen:** Voorstellen voor `Typ` volgen nu de gedetecteerde Duitse, Engelse of Nederlandse databasetaal.
+- **API-diagnose:** API-uitzonderingen en HTTP-fouten worden nu in het log geschreven in plaats van volledig stil genegeerd.
+
+### Documentatie
+- README-bestanden en handleidingen zijn bijgewerkt voor het huidige onderhoudsmenu, taaloptie [8], de werkelijke jaar-uitbijterlogica en de Full-Fetch-workflow.
+- Projectcredits zijn bijgewerkt naar ChatGPT.
+
 ## [0.62.03 Beta] - 2026-09-04
 ### Opgelost
 - **Slimme update-checker:** De ingebouwde update-checker vertaalt versienummers nu naar wiskundige waarden en vergelijkt deze correct. Dit voorkomt valse update-meldingen wanneer de lokaal gebruikte versie hoger is dan de versie in de GitHub-repository (bijv. tijdens lokale ontwikkeling).

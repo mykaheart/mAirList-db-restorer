@@ -18,7 +18,7 @@ To be allowed to access the huge Discogs database, the script requires a free AP
 4. Click on the **"Create an App"** (or Generate Token) button.
 5. Enter any name for the app (e.g., "mAirList Restorer").
 6. You will now receive two important cryptic character strings: The **Consumer Key** and the **Consumer Secret**.
-7. Copy these two values. When starting the `.exe` for the very first time, the program will ask you for them and save them securely locally.
+7. Copy these two values. When starting the `.exe` for the very first time, the program will ask for them and store them locally in the `Data` folder. The values are only Base64-obfuscated there; they are not cryptographically encrypted.
 
 ---
 
@@ -41,8 +41,8 @@ When mAirList is running, it locks the database file. If the tool now tries to s
 
 ## 3. The Workflow: Restoring Metadata
 
-At the first start, the tool asks you for your preferred language (German, English, Dutch). The script remembers this setting for the future. You can change it at any time via Option **[9]** in the main menu.
-As soon as you have loaded your database copy, the interactive menu guides you logically through the entire process. *Note: The script automatically creates a folder called `Data` in which it neatly stores all logs and intermediate saves.*
+At the first start, the tool asks you for your preferred language (German, English, Dutch). The script remembers this setting for the future. You can change it at any time via Option **[8]** in the main menu; Option **[9]** exits the program.
+As soon as you have loaded your database copy, the interactive menu guides you through the process and displays the recommended workflow **1 → 4/5 → 7**. *Note: The script automatically creates a `Data` folder. Workspace files are saved atomically and separated by the full database path, so two identically named `.mldb` files cannot share the same cache.*
 
 ### Step 3.1: Define Folder Exceptions (Ignore-List)
 Before the script begins its search during the first fetch, it asks you for folders that should be **consistently ignored** (e.g., folders for Jingles, News, Drops, or Advertising).
@@ -53,14 +53,16 @@ Before the script begins its search during the first fetch, it asks you for fold
 ### Step 3.2: Fetch Metadata (Fetch)
 In this phase, the script searches for the matching metadata for your tracks via the APIs of MusicBrainz and Discogs. Your original values remain completely untouched!
 
-*   **[1] Smart Fetch (Standard):** The tool only checks tracks that have *not* yet been restored. To avoid overwhelming you with a huge list, the script automatically pauses after 50 loaded tracks. You can then switch directly to the review or load the next 50.
-*   **[2] Smart Fetch (Overnight):** Perfect for massive databases. The script loads all new tracks in one go without pausing. Ideal for letting the PC work overnight.
-*   **[3] Full Fetch (Reset & Overnight):** The script ignores the "RESTAURIERT" (RESTORED) flag and completely re-fetches the data for **ALL** tracks in the database.
+*   **[1] Search new/unprocessed tracks:** Checks only tracks that are not yet restored and pauses after each batch of 50. The workspace can be resumed at any time.
+*   **[2] Search all pending tracks without pauses:** Performs the same work as option 1 but runs to the end without 50-track pauses – useful for large libraries or overnight runs.
+*   **[3] Re-check every track from scratch:** Ignores the `RESTAURIERT` flag and fetches fresh suggestions for **ALL** tracks. After review, these deliberately refreshed values may overwrite already-restored rows; the normal overwrite protection remains active for options 1/2.
+
+If MusicBrainz or Discogs is temporarily unavailable, the Restorer automatically retries the request. If it still fails, the track is **not marked as finished**; it remains pending and will be tried again in a later fetch.
 
 > **Tip:** You can cancel the fetch process at any time with the key combination `Ctrl + C`. The script securely saves your progress up to that point, and you can continue at exactly this point the next time you start!
 
 ### Step 3.3: Review Data (Review)
-Choose Option **[4]** or **[5]**. Here, the tool presents you with each track individually and suggests the metadata found on the internet.
+Choose **[4] Review every suggestion yourself** or **[5] Review with automatic assistance**. Option 4 is fully manual. Option 5 automatically accepts only high-confidence **Year/Genre** matches; all other fields remain reviewable.
 
 *   **Confirm:** If you like a suggestion (e.g., the year), simply press `Enter`. The tool accepts the value and jumps to the next field.
 *   **Keep original (`O` key):** Next to the suggestion, you will always see your original database value in gray. Is your own value better? Simply type an `o` (for original) and press `Enter`.
@@ -69,10 +71,10 @@ Choose Option **[4]** or **[5]**. Here, the tool presents you with each track in
 *   **Oops, typo?** Type a `<` or `b` (for Back) and press `Enter` to jump back one track.
 
 ### Step 3.4: Maintenance
-Under Option **[6]** you will find powerful tools for mass editing. Here you can, among other things, standardize messy genres, repair incorrect capitalization (Title Case), delete old attributes like "Lyrics" (to shrink the database), or have the English mAirList Item Types (e.g., "Music") fully automatically translated into your local language.
+Under Option **[6]** you will find the maintenance tools. You can standardize genres, correct capitalization and apostrophes in Artist/Title, or use the file tagger to write verified database metadata into local FLAC, MP3, and AIFF files. Combined option **[4]** runs the genre and text-case tasks sequentially.
 
 ### Step 3.5: Save in mAirList (Apply)
-When you have checked all tracks, select Option **[7] Save** in the main menu. Only now does the script open your database copy and write the new, clean metadata into it using a fast bulk process.
+When you have checked all tracks, select **[7] Write verified changes to the database copy**. Before writing, the Restorer shows a summary of planned field changes and runs an SQLite integrity check. Only after your confirmation does it create a backup and perform the bulk write. The database integrity is checked again afterwards.
 
 *   The script automatically sets the internal attribute `RESTAURIERT` to `JA` (YES) for each track.
 *   Tracks with this flag will be automatically skipped during future runs.

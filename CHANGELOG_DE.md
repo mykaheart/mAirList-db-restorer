@@ -2,6 +2,40 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.62.05 Beta] - 2026-09-09
+### Hinzugefügt
+- **Fehlertoleranter API-Abruf:** MusicBrainz- und Discogs-Anfragen werden bei temporären Netzwerkfehlern, HTTP 429 sowie typischen 5xx-Fehlern automatisch bis zu dreimal wiederholt. Endgültig fehlgeschlagene Tracks erhalten den Status `FEHLER`, bleiben offen und werden beim nächsten Abruf erneut versucht.
+- **Eindeutige Arbeitsstände pro Datenbank:** CSV-Cache und Logs enthalten nun einen kurzen Hash des vollständigen Datenbankpfads. Gleichnamige `.mldb`-Dateien in unterschiedlichen Ordnern können dadurch niemals mehr denselben Arbeitsstand verwenden. Alte 0.62.04-Caches werden beim ersten Öffnen automatisch migriert.
+- **Atomare CSV-Speicherung:** Sitzungsdateien werden zuerst vollständig in eine temporäre Datei geschrieben und anschließend atomar ersetzt. Ein Absturz oder Stromausfall während des Speicherns kann dadurch nicht mehr so leicht eine halbe CSV hinterlassen.
+- **SQLite-Integritätsprüfung & Apply-Zusammenfassung:** Vor dem finalen Schreiben werden die geplanten Feldänderungen gezählt und angezeigt. Die Datenbank wird vor und nach dem Apply mit `PRAGMA integrity_check` geprüft.
+- **Regressionstests:** Ein neues `tests/`-Paket prüft die sicherheitskritischen Pfade automatisch mit Python `unittest` (Cache-Trennung, atomare CSVs, API-Retries, Fehlerstatus, Integritätsprüfung und Full-Fetch-Apply-Schutz).
+- **Automatische GitHub-Tests:** Ein GitHub-Actions-Workflow führt bei Pushes und Pull Requests unter Windows automatisch `compileall` und die Regressionstests aus. Eine `requirements.txt` dokumentiert die Python-Abhängigkeiten.
+
+### Geändert
+- **GitHub-Sicherheit:** Eine `.gitignore` schützt den lokalen `Data/`-Ordner, Datenbanken, Backups und Build-Artefakte davor, versehentlich in das öffentliche Repository eingecheckt zu werden.
+- **Fehlertolerantere Dateiauswahl:** Ungültige oder inkompatible Datenbankdateien beenden das interaktive Programm nicht mehr; die Auswahl kann direkt korrigiert werden.
+- **Hauptmenü für Einsteiger überarbeitet:** Die Optionen beschreiben jetzt zuerst in Alltagssprache, was tatsächlich passiert. Technische Begriffe wie Smart Fetch/Overnight/Apply stehen nicht mehr im Mittelpunkt. Option 5 weist korrekt darauf hin, dass die Automatik sichere Jahr-/Genre-Treffer betrifft.
+- **Lyrics/Songtexte aus dem Arbeitscache entfernt:** Diese Attribute bleiben in mAirList unangetastet, werden aber nicht mehr in die temporären CSV-Dateien übernommen.
+- **Konfliktfreie Datenmigration:** Bei bereits vorhandenen Dateien im `Data`-Ordner wird keine potenziell wertvolle Datei mehr gelöscht; Konflikte werden mit Zeitstempel separat erhalten.
+
+
+## [0.62.04 Beta] - 2026-09-09
+### Behoben
+- **Full-Fetch / Apply-Kollision:** Voll-Abrufe markieren ihre bewusst neu geprüften Datensätze nun intern mit `FORCE_APPLY`. Dadurch dürfen diese nach dem Review auch dann gespeichert werden, wenn in der `.mldb` noch `RESTAURIERT: JA` steht. Die normale Überschreib-Sicherung für Smart-Abrufe bleibt erhalten.
+- **Vollständiger Cache-Reset:** Wird `RESTAURIERT` in mAirList manuell entfernt, übernimmt der Restorer nun sämtliche Originalfelder frisch aus der `.mldb` (u. a. Artist, Titel, Jahr, Genre, Album, Label, Sprache und Typ) statt nur Artist/Titel.
+- **Discogs Master-/Release-ID:** Treffer vom Typ `master` werden nun über `main_release` auf eine echte Release-ID aufgelöst, bevor Release-Details oder Labelcodes abgefragt werden.
+- **Thread-sicheres API-Throttling:** MusicBrainz- und Discogs-Rate-Limits sind nun gegen parallele Zugriffe abgesichert.
+
+### Optimiert
+- **Weniger MusicBrainz-Anfragen:** Artist- und Titelvorschläge werden pro Track nur noch einmal abgefragt und anschließend wiederverwendet.
+- **Konfidenzlogik:** Jahres-Konfidenz berücksichtigt nun die Übereinstimmung von MusicBrainz und Discogs; Genre-Konfidenz wird separat geführt, damit der Auto-Review nicht mehr die Jahres-Konfidenz für Genre-Entscheidungen missbraucht.
+- **Lokalisierte Elementtypen:** Vorschläge für das Attribut `Typ` werden passend zur erkannten deutschen, englischen oder niederländischen Datenbanksprache erzeugt.
+- **API-Diagnose:** API-Ausnahmen und HTTP-Fehler werden nun im Log protokolliert, statt vollständig still verschluckt zu werden.
+
+### Dokumentation
+- README und Handbücher wurden auf den aktuellen Wartungsumfang, Menüoption [8] für den Sprachwechsel, die tatsächliche Jahres-Ausreißerlogik und den Full-Fetch-Workflow aktualisiert.
+- Projekt-Credits wurden auf ChatGPT aktualisiert.
+
 ## [0.62.03 Beta] - 2026-09-04
 ### Behoben
 - **Smarter Update-Checker:** Der integrierte Update-Prüfer übersetzt die Versionsnummern nun in echte mathematische Werte und vergleicht diese sauber miteinander. Dadurch werden falsche Update-Warnungen verhindert, wenn die lokal verwendete Version höher ist als die auf GitHub veröffentlichte Version (z. B. während der Entwicklung).

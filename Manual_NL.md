@@ -18,7 +18,7 @@ Om toegang te krijgen tot de enorme database van Discogs, heeft het script een g
 4. Klik op de knop **"Create an App"** (of Generate Token).
 5. Voer een willekeurige naam in voor de app (bijv. "mAirList Restorer").
 6. Je ontvangt nu twee belangrijke cryptische tekenreeksen: De **Consumer Key** en het **Consumer Secret**.
-7. Kopieer deze twee waarden. Bij de allereerste start van de `.exe` zal het programma je ernaar vragen en ze veilig lokaal opslaan.
+7. Kopieer deze twee waarden. Bij de allereerste start van de `.exe` zal het programma ernaar vragen en de waarden lokaal in de map `Data` opslaan. Ze zijn daar alleen met Base64 verhuld en niet cryptografisch versleuteld.
 
 ---
 
@@ -41,8 +41,8 @@ Wanneer mAirList draait, vergrendelt (lockt) het het databasebestand. Als de too
 
 ## 3. De Workflow: Metadata herstellen
 
-Bij de eerste start vraagt de tool je naar je voorkeurstaal (Duits, Engels, Nederlands). Het script onthoudt deze instelling voor de toekomst. Via Optie **[9]** in het hoofdmenu kun je dit op elk moment weer wijzigen.
-Zodra je je databasekopie hebt geladen, leidt het interactieve menu je logisch door het hele proces. *Let op: Het script maakt automatisch een map genaamd `Data` aan waarin het alle logs en tussentijdse opslag netjes bewaart.*
+Bij de eerste start vraagt de tool je naar je voorkeurstaal (Duits, Engels, Nederlands). Het script onthoudt deze instelling voor de toekomst. Via Optie **[8]** in het hoofdmenu kun je dit op elk moment wijzigen; Optie **[9]** sluit het programma af.
+Zodra je je databasekopie hebt geladen, leidt het interactieve menu je door het proces en toont het de aanbevolen volgorde **1 → 4/5 → 7**. *Let op: Het script maakt automatisch een map `Data` aan. Werkbestanden worden atomair opgeslagen en per volledig databasepad gescheiden, zodat twee gelijknamige `.mldb`-bestanden nooit dezelfde cache gebruiken.*
 
 ### Stap 3.1: Map-uitzonderingen definiëren (Ignore-List)
 Voordat het script tijdens de eerste fetch met zoeken begint, vraagt het je naar mappen die **consequent genegeerd** moeten worden (bijv. mappen voor Jingles, News, Drops of Reclame).
@@ -53,14 +53,16 @@ Voordat het script tijdens de eerste fetch met zoeken begint, vraagt het je naar
 ### Stap 3.2: Metadata ophalen (Fetch)
 In deze fase zoekt het script via de API's van MusicBrainz en Discogs naar de passende metadata voor je tracks. Je originele waarden blijven daarbij volledig onaangetast!
 
-*   **[1] Smart-Fetch (Standaard):** De tool controleert alleen tracks die nog *niet* hersteld zijn. Om je niet te overweldigen met een enorme lijst, pauzeert het script automatisch na 50 geladen tracks. Je kunt dan direct overschakelen naar de review of de volgende 50 laden.
-*   **[2] Smart-Fetch (Overnight):** Perfect voor enorme databases. Het script laadt alle nieuwe tracks in één keer door zonder pauzes. Ideaal om de pc 's nachts te laten werken.
-*   **[3] Full-Fetch (Reset & Overnight):** Het script negeert de "RESTAURIERT" (HERSTELD) vlag en haalt de gegevens voor **ALLE** tracks in de database volledig opnieuw op.
+*   **[1] Nieuwe/onbewerkte tracks zoeken:** Controleert alleen tracks die nog niet hersteld zijn en pauzeert na elke 50 tracks. De werkstand kan altijd worden hervat.
+*   **[2] Alle openstaande tracks zonder pauze zoeken:** Doet hetzelfde als optie 1, maar loopt zonder 50-trackpauzes tot het einde door – handig voor grote databases of 's nachts.
+*   **[3] Alle tracks volledig opnieuw controleren:** Negeert de `RESTAURIERT`-vlag en haalt voor **ALLE** tracks nieuwe suggesties op. Na controle mogen deze bewust vernieuwde waarden ook reeds herstelde database-items overschrijven; de normale overschrijfbeveiliging blijft actief voor opties 1/2.
+
+Als MusicBrainz of Discogs tijdelijk niet bereikbaar is, probeert de Restorer de aanvraag automatisch meerdere keren. Blijft de fout bestaan, dan wordt de track **niet als klaar gemarkeerd**; hij blijft openstaan en wordt bij een latere fetch opnieuw geprobeerd.
 
 > **Tip:** Je kunt het fetch-proces op elk moment annuleren met de toetsencombinatie `Ctrl + C`. Het script slaat je voortgang tot dan toe veilig op, en je kunt de volgende keer bij het starten precies op dit punt verdergaan!
 
 ### Stap 3.3: Data controleren (Review)
-Kies Optie **[4]** of **[5]**. Hier presenteert de tool je elke track afzonderlijk en stelt het de op internet gevonden metadata voor.
+Kies **[4] Alle suggesties zelf controleren** of **[5] Controle met automatische hulp**. Optie 4 is volledig handmatig. Optie 5 accepteert alleen veilige **Jaar/Genre**-matches automatisch; alle andere velden blijven controleerbaar.
 
 *   **Bevestigen:** Als een suggestie je bevalt (bijv. het jaar), druk dan gewoon op `Enter`. De tool neemt de waarde over en springt naar het volgende veld.
 *   **Origineel behouden (`O`-toets):** Naast de suggestie zie je altijd in het grijs je oorspronkelijke database-waarde. Is je eigen waarde beter? Typ gewoon een `o` (voor origineel) en druk op `Enter`.
@@ -69,10 +71,10 @@ Kies Optie **[4]** of **[5]**. Hier presenteert de tool je elke track afzonderli
 *   **Oeps, typfout?** Typ een `<` of `b` (voor Back) en druk op `Enter` om één track terug te springen.
 
 ### Stap 3.4: Onderhoud (Maintenance)
-Onder Optie **[6]** vind je krachtige hulpmiddelen voor massabewerking. Hier kun je onder andere slordige genres standaardiseren, foutieve hoofdletters/kleine letters repareren (Title Case), oude attributen zoals "Lyrics" verwijderen (om de database te verkleinen) of de Engelse mAirList Item Types (bijv. "Music") volautomatisch laten vertalen naar je lokale taal.
+Onder Optie **[6]** vind je de onderhoudshulpmiddelen. Je kunt genres standaardiseren, hoofdletters/kleine letters en apostrofs in Artiest/Titel corrigeren of met de bestandstagger gecontroleerde metadata uit de database naar lokale FLAC-, MP3- en AIFF-bestanden schrijven. Combinatieoptie **[4]** voert de genre- en tekstcorrectie achter elkaar uit.
 
 ### Stap 3.5: Opslaan in mAirList (Apply)
-Wanneer je alle tracks hebt gecontroleerd, selecteer je in het hoofdmenu Optie **[7] Opslaan**. Pas dan opent het script je databasekopie en schrijft het de nieuwe, schone metadata erin via een snel bulk-proces.
+Wanneer je alle tracks hebt gecontroleerd, selecteer je **[7] Gecontroleerde wijzigingen naar de databasekopie schrijven**. Voor het schrijven toont de Restorer een overzicht van de geplande veldwijzigingen en voert hij een SQLite-integriteitscontrole uit. Pas na jouw bevestiging wordt een back-up gemaakt en de bulk-write uitgevoerd. Daarna wordt de database-integriteit opnieuw gecontroleerd.
 
 *   Het script stelt daarbij voor elke track automatisch het interne attribuut `RESTAURIERT` in op `JA`.
 *   Tracks met deze vlag worden bij toekomstige runs automatisch overgeslagen.

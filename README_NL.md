@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.62.03 BETA
+# mAirList DB Restorer v0.62.05 BETA
 **De intelligente metadata-reparatietool voor lokale mAirList databases**
 
 *(Note: German and English documentation / manuals are available in the repository!)*
@@ -23,10 +23,12 @@ Dit script zoekt niet zomaar blindelings, maar werkt met meerdere veiligheidsnet
 
 *   **Smart Cleaning & VIP-lijsten:** Artiest en titel worden voor de API-zoekopdracht opgeschoond (bijv. "feat.", "ft."). Beruchte spellingen (zoals "AC/DC") krijgen voorrang via een hardcoded VIP-woordenboek.
 *   **Looptijd-Matching (Maxi-herkenning):** Het script vergelijkt de gevonden API-resultaten met de *echte lokale tracklengte* (+/- tolerantie voor cue-punten). Zo herkent het feilloos extended versions of zeldzame radio-edits.
-*   **Uitschieter-filter (Mediaan & Gaten-logica):** Omdat API's vaak foutieve gebruikersinvoer bevatten, berekent het script het gemiddelde van alle gevonden releasejaren en negeert het absurde uitschieters (bijv. een releasejaar van 1945 voor een track uit 2004).
+*   **Uitschieter-filter (Gaten-logica):** Gevonden releasejaren worden gesorteerd en gecontroleerd op onwaarschijnlijke losse uitschieters. Ligt het oudste jaar meer dan acht jaar vóór de volgende treffer en komt het slechts één keer voor, dan wordt het genegeerd.
 *   **OAD-bescherming (Ignore-Lists):** Virtuele en fysieke mappen met namen als "OAD" (On Air Design) of "Jingles" kunnen consequent worden uitgesloten van de zoekopdracht.
 *   **Ergonomisch Review-proces:** Alle API-suggesties kunnen voor het opslaan in de database in een snelle terminal-workflow worden gecontroleerd, aangepast of met één druk op de knop (terugvallen op de originele waarde) worden afgewezen.
-*   **Massabewerking (Onderhoudsmodus):** Een apart menu maakt diepe database-ingrepen mogelijk, zoals het achteraf standaardiseren van honderden genres, het corrigeren van hoofdletters/kleine letters (Title Case) of het verwijderen van oude attributen ("Platinum Notes", "Lyrics").
+*   **Massabewerking (Onderhoudsmodus):** Een apart menu kan genres standaardiseren, hoofdletters/kleine letters en apostrofs corrigeren en gecontroleerde metadata naar lokale FLAC-, MP3- en AIFF-bestanden schrijven.
+*   **Hardening & veilig hervatten:** API-fouten worden automatisch opnieuw geprobeerd en blijven openstaan als ze definitief mislukken. Sessie-CSV's worden atomair opgeslagen en per databasepad gescheiden, zodat werkstanden niet beschadigd raken of tussen gelijknamige databases worden gemengd.
+*   **Veiliger opslaan:** Voor het definitieve schrijven toont de Restorer een wijzigingsoverzicht, controleert de SQLite-integriteit, maakt een back-up en controleert de database na het schrijven opnieuw.
 
 ---
 
@@ -45,9 +47,21 @@ De gedetailleerde stapsgewijze handleiding voor installatie en gebruik vind je a
 
 ---
 
+## 🧪 Ontwikkeling & tests
+
+Voor ontwikkelaars is een `requirements.txt` toegevoegd. De veiligheidskritische regressietests hebben geen extra testframework nodig en kunnen worden uitgevoerd met:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Bij pushes en pull requests voert GitHub Actions automatisch een compile-check en de regressietests op Windows uit.
+
+---
+
 ## 🤖 Transparantie over het ontstaan
 
-Een open woord over de code: Het functionele concept, de workflow en de architectuur van deze tool zijn bedacht door mensenhanden (Myka Vormeng). Het pure programmeren en het schrijven van de Python-code is grotendeels gedaan door de Kunstmatige Intelligentie *Google Gemini*. 
+Een open woord over de code: Het functionele concept, de workflow en de architectuur van deze tool zijn bedacht door mensenhanden (Myka Vormeng). Het pure programmeren en het schrijven van de Python-code is grotendeels gedaan door de Kunstmatige Intelligentie *ChatGPT*. 
 
 De focus van dit project ligt op wat de tool voor de mAirList-community doet en hoeveel uur vervelend handmatig werk (klikken in de cue-editor) het jullie kan besparen.
 

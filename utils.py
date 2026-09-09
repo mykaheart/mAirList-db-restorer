@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.62.03 BETA"
+APP_VERSION = "0.62.05 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -35,43 +35,88 @@ MLDB_ATTRIBUTE_FIELDS = [
     'Label', 'Labelcode', 'ISRC', 'Sprache', 'Typ', 'RESTAURIERT', 'DOPPELUNG'
 ]
 
-ITEM_TYPE_MAPPING = {
-    'Unknown': 'nicht gesetzt', 'Music': 'Musik', 'Voice': 'Moderation',
-    'News': 'Nachrichten', 'Weather': 'Wetter', 'Traffic': 'Verkehr',
-    'Advertising': 'Werbung', 'Package': 'Beitrag', 'Jingle': 'Jingle',
-    'Sound': 'Geräusch', 'Trailer': 'Trailer', 'Promo': 'Promo',
-    'Sponsorship': 'Sponsor-Jingle', 'Sweeper': 'Sweeper', 'Drop': 'Drop',
-    'StationID': 'Station-ID', 'Bed': 'Bett', 'Instrumental': 'Instrumental',
-    'Show': 'Sendung', 'Stream': 'Stream', 'Container': 'Container',
-    'Playlist': 'Playlist', 'Command': 'Befehl', 'CartwallPage': 'Cartwall-Seite',
-    'Break': 'Unterbrechung', 'Dummy': 'Platzhalter', 'Silence': 'Stille',
-    'Error': 'Fehler', 'Other': 'Andere', 'Custom1': 'Benutzerdefiniert 1',
-    'Custom2': 'Benutzerdefiniert 2', 'Custom3': 'Benutzerdefiniert 3'
+ITEM_TYPE_MAPPINGS = {
+    'de': {
+        'Unknown': 'nicht gesetzt', 'Music': 'Musik', 'Voice': 'Moderation',
+        'News': 'Nachrichten', 'Weather': 'Wetter', 'Traffic': 'Verkehr',
+        'Advertising': 'Werbung', 'Package': 'Beitrag', 'Jingle': 'Jingle',
+        'Sound': 'Geräusch', 'Trailer': 'Trailer', 'Promo': 'Promo',
+        'Sponsorship': 'Sponsor-Jingle', 'Sweeper': 'Sweeper', 'Drop': 'Drop',
+        'StationID': 'Station-ID', 'Bed': 'Bett', 'Instrumental': 'Instrumental',
+        'Show': 'Sendung', 'Stream': 'Stream', 'Container': 'Container',
+        'Playlist': 'Playlist', 'Command': 'Befehl', 'CartwallPage': 'Cartwall-Seite',
+        'Break': 'Unterbrechung', 'Dummy': 'Platzhalter', 'Silence': 'Stille',
+        'Error': 'Fehler', 'Other': 'Andere', 'Custom1': 'Benutzerdefiniert 1',
+        'Custom2': 'Benutzerdefiniert 2', 'Custom3': 'Benutzerdefiniert 3'
+    },
+    'en': {
+        'Unknown': 'not set', 'Music': 'Music', 'Voice': 'Voice',
+        'News': 'News', 'Weather': 'Weather', 'Traffic': 'Traffic',
+        'Advertising': 'Advertising', 'Package': 'Package', 'Jingle': 'Jingle',
+        'Sound': 'Sound', 'Trailer': 'Trailer', 'Promo': 'Promo',
+        'Sponsorship': 'Sponsorship', 'Sweeper': 'Sweeper', 'Drop': 'Drop',
+        'StationID': 'Station ID', 'Bed': 'Bed', 'Instrumental': 'Instrumental',
+        'Show': 'Show', 'Stream': 'Stream', 'Container': 'Container',
+        'Playlist': 'Playlist', 'Command': 'Command', 'CartwallPage': 'Cartwall Page',
+        'Break': 'Break', 'Dummy': 'Placeholder', 'Silence': 'Silence',
+        'Error': 'Error', 'Other': 'Other', 'Custom1': 'Custom 1',
+        'Custom2': 'Custom 2', 'Custom3': 'Custom 3'
+    },
+    'nl': {
+        'Unknown': 'niet ingesteld', 'Music': 'Muziek', 'Voice': 'Presentatie',
+        'News': 'Nieuws', 'Weather': 'Weer', 'Traffic': 'Verkeer',
+        'Advertising': 'Reclame', 'Package': 'Bijdrage', 'Jingle': 'Jingle',
+        'Sound': 'Geluid', 'Trailer': 'Trailer', 'Promo': 'Promo',
+        'Sponsorship': 'Sponsor-jingle', 'Sweeper': 'Sweeper', 'Drop': 'Drop',
+        'StationID': 'Station-ID', 'Bed': 'Bed', 'Instrumental': 'Instrumentaal',
+        'Show': 'Programma', 'Stream': 'Stream', 'Container': 'Container',
+        'Playlist': 'Afspeellijst', 'Command': 'Commando', 'CartwallPage': 'Cartwall-pagina',
+        'Break': 'Onderbreking', 'Dummy': 'Plaatshouder', 'Silence': 'Stilte',
+        'Error': 'Fout', 'Other': 'Anders', 'Custom1': 'Aangepast 1',
+        'Custom2': 'Aangepast 2', 'Custom3': 'Aangepast 3'
+    }
 }
+
+def map_item_type(raw_type, lang=None):
+    lang = lang if lang in ITEM_TYPE_MAPPINGS else CURRENT_LANG
+    mapping = ITEM_TYPE_MAPPINGS.get(lang, ITEM_TYPE_MAPPINGS['de'])
+    return mapping.get(str(raw_type).strip(), '')
 
 T = {
     'de': {
-        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and Google Gemini (Programming)",
+        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and ChatGPT (Programming)",
         'menu_title': "mAirList Datenbank-Assistent",
-        'menu_db_none': "Aktive Datenbank: KEINE (Bitte zuerst auswählen!)",
+        'menu_db_none': "Keine Datenbank ausgewählt – beginne mit Option 0.",
         'menu_db_act': "Aktive Datenbank:",
-        'menu_opt0': "Aktive Datenbank auswählen / wechseln",
-        'menu_h1': "--- SCHRITT 1: METADATEN LADEN ---",
-        'menu_opt1': "Smart-Abruf - Standard (Pausiert alle 50 Tracks / Fortsetzbar)",
-        'menu_opt2': "Smart-Abruf - Overnight (Läuft ohne Pausen durch / Fortsetzbar)",
-        'menu_opt3': "Voll-Abruf  - Reset und Overnight (Alle Tracks komplett neu)",
-        'menu_h2': "--- SCHRITT 2: DATEN KONTROLLIEREN ---",
-        'menu_opt4': "Kontrolle   - Alle Vorschläge manuell prüfen",
-        'menu_opt5': "Kontrolle   - Sichere Treffer automatisch übernehmen",
-        'menu_h3': "--- WARTUNG ---",
-        'menu_opt6': "Wartung     - Massenbearbeitung (Genres, Schreibweisen, Tagging)",
-        'menu_h4': "--- SCHRITT 3: IN MAIRLIST SPEICHERN ---",
-        'menu_opt7': "Speichern   - Geprüfte Werte in .mldb-Kopie schreiben",
+        'menu_opt0': "Datenbank-Kopie auswählen oder wechseln",
+        'menu_desc0': "Wähle die .mldb-Kopie, mit der der Restorer arbeiten soll.",
+        'menu_h1': "--- SCHRITT 1: METADATEN SUCHEN ---",
+        'menu_opt1': "Neue/unbearbeitete Tracks suchen",
+        'menu_desc1': "Lädt Vorschläge in Blöcken à 50; jederzeit fortsetzbar.",
+        'menu_opt2': "Alle offenen Tracks ohne Pause suchen",
+        'menu_desc2': "Wie Option 1, läuft aber bis zum Ende durch – ideal über Nacht.",
+        'menu_opt3': "Alle Tracks komplett neu prüfen",
+        'menu_desc3': "Ignoriert den Restauriert-Status und holt für jeden Track neue Vorschläge.",
+        'menu_h2': "--- SCHRITT 2: VORSCHLÄGE PRÜFEN ---",
+        'menu_opt4': "Alle Vorschläge selbst kontrollieren",
+        'menu_desc4': "Jeden gefundenen Wert einzeln ansehen, übernehmen oder ändern.",
+        'menu_opt5': "Prüfung mit Automatik",
+        'menu_desc5': "Sichere Jahr-/Genre-Treffer automatisch; alles andere bleibt kontrollierbar.",
+        'menu_h3': "--- OPTIONAL: DATENBANK / DATEIEN PFLEGEN ---",
+        'menu_opt6': "Wartungswerkzeuge öffnen",
+        'menu_desc6': "Genres/Schreibweisen bereinigen oder geprüfte Tags in Audiodateien schreiben.",
+        'menu_h4': "--- SCHRITT 3: GEPRÜFTE ÄNDERUNGEN SPEICHERN ---",
+        'menu_opt7': "Geprüfte Änderungen in die Datenbank-Kopie schreiben",
+        'menu_desc7': "Zeigt zuerst eine Zusammenfassung, erstellt ein Backup und speichert danach.",
         'menu_opt8': "Sprache ändern / Change Language",
-        'menu_opt9': "Beenden",
+        'menu_opt9': "Programm beenden",
+        'menu_workflow': "Empfohlener Ablauf: 1 suchen → 4/5 prüfen → 7 speichern",
         'menu_prompt': "Auswahl [0-9]:",
         'menu_err': "Ungültige Auswahl. Bitte erneut versuchen.",
         'menu_err_db': "Fehler: Keine Datenbank ausgewählt! Bitte wähle zuerst Option 0.",
+        'db_invalid_file': "Fehler: Die ausgewählte Datei ist keine lesbare mAirList-.mldb-Datenbank oder ihre Schema-Version konnte nicht ermittelt werden.",
+        'db_read_error': "Die mAirList-Datenbank konnte nicht vollständig gelesen werden: {details}",
+        'db_incompatible': "Inkompatible Datenbank!\n\nSchema-Version: [bold yellow]{version}[/bold yellow]\nUnterstützt: [bold green]{supported}[/bold green]\nRestorer-Version: {app_version}",
         'menu_path_hint1': "Hinweis: Bitte den Pfad zu einer KOPIE deiner Datenbank angeben.",
         'menu_path_hint2': "(Tipp: Einfach die .mldb-Datei in dieses Fenster ziehen und Enter drücken)",
         'menu_path_prompt': "Pfad: ",
@@ -80,12 +125,12 @@ T = {
         'menu_warn_apply1': "ACHTUNG: Dieser Vorgang schreibt alle geprüften Werte in die oben",
         'menu_warn_apply2': "ausgewählte .mldb-Datei. Nutze hierfür IMMER EINE KOPIE!",
         'menu_continue': "Drücke Enter, um ins Hauptmenü zurückzukehren...",
-        'setup_title': "[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden sicher im 'Data'-Ordner gespeichert.",
+        'setup_title': "[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden lokal im 'Data'-Ordner gespeichert.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
         'setup_email': "  Deine Kontakt-E-Mail: ",
         'setup_email_err': "[red]Ungültige E-Mail-Adresse, bitte erneut eingeben.[/red]",
-        'setup_saved': "[green]✓ Zugangsdaten sicher gespeichert in '{config_file}'.[/green]\n",
+        'setup_saved': "[green]✓ Zugangsdaten lokal gespeichert in '{config_file}'.[/green]\n",
         'ign_current': "\n[cyan]Aktuelle Ordner-Ausnahmen für diese DB:[/cyan] [yellow]{liste}[/yellow]",
         'ign_reset': "Möchtest du diese Liste neu erstellen? [j/N]: ",
         'ign_none': "Keine",
@@ -105,8 +150,11 @@ T = {
         'fetch_done_already': "[bold green]✓ Alle Tracks sind bereits auf dem neuesten Stand![/bold green]",
         'fetch_progress': "[bold magenta]Fetching Metadaten...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jahr: [bold cyan]{jahr}[/bold cyan], Konfidenz: [{c_color}]{conf}[/{c_color}])",
+        'fetch_track_error': "[bold yellow]⚠ ID {id}: API-/Netzwerkfehler. Track bleibt offen und wird später erneut versucht.[/bold yellow]",
+        'fetch_done_with_errors': "\n[bold yellow]⚠ Abruf beendet, aber {count} Track(s) konnten wegen API-/Netzwerkfehlern nicht abgeschlossen werden. Sie bleiben offen und werden beim nächsten Abruf erneut versucht.[/bold yellow]",
         'fetch_interrupt': "\n[bold yellow]Abruf unterbrochen. Fortschritt sicher gespeichert.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]Option [4] oder [5] im Hauptmenü (Review)[/bold cyan]",
+        'fetch_paused_review': "\n[bold cyan]Abruf nach diesem Block pausiert.[/bold cyan] Du kannst die geladenen Tracks jetzt mit Option 4 oder 5 prüfen. Option 1 setzt den Abruf später fort.",
         'fetch_chunk_pause': "\n[bold yellow]☕ {count} Tracks geladen![/bold yellow]\nMöchtest du diese jetzt kontrollieren (Review)? \n[dim]Tipp: Du kannst den Fetch später im Hauptmenü (Option 1) jederzeit fortsetzen.[/dim]",
         'fetch_chunk_prompt': "Tippe [cyan]'r'[/cyan] für Review oder [green]Enter[/green], um weitere 50 Tracks zu laden: ",
         'err_file_not_found': "[bold red][Fehler][/bold red] '{file}' nicht gefunden.",
@@ -139,6 +187,16 @@ T = {
         'apply_err_lock': "\n[bold red][Fehler] Datenbank gelockt / Zugriff verweigert:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Fertig! {count} Zeile(n) in '{db}' erfolgreich aktualisiert.[/bold green]",
         'apply_no_new': "\n[yellow]Keine neuen Daten zum Speichern vorhanden. (Alle Einträge in der CSV sind in der DB bereits als 'RESTAURIERT' markiert).[/yellow]",
+        'apply_integrity_check': "[cyan]Prüfe Datenbank-Integrität...[/cyan]",
+        'apply_integrity_ok': "[green]✓ Datenbank-Integrität: OK[/green]",
+        'apply_integrity_fail': "[bold red]⛔ Datenbank-Integritätsprüfung fehlgeschlagen:[/bold red] {details}\nEs werden keine Änderungen geschrieben.",
+        'apply_integrity_after_fail': "[bold red]⛔ WARNUNG: Integritätsprüfung nach dem Schreiben fehlgeschlagen![/bold red]\nBackup: {backup}\nDetails: {details}",
+        'apply_summary_title': "Änderungen vor dem Speichern",
+        'apply_summary_field': "Feld",
+        'apply_summary_count': "Änderungen",
+        'apply_summary_total': "Geprüfte Tracks, die geschrieben werden",
+        'apply_summary_force': "Davon bewusst komplett neu geprüft (Voll-Abruf)",
+        'apply_summary_restored': "Tracks werden als RESTAURIERT markiert",
         'conf_hoch': "hoch", 'conf_mittel': "mittel", 'conf_niedrig': "niedrig",
         'maint_title': "\n[bold cyan]=== WARTUNGS-MENÜ ===[/bold cyan]",
         'maint_warn': "[bold red]ACHTUNG: ALLE AKTIONEN HIER SCHREIBEN DIREKT IN DIE DATENBANK OHNE UNDO![/bold red]\nBitte arbeite IMMER auf einer Datenbank-Kopie.",
@@ -154,27 +212,39 @@ T = {
         'maint_no_changes': "[yellow]Keine Änderungen nötig für diesen Schritt.[/yellow]"
     },
     'en': {
-        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and Google Gemini (Programming)",
+        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and ChatGPT (Programming)",
         'menu_title': "mAirList Database Assistant",
-        'menu_db_none': "Active Database: NONE (Please select first!)",
+        'menu_db_none': "No database selected – start with option 0.",
         'menu_db_act': "Active Database:",
-        'menu_opt0': "Select / change active database",
-        'menu_h1': "--- STEP 1: FETCH METADATA ---",
-        'menu_opt1': "Smart Fetch - Standard (Pauses every 50 tracks / Resumable)",
-        'menu_opt2': "Smart Fetch - Overnight (Runs continuously / Resumable)",
-        'menu_opt3': "Full Fetch  - Reset and Overnight (Re-fetch all tracks)",
-        'menu_h2': "--- STEP 2: REVIEW DATA ---",
-        'menu_opt4': "Review      - Manually inspect all proposals",
-        'menu_opt5': "Review      - Auto-accept safe matches (ask for unsure ones)",
-        'menu_h3': "--- MAINTENANCE ---",
-        'menu_opt6': "Maintenance - Mass editing (Genres, Text Case, Tagging)",
-        'menu_h4': "--- STEP 3: SAVE TO MAIRLIST ---",
-        'menu_opt7': "Apply       - Write verified values to .mldb copy",
+        'menu_opt0': "Select or change the database copy",
+        'menu_desc0': "Choose the .mldb copy the Restorer should work with.",
+        'menu_h1': "--- STEP 1: SEARCH FOR METADATA ---",
+        'menu_opt1': "Search new/unprocessed tracks",
+        'menu_desc1': "Fetches suggestions in batches of 50; resumable at any time.",
+        'menu_opt2': "Search all pending tracks without pauses",
+        'menu_desc2': "Same as option 1, but runs to the end – ideal overnight.",
+        'menu_opt3': "Re-check every track from scratch",
+        'menu_desc3': "Ignores the restored flag and fetches fresh suggestions for every track.",
+        'menu_h2': "--- STEP 2: REVIEW SUGGESTIONS ---",
+        'menu_opt4': "Review every suggestion yourself",
+        'menu_desc4': "Inspect each found value and accept, keep the original, or edit it.",
+        'menu_opt5': "Review with automatic assistance",
+        'menu_desc5': "Auto-accepts safe Year/Genre matches; everything else stays reviewable.",
+        'menu_h3': "--- OPTIONAL: MAINTAIN DATABASE / FILES ---",
+        'menu_opt6': "Open maintenance tools",
+        'menu_desc6': "Clean genres/text or write verified tags into audio files.",
+        'menu_h4': "--- STEP 3: SAVE VERIFIED CHANGES ---",
+        'menu_opt7': "Write verified changes to the database copy",
+        'menu_desc7': "Shows a summary first, creates a backup, then writes the changes.",
         'menu_opt8': "Change Language / Sprache ändern",
-        'menu_opt9': "Exit",
+        'menu_opt9': "Exit program",
+        'menu_workflow': "Recommended workflow: 1 search → 4/5 review → 7 save",
         'menu_prompt': "Choice [0-9]:",
         'menu_err': "Invalid choice. Please try again.",
         'menu_err_db': "Error: No database selected! Please choose Option 0 first.",
+        'db_invalid_file': "Error: The selected file is not a readable mAirList .mldb database, or its schema version could not be determined.",
+        'db_read_error': "The mAirList database could not be read completely: {details}",
+        'db_incompatible': "Incompatible database!\n\nSchema version: [bold yellow]{version}[/bold yellow]\nSupported: [bold green]{supported}[/bold green]\nRestorer version: {app_version}",
         'menu_path_hint1': "Note: Please provide the path to a COPY of your database.",
         'menu_path_hint2': "(Tip: Just drag and drop the .mldb file into this window and press Enter)",
         'menu_path_prompt': "Path: ",
@@ -183,12 +253,12 @@ T = {
         'menu_warn_apply1': "WARNING: This operation writes all verified values to the",
         'menu_warn_apply2': "selected .mldb file. ALWAYS USE A COPY for this!",
         'menu_continue': "Press Enter to return to the main menu...",
-        'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails will be safely masked locally in the 'Data' folder.",
+        'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails are stored locally in the 'Data' folder (Base64-obfuscated, not encrypted).",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
         'setup_email': "  Your Contact Email: ",
         'setup_email_err': "[red]Invalid email address, please try again.[/red]",
-        'setup_saved': "[green]✓ Credentials securely saved in '{config_file}'.[/green]\n",
+        'setup_saved': "[green]✓ Credentials stored locally in '{config_file}'.[/green]\n",
         'ign_current': "\n[cyan]Current folder exceptions for this DB:[/cyan] [yellow]{liste}[/yellow]",
         'ign_reset': "Do you want to recreate this list? [y/N]: ",
         'ign_none': "None",
@@ -208,8 +278,11 @@ T = {
         'fetch_done_already': "[bold green]✓ All tracks are already up to date![/bold green]",
         'fetch_progress': "[bold magenta]Fetching metadata...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Year: [bold cyan]{jahr}[/bold cyan], Confidence: [{c_color}]{conf}[/{c_color}])",
+        'fetch_track_error': "[bold yellow]⚠ ID {id}: API/network error. Track stays pending and will be retried later.[/bold yellow]",
+        'fetch_done_with_errors': "\n[bold yellow]⚠ Fetch finished, but {count} track(s) could not be completed because of API/network errors. They remain pending and will be retried on the next fetch.[/bold yellow]",
         'fetch_interrupt': "\n[bold yellow]Fetch interrupted. Progress safely saved.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]Option [4] or [5] in the main menu (Review)[/bold cyan]",
+        'fetch_paused_review': "\n[bold cyan]Fetch paused after this batch.[/bold cyan] You can review the loaded tracks with option 4 or 5 now. Option 1 resumes the fetch later.",
         'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks fetched![/bold yellow]\nDo you want to review them now?\n[dim]Tip: You can safely resume the fetch process later from the main menu (Option 1).[/dim]",
         'fetch_chunk_prompt': "Type [cyan]'r'[/cyan] for Review or [green]Enter[/green] for the next 50 tracks: ",
         'err_file_not_found': "[bold red][Error][/bold red] '{file}' not found.",
@@ -242,6 +315,16 @@ T = {
         'apply_err_lock': "\n[bold red][Error] Database locked / Access denied:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Done! {count} row(s) in '{db}' successfully updated.[/bold green]",
         'apply_no_new': "\n[yellow]No new data to apply. (All entries in the CSV are already marked as 'RESTAURIERT' in the database).[/yellow]",
+        'apply_integrity_check': "[cyan]Checking database integrity...[/cyan]",
+        'apply_integrity_ok': "[green]✓ Database integrity: OK[/green]",
+        'apply_integrity_fail': "[bold red]⛔ Database integrity check failed:[/bold red] {details}\nNo changes will be written.",
+        'apply_integrity_after_fail': "[bold red]⛔ WARNING: Integrity check failed after writing![/bold red]\nBackup: {backup}\nDetails: {details}",
+        'apply_summary_title': "Changes before saving",
+        'apply_summary_field': "Field",
+        'apply_summary_count': "Changes",
+        'apply_summary_total': "Verified tracks to be written",
+        'apply_summary_force': "Deliberately re-checked via Full Fetch",
+        'apply_summary_restored': "Tracks will be marked RESTAURIERT",
         'conf_hoch': "high", 'conf_mittel': "medium", 'conf_niedrig': "low",
         'maint_title': "\n[bold cyan]=== MAINTENANCE MENU ===[/bold cyan]",
         'maint_warn': "[bold red]WARNING: ALL ACTIONS HERE WRITE DIRECTLY TO THE DATABASE WITH NO UNDO![/bold red]\nPlease ensure you are working on a COPY.",
@@ -257,27 +340,39 @@ T = {
         'maint_no_changes': "[yellow]No changes needed.[/yellow]"
     },
     'nl': {
-        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and Google Gemini (Programming)",
+        'menu_copyright': "(c) 2026 by Myka Vormeng (Concept)\n           and ChatGPT (Programming)",
         'menu_title': "mAirList Database Assistent",
-        'menu_db_none': "Actieve database: GEEN (Selecteer eerst!)",
+        'menu_db_none': "Geen database geselecteerd – begin met optie 0.",
         'menu_db_act': "Actieve database:",
-        'menu_opt0': "Actieve database selecteren / wijzigen",
-        'menu_h1': "--- STAP 1: METADATA OPHALEN ---",
-        'menu_opt1': "Smart-Fetch - Standaard (Pauzeert elke 50 tracks / Hervatbaar)",
-        'menu_opt2': "Smart-Fetch - Overnight (Draait continu / Hervatbaar)",
-        'menu_opt3': "Full-Fetch  - Reset en Overnight (Alle tracks volledig opnieuw)",
-        'menu_h2': "--- STAP 2: DATA CONTROLEREN ---",
-        'menu_opt4': "Controle    - Alle suggesties handmatig controleren",
-        'menu_opt5': "Controle    - Veilige matches automatisch accepteren",
-        'menu_h3': "--- ONDERHOUD ---",
-        'menu_opt6': "Onderhoud   - Massabewerking (Genres, Tekst, Tagging)",
-        'menu_h4': "--- STAP 3: OPSLAAN IN MAIRLIST ---",
-        'menu_opt7': "Opslaan     - Gecontroleerde waarden in .mldb-kopie schrijven",
+        'menu_opt0': "Databasekopie selecteren of wijzigen",
+        'menu_desc0': "Kies de .mldb-kopie waarmee de Restorer moet werken.",
+        'menu_h1': "--- STAP 1: METADATA ZOEKEN ---",
+        'menu_opt1': "Nieuwe/onbewerkte tracks zoeken",
+        'menu_desc1': "Haalt suggesties op in blokken van 50; altijd hervatbaar.",
+        'menu_opt2': "Alle openstaande tracks zonder pauze zoeken",
+        'menu_desc2': "Zoals optie 1, maar loopt tot het einde door – ideaal 's nachts.",
+        'menu_opt3': "Alle tracks volledig opnieuw controleren",
+        'menu_desc3': "Negeert de hersteld-status en haalt voor elke track nieuwe suggesties op.",
+        'menu_h2': "--- STAP 2: SUGGESTIES CONTROLEREN ---",
+        'menu_opt4': "Alle suggesties zelf controleren",
+        'menu_desc4': "Bekijk elke gevonden waarde en accepteer, behoud of wijzig deze.",
+        'menu_opt5': "Controle met automatische hulp",
+        'menu_desc5': "Accepteert veilige Jaar/Genre-matches automatisch; de rest blijft controleerbaar.",
+        'menu_h3': "--- OPTIONEEL: DATABASE / BESTANDEN ONDERHOUDEN ---",
+        'menu_opt6': "Onderhoudstools openen",
+        'menu_desc6': "Genres/tekst opschonen of gecontroleerde tags naar audiobestanden schrijven.",
+        'menu_h4': "--- STAP 3: GECONTROLEERDE WIJZIGINGEN OPSLAAN ---",
+        'menu_opt7': "Gecontroleerde wijzigingen naar de databasekopie schrijven",
+        'menu_desc7': "Toont eerst een overzicht, maakt een back-up en schrijft daarna.",
         'menu_opt8': "Taal wijzigen / Change Language",
-        'menu_opt9': "Afsluiten",
+        'menu_opt9': "Programma afsluiten",
+        'menu_workflow': "Aanbevolen volgorde: 1 zoeken → 4/5 controleren → 7 opslaan",
         'menu_prompt': "Keuze [0-9]:",
         'menu_err': "Ongeldige keuze. Probeer het opnieuw.",
         'menu_err_db': "Fout: Geen database geselecteerd! Kies eerst optie 0.",
+        'db_invalid_file': "Fout: Het geselecteerde bestand is geen leesbare mAirList-.mldb-database, of de schemaversie kon niet worden bepaald.",
+        'db_read_error': "De mAirList-database kon niet volledig worden gelezen: {details}",
+        'db_incompatible': "Incompatibele database!\n\nSchemaversie: [bold yellow]{version}[/bold yellow]\nOndersteund: [bold green]{supported}[/bold green]\nRestorer-versie: {app_version}",
         'menu_path_hint1': "Let op: Geef het pad op naar een KOPIE van je database.",
         'menu_path_hint2': "(Tip: Sleep het .mldb bestand gewoon in dit venster en druk op Enter)",
         'menu_path_prompt': "Pad: ",
@@ -286,12 +381,12 @@ T = {
         'menu_warn_apply1': "WAARSCHUWING: Dit proces schrijft alle gecontroleerde waarden naar het",
         'menu_warn_apply2': "bovenstaande .mldb bestand. Gebruik hiervoor ALTIJD EEN KOPIE!",
         'menu_continue': "Druk op Enter om terug te keren naar het hoofdmenu...",
-        'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden veilig opgeslagen in de map 'Data'.",
+        'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal opgeslagen in de map 'Data'.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
         'setup_email': "  Jouw contact e-mail: ",
         'setup_email_err': "[red]Ongeldig e-mailadres, probeer het opnieuw.[/red]",
-        'setup_saved': "[green]✓ Inloggegevens veilig opgeslagen in '{config_file}'.[/green]\n",
+        'setup_saved': "[green]✓ Inloggegevens lokaal opgeslagen in '{config_file}'.[/green]\n",
         'ign_current': "\n[cyan]Huidige map-uitzonderingen voor deze DB:[/cyan] [yellow]{liste}[/yellow]",
         'ign_reset': "Wil je deze lijst opnieuw aanmaken? [j/N]: ",
         'ign_none': "Geen",
@@ -311,8 +406,11 @@ T = {
         'fetch_done_already': "[bold green]✓ Alle tracks zijn al up-to-date![/bold green]",
         'fetch_progress': "[bold magenta]Metadata ophalen...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jaar: [bold cyan]{jahr}[/bold cyan], Betrouwbaarheid: [{c_color}]{conf}[/{c_color}])",
+        'fetch_track_error': "[bold yellow]⚠ ID {id}: API-/netwerkfout. Track blijft open en wordt later opnieuw geprobeerd.[/bold yellow]",
+        'fetch_done_with_errors': "\n[bold yellow]⚠ Ophalen voltooid, maar {count} track(s) konden door API-/netwerkfouten niet worden afgerond. Ze blijven open en worden bij de volgende fetch opnieuw geprobeerd.[/bold yellow]",
         'fetch_interrupt': "\n[bold yellow]Ophalen onderbroken. Voortgang veilig opgeslagen.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]Optie [4] of [5] in het hoofdmenu (Review)[/bold cyan]",
+        'fetch_paused_review': "\n[bold cyan]Ophalen na dit blok gepauzeerd.[/bold cyan] Je kunt de geladen tracks nu met optie 4 of 5 controleren. Optie 1 hervat het ophalen later.",
         'fetch_chunk_pause': "\n[bold yellow]☕ {count} tracks opgehaald![/bold yellow]\nWil je deze nu controleren (Review)?\n[dim]Tip: Je kunt de fetch later altijd hervatten via optie 1 in het hoofdmenu.[/dim]",
         'fetch_chunk_prompt': "Typ [cyan]'r'[/cyan] voor Review of [green]Enter[/green] voor de volgende 50 tracks: ",
         'err_file_not_found': "[bold red][Fout][/bold red] '{file}' niet gevonden.",
@@ -345,6 +443,16 @@ T = {
         'apply_err_lock': "\n[bold red][Fout] Database vergrendeld / Toegang geweigerd:[/bold red] {err}",
         'apply_success': "\n[bold green]✓ Klaar! {count} rij(en) in '{db}' succesvol bijgewerkt.[/bold green]",
         'apply_no_new': "\n[yellow]Geen nieuwe gegevens om op te slaan. (Alle vermeldingen in de CSV zijn al gemarkeerd als 'RESTAURIERT' in de database).[/yellow]",
+        'apply_integrity_check': "[cyan]Database-integriteit controleren...[/cyan]",
+        'apply_integrity_ok': "[green]✓ Database-integriteit: OK[/green]",
+        'apply_integrity_fail': "[bold red]⛔ Database-integriteitscontrole mislukt:[/bold red] {details}\nEr worden geen wijzigingen geschreven.",
+        'apply_integrity_after_fail': "[bold red]⛔ WAARSCHUWING: Integriteitscontrole na het schrijven mislukt![/bold red]\nBack-up: {backup}\nDetails: {details}",
+        'apply_summary_title': "Wijzigingen vóór opslaan",
+        'apply_summary_field': "Veld",
+        'apply_summary_count': "Wijzigingen",
+        'apply_summary_total': "Gecontroleerde tracks die worden geschreven",
+        'apply_summary_force': "Bewust volledig opnieuw gecontroleerd (Full Fetch)",
+        'apply_summary_restored': "Tracks worden als RESTAURIERT gemarkeerd",
         'conf_hoch': "hoog", 'conf_mittel': "gemiddeld", 'conf_niedrig': "laag",
         'maint_title': "\n[bold cyan]=== ONDERHOUDSMENU ===[/bold cyan]",
         'maint_warn': "[bold red]WAARSCHUWING: ALLE ACTIES HIER SCHRIJVEN DIRECT NAAR DE DATABASE ZONDER UNDO![/bold red]\nZorg ervoor dat je op een KOPIE werkt.",
@@ -407,11 +515,29 @@ def clean_nan(val):
     return str(val).strip()
 
 def save_safe_csv(df, filepath):
-    if 'LYRICS' in df.columns:
-        df['LYRICS'] = df['LYRICS'].fillna('').astype(str)
-        df['LYRICS'] = df['LYRICS'].str.replace(r'[\r\n]+', ' ', regex=True)
-        df['LYRICS'] = df['LYRICS'].str.replace(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', regex=True)
-    df.to_csv(filepath, index=False, encoding='utf-8-sig', quoting=csv.QUOTE_ALL)
+    # Lyrics/Songtext are not used by the Restorer and can make session files huge.
+    # Keep them untouched in mAirList, but never copy them into the CSV workspace.
+    drop_names = {'lyrics', 'songtext', 'songtexte', 'song text'}
+    drop_cols = [c for c in df.columns if str(c).strip().lower() in drop_names]
+    out_df = df.drop(columns=drop_cols, errors='ignore')
+
+    directory = os.path.dirname(os.path.abspath(filepath)) or '.'
+    os.makedirs(directory, exist_ok=True)
+    temp_path = os.path.join(directory, f".{os.path.basename(filepath)}.tmp-{os.getpid()}")
+
+    try:
+        with open(temp_path, 'w', encoding='utf-8-sig', newline='') as handle:
+            out_df.to_csv(handle, index=False, quoting=csv.QUOTE_ALL)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # Atomic replacement: either the old complete file or the new complete file exists.
+        os.replace(temp_path, filepath)
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 def get_best_duration(dur, tot_dur):
     try:
