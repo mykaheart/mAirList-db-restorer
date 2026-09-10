@@ -73,6 +73,10 @@ Wähle Option **[4] Alle Vorschläge selbst kontrollieren** oder **[5] Prüfung 
 ### Schritt 3.4: Wartung (Maintenance)
 Unter Option **[6]** findest du die Wartungswerkzeuge. Du kannst Genres standardisieren, Groß-/Kleinschreibung und Apostrophe in Artist/Title korrigieren oder mit dem Datei-Tagger geprüfte Metadaten aus der Datenbank in lokale FLAC-, MP3- und AIFF-Dateien schreiben. Die Sammeloption **[4]** führt die Genre- und Schreibweisenkorrektur nacheinander aus.
 
+Mit Wartungsoption **[5] Dopplungs-Kandidaten markieren / Status aktualisieren** sucht der Restorer nach aktuellen Prüf-Kandidaten. Als Kandidaten gelten Musik-Elemente mit identischer normalisierter Artist/Titel-Kombination, identischem gespeicherten Dateipfad oder gleicher gültiger ISRC. Unterschiedliche Laufzeiten verhindern bewusst keine Markierung, weil verschiedene Edits oder Versionen anschließend in der mAirList-DB-App vom Menschen beurteilt werden sollen.
+
+Gefundene Elemente erhalten ausschließlich das Attribut `DOPPELUNG=JA`; es wird **kein Element automatisch gelöscht**. Nach deiner Prüfung in mAirList startest du dieselbe Funktion erneut. Ist ein zuvor markiertes Element jetzt ohne passenden Partner, entfernt der Restorer dessen `DOPPELUNG`-Attribut automatisch. Dadurch eignet sich das Attribut besonders gut für einen Smart Folder bzw. Datenbankfilter mit `DOPPELUNG = JA`. Vor jeder tatsächlichen Änderung prüft der Restorer die SQLite-Integrität, erstellt ein Backup und aktualisiert die Markierungen in einer einzigen Transaktion.
+
 ### Schritt 3.5: In mAirList speichern (Apply)
 Wenn du alle Tracks geprüft hast, wählst du im Hauptmenü Option **[7] Geprüfte Änderungen in die Datenbank-Kopie schreiben**. Vor dem Schreiben zeigt der Restorer eine Zusammenfassung der geplanten Feldänderungen und führt eine SQLite-Integritätsprüfung durch. Erst nach deiner Bestätigung wird ein Backup erstellt und in einem schnellen Bulk-Verfahren geschrieben. Anschließend wird die Datenbankintegrität erneut geprüft.
 

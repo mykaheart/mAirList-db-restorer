@@ -73,6 +73,10 @@ Choose **[4] Review every suggestion yourself** or **[5] Review with automatic a
 ### Step 3.4: Maintenance
 Under Option **[6]** you will find the maintenance tools. You can standardize genres, correct capitalization and apostrophes in Artist/Title, or use the file tagger to write verified database metadata into local FLAC, MP3, and AIFF files. Combined option **[4]** runs the genre and text-case tasks sequentially.
 
+Maintenance option **[5] Mark duplicate candidates / refresh status** scans for current review candidates. Music items are candidates when they share the same normalized Artist/Title pair, the same stored file path, or the same valid ISRC. Different durations deliberately do not suppress the flag because alternate edits or versions should be reviewed by a human in the mAirList DB app.
+
+Found items only receive the attribute `DOPPELUNG=JA`; **no item is ever deleted automatically**. After reviewing the candidates in mAirList, run the same function again. If a previously marked item no longer has a matching partner, the Restorer automatically removes its `DOPPELUNG` attribute. This makes the attribute especially useful for a Smart Folder or database filter using `DOPPELUNG = JA`. Before any actual change, the Restorer checks SQLite integrity, creates a backup, and synchronizes the flags in a single transaction.
+
 ### Step 3.5: Save in mAirList (Apply)
 When you have checked all tracks, select **[7] Write verified changes to the database copy**. Before writing, the Restorer shows a summary of planned field changes and runs an SQLite integrity check. Only after your confirmation does it create a backup and perform the bulk write. The database integrity is checked again afterwards.
 

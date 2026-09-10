@@ -120,7 +120,7 @@ def check_for_updates(interactive=False):
                     if remote_tuple > local_tuple:
                         console.print(f"[bold yellow]⚡ Update verfügbar! Neue Version {remote_version} wurde veröffentlicht (Du nutzt {utils.APP_VERSION}).[/bold yellow]")
                         console.print(f"[bold cyan]👉 Download als fertige ZIP-Datei (inkl. Handbüchern) hier:[/bold cyan]")
-                        console.print(f"[white]https://drive.google.com/file/d/1lV2qG7nSj28BKC2W5FoPn4bgfqqsDjdM/view?usp=sharing[/white]")
+                        console.print(f"[white]https://drive.google.com/drive/folders/18SmIOBFbSM5apwS6FA3F72-syLvBAftj?usp=drive_link[/white]")
                         
                         if interactive:
                             console.input("\nDrücke Enter zum Fortfahren (oder schließe das Programm, um zu updaten)...")
@@ -838,16 +838,18 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt2'))
         console.print(utils.t('maint_opt3'))
         console.print(utils.t('maint_opt4'))
+        console.print(utils.t('maint_opt5'))
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4']:
+        elif choice in ['1', '2', '3', '4', '5']:
             do_genres = choice in ['1', '4']
             do_case   = choice in ['2', '4']
             do_tags   = choice == '3'
+            do_duplicates = choice == '5'
             
             try:
                 if do_genres:
@@ -865,9 +867,91 @@ def phase_maintenance(db_path):
                     count = db.run_maintenance_file_tagger(db_path)
                     if count > 0: console.print(utils.t('maint_done_tags', count=count))
                     else: console.print(utils.t('maint_no_changes'))
+
+                if do_duplicates:
+                    console.print(utils.t('maint_dup_scan'))
+                    ignored_folders = utils.get_saved_ignored_folders(db_path)
+                    frame = db.load_dataframe_from_mldb(db_path, ignored_folders)
+                    groups = db.find_duplicate_groups(frame)
+                    candidate_ids = set().union(*groups) if groups else set()
+
+                    flag_state = db.get_duplicate_flag_state(db_path)
+                    existing_ids = set(flag_state)
+                    existing_ja = {
+                        item_id for item_id, values in flag_state.items()
+                        if any(value.strip().upper() == 'JA' for _, value in values)
+                    }
+                    new_count = len(candidate_ids - existing_ja)
+                    still_count = len(candidate_ids & existing_ja)
+                    removed_count = len(existing_ids - candidate_ids)
+
+                    table = Table(title=utils.t('maint_dup_summary_title'), box=box.ROUNDED)
+                    table.add_column(utils.t('apply_summary_field'))
+                    table.add_column(utils.t('apply_summary_count'), justify='right')
+                    table.add_row(utils.t('maint_dup_groups'), str(len(groups)))
+                    table.add_row(utils.t('maint_dup_items'), str(len(candidate_ids)))
+                    table.add_row(utils.t('maint_dup_new'), str(new_count))
+                    table.add_row(utils.t('maint_dup_still'), str(still_count))
+                    table.add_row(utils.t('maint_dup_removed'), str(removed_count))
+                    console.print(table)
+
+                    if new_count == 0 and removed_count == 0:
+                        console.print(utils.t('maint_dup_nochange'))
+                    else:
+                        console.print(utils.t('apply_integrity_check'))
+                        integrity_ok, integrity_details = db.check_integrity(db_path)
+                        if not integrity_ok:
+                            console.print(Panel(
+                                utils.t('apply_integrity_fail', details=integrity_details),
+                                box=box.HEAVY, style='red'
+                            ))
+                            break
+                        console.print(utils.t('apply_integrity_ok'))
+
+                        backup_path = f"{db_path}.backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                        shutil.copy2(db_path, backup_path)
+                        console.print(utils.t('apply_backup', path=backup_path))
+
+                        try:
+                            db_dir = os.path.dirname(os.path.abspath(db_path)) or "."
+                            base_name = os.path.basename(db_path)
+                            backups = [
+                                os.path.join(db_dir, f) for f in os.listdir(db_dir)
+                                if f.startswith(base_name + ".backup-")
+                            ]
+                            backups.sort()
+                            if len(backups) > 5:
+                                for old_backup in backups[:-5]:
+                                    os.remove(old_backup)
+                                console.print(utils.t('apply_backup_clean'))
+                        except Exception as e:
+                            utils.log_change('BACKUP', f"Alte Backups konnten nicht vollständig bereinigt werden: {e}")
+
+                        result = db.apply_duplicate_flags(db_path, candidate_ids)
+
+                        console.print(utils.t('apply_integrity_check'))
+                        post_ok, post_details = db.check_integrity(db_path)
+                        if not post_ok:
+                            console.print(Panel(
+                                utils.t('apply_integrity_after_fail', backup=backup_path, details=post_details),
+                                box=box.HEAVY, style='red'
+                            ))
+                            utils.log_change(
+                                'CRITICAL',
+                                f"Integrität nach Dopplungsprüfung fehlgeschlagen: {post_details}; Backup: {backup_path}"
+                            )
+                            break
+                        console.print(utils.t('apply_integrity_ok'))
+                        console.print(utils.t(
+                            'maint_dup_done',
+                            new=result['new'], still=result['unchanged'], removed=result['removed']
+                        ))
                         
             except sqlite3.OperationalError as e:
                 console.print(utils.t('apply_err_lock', err=str(e)))
+            except Exception as e:
+                utils.log_change('ERROR', f"Wartungsfunktion fehlgeschlagen: {e}")
+                console.print(Panel(str(e), box=box.HEAVY, style='red'))
             break
         else:
             continue

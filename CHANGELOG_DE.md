@@ -2,6 +2,21 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.63.00 Beta] - 2026-09-09
+### Hinzugefügt
+- **Dopplungsprüfung neu konzipiert:** Wartungsoption `[5]` erkennt aktuelle Dopplungs-Kandidaten anhand identischer normalisierter Artist/Titel-Kombinationen, identischer gespeicherter Dateipfade oder gleicher gültiger ISRCs und markiert die betroffenen Musik-Elemente mit `DOPPELUNG=JA`.
+- **Automatische Statusbereinigung:** Wird ein zuvor markierter Kandidat nach der manuellen Prüfung in mAirList zum Einzelstück, entfernt der nächste Scan dessen `DOPPELUNG`-Attribut automatisch. Dadurch bleibt ein Smart Folder bzw. Filter auf `DOPPELUNG = JA` selbstständig aktuell.
+- **Regressionstest für den kompletten Dopplungs-Lebenszyklus:** Der Test prüft Markieren, bewusst unterschiedliche Laufzeiten, das manuelle Entfernen eines Dubletten-Elements und die automatische Bereinigung des verbliebenen Flags.
+
+### Sicherheit
+- **Keine automatische Löschung:** Die Funktion entscheidet niemals selbst, welches Element entfernt werden soll. Sie schreibt ausschließlich Prüf-Markierungen; die Entscheidung bleibt vollständig beim Nutzer in der mAirList-DB-App.
+- **Transaktion, Backup und Integritätsprüfung:** Kandidaten werden zuerst vollständig im Speicher berechnet. Nur bei tatsächlichen Statusänderungen erfolgen SQLite-Integritätsprüfung, Backup und eine atomare Transaktion; anschließend wird die Integrität erneut geprüft.
+- **Ignore-Listen werden respektiert:** Die gespeicherten Ordner-Ausnahmen der gewählten Datenbank werden auch bei der Dopplungssuche berücksichtigt.
+
+### Geändert
+- **Offizieller Download-Link:** README und Update-Hinweis verweisen nun auf den offiziellen öffentlichen Google-Drive-Ordner für fertige Standalone-Releases.
+- **Version:** Anwendung und Windows-Versionsressource auf `0.63.00 BETA` / `0.63.0.0 Beta` aktualisiert.
+
 ## [0.62.05 Beta] - 2026-09-09
 ### Hinzugefügt
 - **Fehlertoleranter API-Abruf:** MusicBrainz- und Discogs-Anfragen werden bei temporären Netzwerkfehlern, HTTP 429 sowie typischen 5xx-Fehlern automatisch bis zu dreimal wiederholt. Endgültig fehlgeschlagene Tracks erhalten den Status `FEHLER`, bleiben offen und werden beim nächsten Abruf erneut versucht.

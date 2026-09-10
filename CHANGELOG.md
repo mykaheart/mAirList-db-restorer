@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.63.00 Beta] - 2026-09-09
+### Added
+- **Redesigned duplicate scan:** Maintenance option `[5]` finds current duplicate candidates by matching normalized Artist/Title pairs, stored file paths, or valid ISRCs and marks affected music items with `DOPPELUNG=JA`.
+- **Automatic status cleanup:** If a previously marked candidate becomes a single remaining item after manual review in mAirList, the next scan automatically removes its `DOPPELUNG` attribute. A Smart Folder or filter using `DOPPELUNG = JA` therefore stays current on its own.
+- **Duplicate lifecycle regression test:** The test covers marking, deliberately different durations, manual removal of one duplicate item, and automatic cleanup of the remaining flag.
+
+### Safety
+- **No automatic deletion:** The feature never decides which item should be removed. It writes review flags only; the final decision remains entirely with the user in the mAirList DB app.
+- **Transaction, backup and integrity checks:** Candidates are fully calculated in memory first. Only real status changes trigger an SQLite integrity check, backup and atomic transaction, followed by a second integrity check.
+- **Ignore lists are respected:** Stored folder exclusions for the selected database are also applied to duplicate detection.
+
+### Changed
+- **Official download link:** README files and the update notice now point to the official public Google Drive folder for ready-to-use standalone releases.
+- **Version:** Application and Windows version resource updated to `0.63.00 BETA` / `0.63.0.0 Beta`.
+
 ## [0.62.05 Beta] - 2026-09-09
 ### Added
 - **Resilient API fetching:** MusicBrainz and Discogs requests are retried up to three times for transient network errors, HTTP 429 and common 5xx responses. Tracks that still fail receive `FEHLER` status, remain pending and are retried on a later fetch.

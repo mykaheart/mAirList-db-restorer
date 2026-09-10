@@ -1,11 +1,11 @@
-# mAirList DB Restorer v0.62.05 BETA
+# mAirList DB Restorer v0.63.00 BETA
 **The intelligent metadata repair tool for local mAirList databases**
 
 *(Note: German and Dutch documentation / manuals are available in the repository!)*
 
 ### 🚀 Quick Download
 For everyone who wants to get started right away without installing Python: Simply download the ready-to-use, pre-compiled `.exe` version including manuals!
-👉 **[Download mAirList-DB-Restorer (ZIP) via Google Drive](https://drive.google.com/file/d/1lV2qG7nSj28BKC2W5FoPn4bgfqqsDjdM/view?usp=sharing)**
+👉 **[Download mAirList-DB-Restorer (ZIP) via Google Drive](https://drive.google.com/drive/folders/18SmIOBFbSM5apwS6FA3F72-syLvBAftj?usp=drive_link)**
 
 *(The remaining source code in this repository is intended for developers and enthusiasts who wish to compile the script themselves or transparently view the code).*
 
@@ -29,6 +29,7 @@ This script doesn't just search blindly; it uses multiple safety nets and logic 
 *   **Mass Editing (Maintenance Mode):** A separate menu can standardize genres, correct capitalization and apostrophes, and write verified metadata into local FLAC, MP3, and AIFF files.
 *   **Hardening & Resume Safety:** API failures are retried automatically and remain pending if they still fail. Session CSV files are written atomically and separated per database path so workspaces cannot be corrupted or mixed between identically named databases.
 *   **Safer Apply:** Before final writing, the Restorer shows a change summary, checks SQLite integrity, creates a backup, and checks the database again after writing.
+*   **Duplicate Scan:** Maintenance can mark current duplicate candidates based on matching Artist/Title pairs, file paths, or valid ISRCs with `DOPPELUNG=JA`. A later scan automatically removes resolved flags; the Restorer never deletes items automatically.
 
 ---
 
@@ -58,6 +59,10 @@ python -m unittest discover -s tests -v
 On pushes and pull requests, GitHub Actions automatically runs a compile check and the regression tests on Windows.
 
 ---
+
+## 📜 License
+
+The mAirList DB Restorer is released as **source-available freeware**. The source code may be reviewed and modified for personal or internal use. Redistribution, re-uploading, mirroring, selling, or publishing modified or unmodified copies is not permitted without prior written permission. Official downloads may be provided through any distribution channel explicitly designated by the copyright holder. See `LICENSE.txt` for details.
 
 ## 🤖 Transparency Regarding Origin
 

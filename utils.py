@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.62.05 BETA"
+APP_VERSION = "0.63.00 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -104,7 +104,7 @@ T = {
         'menu_desc5': "Sichere Jahr-/Genre-Treffer automatisch; alles andere bleibt kontrollierbar.",
         'menu_h3': "--- OPTIONAL: DATENBANK / DATEIEN PFLEGEN ---",
         'menu_opt6': "Wartungswerkzeuge öffnen",
-        'menu_desc6': "Genres/Schreibweisen bereinigen oder geprüfte Tags in Audiodateien schreiben.",
+        'menu_desc6': "Genres/Schreibweisen bereinigen, Dopplungen markieren oder geprüfte Tags schreiben.",
         'menu_h4': "--- SCHRITT 3: GEPRÜFTE ÄNDERUNGEN SPEICHERN ---",
         'menu_opt7': "Geprüfte Änderungen in die Datenbank-Kopie schreiben",
         'menu_desc7': "Zeigt zuerst eine Zusammenfassung, erstellt ein Backup und speichert danach.",
@@ -204,8 +204,18 @@ T = {
         'maint_opt2': "  [[green]2[/green]] Groß-/Kleinschreibung & Apostrophe korrigieren (Artist/Title)",
         'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadaten aus DB in Audio-Dateien schreiben)",
         'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben (1-2) nacheinander ausführen",
+        'maint_opt5': "  [[green]5[/green]] Dopplungs-Kandidaten markieren / Status aktualisieren",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-4]: ",
+        'maint_prompt': "Auswahl [0-5]: ",
+        'maint_dup_scan': "[cyan]Prüfe die Datenbank auf aktuelle Dopplungs-Kandidaten...[/cyan]",
+        'maint_dup_summary_title': "Dopplungsprüfung",
+        'maint_dup_groups': "Gefundene Gruppen",
+        'maint_dup_items': "Betroffene Elemente",
+        'maint_dup_new': "Neu als DOPPELUNG markiert",
+        'maint_dup_still': "Weiterhin markiert",
+        'maint_dup_removed': "Erledigte Markierungen entfernt",
+        'maint_dup_nochange': "[green]✓ Der DOPPELUNG-Status ist bereits aktuell. Es wurde nichts geschrieben.[/green]",
+        'maint_dup_done': "[bold green]✓ Dopplungsstatus aktualisiert:[/bold green] {new} neu/geändert, {still} weiterhin markiert, {removed} erledigte Markierung(en) entfernt. [dim]Es wurden keine Elemente gelöscht.[/dim]",
         'maint_done_case': "[bold green]✓ Fertig! {count} Tracks (Artist/Title) korrigiert.[/bold green]",
         'maint_done_tags': "[bold green]✓ Fertig! {count} Audio-Dateien (FLAC/AIFF/MP3) wurden erfolgreich getaggt.[/bold green]",
         'std_done': "[bold green]✓ Fertig! {count} unsaubere Genres wurden erfolgreich ueberschrieben.[/bold green]",
@@ -232,7 +242,7 @@ T = {
         'menu_desc5': "Auto-accepts safe Year/Genre matches; everything else stays reviewable.",
         'menu_h3': "--- OPTIONAL: MAINTAIN DATABASE / FILES ---",
         'menu_opt6': "Open maintenance tools",
-        'menu_desc6': "Clean genres/text or write verified tags into audio files.",
+        'menu_desc6': "Clean genres/text, mark duplicate candidates, or write verified audio tags.",
         'menu_h4': "--- STEP 3: SAVE VERIFIED CHANGES ---",
         'menu_opt7': "Write verified changes to the database copy",
         'menu_desc7': "Shows a summary first, creates a backup, then writes the changes.",
@@ -332,8 +342,18 @@ T = {
         'maint_opt2': "  [[green]2[/green]] Fix Case & Apostrophes (Artist/Title)",
         'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Write DB metadata directly into physical audio files)",
         'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks (1-2) sequentially",
+        'maint_opt5': "  [[green]5[/green]] Mark duplicate candidates / refresh status",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-4]: ",
+        'maint_prompt': "Choice [0-5]: ",
+        'maint_dup_scan': "[cyan]Scanning the database for current duplicate candidates...[/cyan]",
+        'maint_dup_summary_title': "Duplicate scan",
+        'maint_dup_groups': "Candidate groups found",
+        'maint_dup_items': "Affected items",
+        'maint_dup_new': "Newly marked DOPPELUNG",
+        'maint_dup_still': "Still marked",
+        'maint_dup_removed': "Resolved flags removed",
+        'maint_dup_nochange': "[green]✓ The DOPPELUNG status is already current. Nothing was written.[/green]",
+        'maint_dup_done': "[bold green]✓ Duplicate status updated:[/bold green] {new} new/changed, {still} still marked, {removed} resolved flag(s) removed. [dim]No items were deleted.[/dim]",
         'maint_done_case': "[bold green]✓ Done! Corrected {count} tracks (Artist/Title).[/bold green]",
         'maint_done_tags': "[bold green]✓ Done! Successfully tagged {count} audio files (FLAC/AIFF/MP3).[/bold green]",
         'std_done': "[bold green]✓ Done! {count} unstandardized genres successfully updated.[/bold green]",
@@ -360,7 +380,7 @@ T = {
         'menu_desc5': "Accepteert veilige Jaar/Genre-matches automatisch; de rest blijft controleerbaar.",
         'menu_h3': "--- OPTIONEEL: DATABASE / BESTANDEN ONDERHOUDEN ---",
         'menu_opt6': "Onderhoudstools openen",
-        'menu_desc6': "Genres/tekst opschonen of gecontroleerde tags naar audiobestanden schrijven.",
+        'menu_desc6': "Genres/tekst opschonen, dubbelen markeren of gecontroleerde audiotags schrijven.",
         'menu_h4': "--- STAP 3: GECONTROLEERDE WIJZIGINGEN OPSLAAN ---",
         'menu_opt7': "Gecontroleerde wijzigingen naar de databasekopie schrijven",
         'menu_desc7': "Toont eerst een overzicht, maakt een back-up en schrijft daarna.",
@@ -460,8 +480,18 @@ T = {
         'maint_opt2': "  [[green]2[/green]] Hoofdletters/kleine letters & apostrofs corrigeren (Artist/Title)",
         'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadata uit DB direct naar audiobestanden schrijven)",
         'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken (1-2) achter elkaar uitvoeren",
+        'maint_opt5': "  [[green]5[/green]] Dubbele kandidaten markeren / status bijwerken",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-4]: ",
+        'maint_prompt': "Keuze [0-5]: ",
+        'maint_dup_scan': "[cyan]Database controleren op actuele dubbele kandidaten...[/cyan]",
+        'maint_dup_summary_title': "Controle op dubbelen",
+        'maint_dup_groups': "Gevonden kandidaatgroepen",
+        'maint_dup_items': "Betrokken items",
+        'maint_dup_new': "Nieuw als DOPPELUNG gemarkeerd",
+        'maint_dup_still': "Nog steeds gemarkeerd",
+        'maint_dup_removed': "Afgehandelde markeringen verwijderd",
+        'maint_dup_nochange': "[green]✓ De DOPPELUNG-status is al actueel. Er is niets geschreven.[/green]",
+        'maint_dup_done': "[bold green]✓ Dubbele status bijgewerkt:[/bold green] {new} nieuw/gewijzigd, {still} nog gemarkeerd, {removed} afgehandelde markering(en) verwijderd. [dim]Er zijn geen items verwijderd.[/dim]",
         'maint_done_case': "[bold green]✓ Klaar! {count} tracks (Artiest/Titel) gecorrigeerd.[/bold green]",
         'maint_done_tags': "[bold green]✓ Klaar! {count} audiobestanden (FLAC/AIFF/MP3) succesvol getagd.[/bold green]",
         'std_done': "[bold green]✓ Klaar! {count} ongestandaardiseerde genres succesvol bijgewerkt.[/bold green]",
@@ -636,6 +666,20 @@ def add_custom_lang(lang):
         config['CUSTOM_LANGS'] = CUSTOM_LANGS
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
+
+def get_saved_ignored_folders(db_path):
+    """Return the stored ignore list for a database without prompting the user."""
+    db_abs = os.path.abspath(db_path)
+    if not os.path.exists(CONFIG_FILE):
+        return []
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        values = config.get('DB_IGNORES', {}).get(db_abs, [])
+        return values if isinstance(values, list) else []
+    except Exception:
+        return []
+
 
 def setup_ignored_folders(db_path):
     db_abs = os.path.abspath(db_path)

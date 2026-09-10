@@ -1,11 +1,11 @@
-# mAirList DB Restorer v0.62.05 BETA
+# mAirList DB Restorer v0.63.00 BETA
 **De intelligente metadata-reparatietool voor lokale mAirList databases**
 
 *(Note: German and English documentation / manuals are available in the repository!)*
 
 ### 🚀 Quick Download
 Voor iedereen die direct aan de slag wil zonder Python te installeren: Download gewoon de kant-en-klare, gecompileerde `.exe`-versie inclusief handleidingen!
-👉 **[Download mAirList-DB-Restorer (ZIP) via Google Drive](https://drive.google.com/file/d/1lV2qG7nSj28BKC2W5FoPn4bgfqqsDjdM/view?usp=sharing)**
+👉 **[Download mAirList-DB-Restorer (ZIP) via Google Drive](https://drive.google.com/drive/folders/18SmIOBFbSM5apwS6FA3F72-syLvBAftj?usp=drive_link)**
 
 *(De rest van de broncode in deze repository is bedoeld voor ontwikkelaars en geïnteresseerden die het script zelf willen compileren of de code transparant willen inzien).*
 
@@ -29,6 +29,7 @@ Dit script zoekt niet zomaar blindelings, maar werkt met meerdere veiligheidsnet
 *   **Massabewerking (Onderhoudsmodus):** Een apart menu kan genres standaardiseren, hoofdletters/kleine letters en apostrofs corrigeren en gecontroleerde metadata naar lokale FLAC-, MP3- en AIFF-bestanden schrijven.
 *   **Hardening & veilig hervatten:** API-fouten worden automatisch opnieuw geprobeerd en blijven openstaan als ze definitief mislukken. Sessie-CSV's worden atomair opgeslagen en per databasepad gescheiden, zodat werkstanden niet beschadigd raken of tussen gelijknamige databases worden gemengd.
 *   **Veiliger opslaan:** Voor het definitieve schrijven toont de Restorer een wijzigingsoverzicht, controleert de SQLite-integriteit, maakt een back-up en controleert de database na het schrijven opnieuw.
+*   **Controle op dubbelen:** Onderhoud kan actuele dubbele kandidaten op basis van gelijke Artiest/Titel-combinaties, bestandspaden of geldige ISRCs markeren met `DOPPELUNG=JA`. Bij een volgende scan worden afgehandelde markeringen automatisch verwijderd; de Restorer verwijdert nooit automatisch items.
 
 ---
 
@@ -58,6 +59,10 @@ python -m unittest discover -s tests -v
 Bij pushes en pull requests voert GitHub Actions automatisch een compile-check en de regressietests op Windows uit.
 
 ---
+
+## 📜 Licentie
+
+De mAirList DB Restorer wordt uitgebracht als **source-available freeware**. De broncode mag worden bekeken en aangepast voor persoonlijk of intern gebruik. Herdistributie, opnieuw uploaden, spiegelen, verkopen of publiceren van gewijzigde of ongewijzigde versies is niet toegestaan zonder voorafgaande schriftelijke toestemming. Officiële downloads mogen via alle door de auteursrechthebbende expliciet aangewezen distributiekanalen worden aangeboden. Zie `LICENSE.txt` voor details.
 
 ## 🤖 Transparantie over het ontstaan
 

@@ -292,6 +292,186 @@ def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
         conn.close()
     return updated
 
+def _normalize_duplicate_text(value):
+    if value is None or pd.isna(value):
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() in ('nan', 'none'):
+        return ""
+    text = re.sub(r"[´`‘’]", "'", text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.casefold()
+
+
+def _normalize_duplicate_path(value):
+    if value is None or pd.isna(value):
+        return ""
+    text = str(value).strip().strip('"').strip("'")
+    if not text or text.lower() in ('nan', 'none'):
+        return ""
+    return re.sub(r'\\+', r'\\', text.replace('/', '\\')).casefold()
+
+
+def _normalize_isrc(value):
+    if value is None or pd.isna(value):
+        return ""
+    clean = re.sub(r'[^A-Za-z0-9]', '', str(value)).upper()
+    return clean if len(clean) == 12 else ""
+
+
+def find_duplicate_groups(df):
+    """Find conservative duplicate-candidate groups without modifying the database.
+
+    Candidates are linked when they share an exact normalized Artist+Title pair,
+    the same stored file path, or the same valid 12-character ISRC. Different
+    durations deliberately do not suppress a candidate: that decision belongs
+    in the mAirList DB app during human review.
+    """
+    if df is None or df.empty or 'ID' not in df.columns:
+        return []
+
+    work = df.copy()
+    work['ID'] = work['ID'].astype(str)
+    work = work[work['ID'].str.strip() != ''].copy()
+
+    # Duplicate maintenance is intended for music tracks. Empty ItemType is kept
+    # for compatibility with databases where type information is incomplete.
+    if 'ItemType' in work.columns:
+        item_type = work['ItemType'].fillna('').astype(str).str.strip().str.casefold()
+        work = work[(item_type == '') | (item_type == 'music')].copy()
+
+    ids = list(work['ID'])
+    parent = {item_id: item_id for item_id in ids}
+
+    def find(item_id):
+        while parent[item_id] != item_id:
+            parent[item_id] = parent[parent[item_id]]
+            item_id = parent[item_id]
+        return item_id
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    def union_by_key(key_pairs):
+        buckets = {}
+        for item_id, key in key_pairs:
+            if not key:
+                continue
+            buckets.setdefault(key, []).append(item_id)
+        for members in buckets.values():
+            if len(members) < 2:
+                continue
+            first = members[0]
+            for member in members[1:]:
+                union(first, member)
+
+    artist_title_pairs = []
+    for _, row in work.iterrows():
+        artist = _normalize_duplicate_text(row.get('Artist', ''))
+        title = _normalize_duplicate_text(row.get('Title', ''))
+        key = (artist, title) if artist and title else None
+        artist_title_pairs.append((str(row['ID']), key))
+    union_by_key(artist_title_pairs)
+
+    union_by_key([
+        (str(row['ID']), _normalize_duplicate_path(row.get('Filename', '')))
+        for _, row in work.iterrows()
+    ])
+
+    union_by_key([
+        (str(row['ID']), _normalize_isrc(row.get('ISRC', '')))
+        for _, row in work.iterrows()
+    ])
+
+    components = {}
+    for item_id in ids:
+        root = find(item_id)
+        components.setdefault(root, set()).add(item_id)
+
+    groups = [members for members in components.values() if len(members) >= 2]
+    groups.sort(key=lambda members: (min(int(x) if str(x).isdigit() else 10**18 for x in members), len(members)))
+    return groups
+
+
+def get_duplicate_flag_state(db_path):
+    """Return all existing DOPPELUNG attributes keyed by item ID."""
+    conn = None
+    try:
+        uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        rows = conn.execute(
+            "SELECT item, name, value FROM item_attributes WHERE LOWER(name) = 'doppelung'"
+        ).fetchall()
+        state = {}
+        for item_id, name, value in rows:
+            state.setdefault(str(item_id), []).append((str(name), '' if value is None else str(value)))
+        return state
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def apply_duplicate_flags(db_path, candidate_ids):
+    """Atomically synchronize the Restorer-managed DOPPELUNG=JA attributes."""
+    candidate_ids = {str(item_id) for item_id in candidate_ids}
+    state = get_duplicate_flag_state(db_path)
+    existing_ids = set(state)
+    existing_ja = {
+        item_id for item_id, values in state.items()
+        if any(value.strip().upper() == 'JA' for _, value in values)
+    }
+
+    stale_ids = existing_ids - candidate_ids
+    new_or_changed_ids = candidate_ids - existing_ja
+    unchanged_ids = candidate_ids & existing_ja
+
+    if not stale_ids and not new_or_changed_ids:
+        return {
+            'new': 0,
+            'unchanged': len(unchanged_ids),
+            'removed': 0,
+            'written': 0,
+        }
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute('BEGIN IMMEDIATE')
+
+        for item_id in sorted(stale_ids | new_or_changed_ids):
+            cur.execute(
+                "DELETE FROM item_attributes WHERE item = ? AND LOWER(name) = 'doppelung'",
+                (int(item_id),)
+            )
+
+        if new_or_changed_ids:
+            cur.executemany(
+                "INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, 'DOPPELUNG', 'JA')",
+                [(int(item_id),) for item_id in sorted(new_or_changed_ids)]
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    utils.log_change(
+        'MAINTENANCE',
+        f"Dopplungsstatus synchronisiert: {len(new_or_changed_ids)} neu/geändert, "
+        f"{len(unchanged_ids)} weiterhin markiert, {len(stale_ids)} entfernt."
+    )
+    return {
+        'new': len(new_or_changed_ids),
+        'unchanged': len(unchanged_ids),
+        'removed': len(stale_ids),
+        'written': len(new_or_changed_ids) + len(stale_ids),
+    }
+
+
 def run_maintenance_genres(db_path):
     import sqlite3
     import utils

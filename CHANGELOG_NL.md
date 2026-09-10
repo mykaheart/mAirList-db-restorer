@@ -2,6 +2,21 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.63.00 Beta] - 2026-09-09
+### Toegevoegd
+- **Controle op dubbelen opnieuw ontworpen:** Onderhoudsoptie `[5]` zoekt actuele dubbele kandidaten op basis van gelijke genormaliseerde Artiest/Titel-combinaties, opgeslagen bestandspaden of geldige ISRCs en markeert de betrokken muziekitems met `DOPPELUNG=JA`.
+- **Automatische statusopschoning:** Als een eerder gemarkeerde kandidaat na handmatige controle in mAirList als enig item overblijft, verwijdert de volgende scan automatisch het `DOPPELUNG`-attribuut. Een Smart Folder of filter met `DOPPELUNG = JA` blijft daardoor vanzelf actueel.
+- **Regressietest voor de volledige levenscyclus:** De test controleert markeren, bewust verschillende looptijden, het handmatig verwijderen van één dubbel item en het automatisch opruimen van de resterende markering.
+
+### Veiligheid
+- **Geen automatische verwijdering:** De functie beslist nooit zelf welk item verwijderd moet worden. Ze schrijft uitsluitend controlemarkeringen; de uiteindelijke beslissing blijft volledig bij de gebruiker in de mAirList DB-app.
+- **Transactie, back-up en integriteitscontrole:** Kandidaten worden eerst volledig in het geheugen berekend. Alleen echte statuswijzigingen veroorzaken een SQLite-integriteitscontrole, back-up en atomaire transactie, gevolgd door een tweede integriteitscontrole.
+- **Negeerlijsten worden gerespecteerd:** Opgeslagen mapuitzonderingen voor de geselecteerde database gelden ook voor de controle op dubbelen.
+
+### Gewijzigd
+- **Officiële downloadlink:** README-bestanden en de update-melding verwijzen nu naar de officiële openbare Google Drive-map voor kant-en-klare standalone-releases.
+- **Versie:** Applicatie en Windows-versiebron bijgewerkt naar `0.63.00 BETA` / `0.63.0.0 Beta`.
+
 ## [0.62.05 Beta] - 2026-09-09
 ### Toegevoegd
 - **Fouttolerante API-ophaling:** MusicBrainz- en Discogs-aanvragen worden bij tijdelijke netwerkfouten, HTTP 429 en veelvoorkomende 5xx-fouten automatisch maximaal drie keer opnieuw geprobeerd. Tracks die definitief mislukken krijgen status `FEHLER`, blijven openstaan en worden bij een latere fetch opnieuw geprobeerd.

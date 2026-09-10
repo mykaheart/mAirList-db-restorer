@@ -73,6 +73,10 @@ Kies **[4] Alle suggesties zelf controleren** of **[5] Controle met automatische
 ### Stap 3.4: Onderhoud (Maintenance)
 Onder Optie **[6]** vind je de onderhoudshulpmiddelen. Je kunt genres standaardiseren, hoofdletters/kleine letters en apostrofs in Artiest/Titel corrigeren of met de bestandstagger gecontroleerde metadata uit de database naar lokale FLAC-, MP3- en AIFF-bestanden schrijven. Combinatieoptie **[4]** voert de genre- en tekstcorrectie achter elkaar uit.
 
+Onderhoudsoptie **[5] Dubbele kandidaten markeren / status bijwerken** zoekt naar actuele controlekandidaten. Muziekitems gelden als kandidaat wanneer ze dezelfde genormaliseerde Artiest/Titel-combinatie, hetzelfde opgeslagen bestandspad of dezelfde geldige ISRC hebben. Verschillende looptijden verhinderen bewust geen markering, omdat verschillende edits of versies daarna door de gebruiker in de mAirList DB-app moeten worden beoordeeld.
+
+Gevonden items krijgen alleen het attribuut `DOPPELUNG=JA`; **er wordt nooit automatisch een item verwijderd**. Na je controle in mAirList voer je dezelfde functie opnieuw uit. Heeft een eerder gemarkeerd item dan geen passende partner meer, dan verwijdert de Restorer automatisch het `DOPPELUNG`-attribuut. Daardoor is het attribuut bijzonder geschikt voor een Smart Folder of databasefilter met `DOPPELUNG = JA`. Voor elke echte wijziging controleert de Restorer de SQLite-integriteit, maakt hij een back-up en synchroniseert hij de markeringen in één transactie.
+
 ### Stap 3.5: Opslaan in mAirList (Apply)
 Wanneer je alle tracks hebt gecontroleerd, selecteer je **[7] Gecontroleerde wijzigingen naar de databasekopie schrijven**. Voor het schrijven toont de Restorer een overzicht van de geplande veldwijzigingen en voert hij een SQLite-integriteitscontrole uit. Pas na jouw bevestiging wordt een back-up gemaakt en de bulk-write uitgevoerd. Daarna wordt de database-integriteit opnieuw gecontroleerd.
 
