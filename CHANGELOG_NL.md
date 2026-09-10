@@ -2,7 +2,7 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
-## [0.63.00 Beta] - 2026-09-09
+## [0.63.00 Beta] - 2026-09-10
 ### Toegevoegd
 - **Controle op dubbelen opnieuw ontworpen:** Onderhoudsoptie `[5]` zoekt actuele dubbele kandidaten op basis van gelijke genormaliseerde Artiest/Titel-combinaties, opgeslagen bestandspaden of geldige ISRCs en markeert de betrokken muziekitems met `DOPPELUNG=JA`.
 - **Automatische statusopschoning:** Als een eerder gemarkeerde kandidaat na handmatige controle in mAirList als enig item overblijft, verwijdert de volgende scan automatisch het `DOPPELUNG`-attribuut. Een Smart Folder of filter met `DOPPELUNG = JA` blijft daardoor vanzelf actueel.
@@ -15,6 +15,7 @@ Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteer
 
 ### Gewijzigd
 - **Officiële downloadlink:** README-bestanden en de update-melding verwijzen nu naar de officiële openbare Google Drive-map voor kant-en-klare standalone-releases.
+- **Duidelijkere integriteitsbeveiliging:** Als de controle al vóór het schrijven mislukt, vermeldt de Restorer nu uitdrukkelijk dat er nog niets is gewijzigd. Meldingen die alleen indexen betreffen worden als een typisch SQLite-indexprobleem toegelicht; automatische databasereparatie gebeurt bewust niet.
 - **Versie:** Applicatie en Windows-versiebron bijgewerkt naar `0.63.00 BETA` / `0.63.0.0 Beta`.
 
 ## [0.62.05 Beta] - 2026-09-09

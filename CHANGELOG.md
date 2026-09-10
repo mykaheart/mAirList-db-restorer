@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.63.00 Beta] - 2026-09-09
+## [0.63.00 Beta] - 2026-09-10
 ### Added
 - **Redesigned duplicate scan:** Maintenance option `[5]` finds current duplicate candidates by matching normalized Artist/Title pairs, stored file paths, or valid ISRCs and marks affected music items with `DOPPELUNG=JA`.
 - **Automatic status cleanup:** If a previously marked candidate becomes a single remaining item after manual review in mAirList, the next scan automatically removes its `DOPPELUNG` attribute. A Smart Folder or filter using `DOPPELUNG = JA` therefore stays current on its own.
@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **Official download link:** README files and the update notice now point to the official public Google Drive folder for ready-to-use standalone releases.
+- **Clearer integrity safety message:** If the pre-write check already fails, the Restorer now explicitly states that no change has been made. Index-only messages are identified as a typical SQLite index issue; automatic database repair is deliberately not performed.
 - **Version:** Application and Windows version resource updated to `0.63.00 BETA` / `0.63.0.0 Beta`.
 
 ## [0.62.05 Beta] - 2026-09-09

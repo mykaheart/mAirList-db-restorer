@@ -2,7 +2,7 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [0.63.00 Beta] - 2026-09-09
+## [0.63.00 Beta] - 2026-09-10
 ### Hinzugefügt
 - **Dopplungsprüfung neu konzipiert:** Wartungsoption `[5]` erkennt aktuelle Dopplungs-Kandidaten anhand identischer normalisierter Artist/Titel-Kombinationen, identischer gespeicherter Dateipfade oder gleicher gültiger ISRCs und markiert die betroffenen Musik-Elemente mit `DOPPELUNG=JA`.
 - **Automatische Statusbereinigung:** Wird ein zuvor markierter Kandidat nach der manuellen Prüfung in mAirList zum Einzelstück, entfernt der nächste Scan dessen `DOPPELUNG`-Attribut automatisch. Dadurch bleibt ein Smart Folder bzw. Filter auf `DOPPELUNG = JA` selbstständig aktuell.
@@ -15,6 +15,7 @@ Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert
 
 ### Geändert
 - **Offizieller Download-Link:** README und Update-Hinweis verweisen nun auf den offiziellen öffentlichen Google-Drive-Ordner für fertige Standalone-Releases.
+- **Verständlicher Integritäts-Airbag:** Scheitert die Prüfung bereits vor dem Schreiben, erklärt der Restorer nun ausdrücklich, dass noch keine Änderung vorgenommen wurde. Reine Indexmeldungen werden als typischer SQLite-Indexfehler eingeordnet; eine automatische Datenbankreparatur findet bewusst nicht statt.
 - **Version:** Anwendung und Windows-Versionsressource auf `0.63.00 BETA` / `0.63.0.0 Beta` aktualisiert.
 
 ## [0.62.05 Beta] - 2026-09-09
