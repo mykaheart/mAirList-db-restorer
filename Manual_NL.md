@@ -8,7 +8,7 @@ Dankzij de "All-in-One"-architectuur is het programma direct klaar voor gebruik 
 
 ## 1. Voorbereiding & Installatie
 
-De tool is een volledig op zichzelf staande applicatie (`.exe`). Je hoeft geen Python of andere codebibliotheken te installeren. Download gewoon het huidige ZIP-bestand, pak het uit op een locatie naar keuze en start het bestand **`mAirList-DB-Restorer.exe`**.
+De tool is een volledig op zichzelf staande applicatie (`.exe`). Je hoeft geen Python of andere codebibliotheken te installeren. Download gewoon het huidige ZIP-bestand, pak het uit op een locatie naar keuze en start het bestand **`Restorer.exe`**.
 
 ### Stap 1.1: Discogs API-Keys genereren
 Om toegang te krijgen tot de enorme database van Discogs, heeft het script een gratis API-sleutel nodig.
