@@ -62,7 +62,7 @@ Bij pushes en pull requests voert GitHub Actions automatisch een compile-check e
 
 ## 📜 Licentie
 
-De mAirList DB Restorer wordt uitgebracht als **source-available freeware**. De broncode mag worden bekeken en aangepast voor persoonlijk of intern gebruik. Herdistributie, opnieuw uploaden, spiegelen, verkopen of publiceren van gewijzigde of ongewijzigde versies is niet toegestaan zonder voorafgaande schriftelijke toestemming. Officiële downloads mogen via alle door de auteursrechthebbende expliciet aangewezen distributiekanalen worden aangeboden. Zie `LICENSE.txt` voor details.
+De mAirList DB Restorer wordt uitgebracht als **source-available freeware**. De broncode mag worden bekeken en aangepast voor persoonlijk of intern gebruik. Herdistributie, opnieuw uploaden, spiegelen, verkopen of publiceren van gewijzigde of ongewijzigde versies is niet toegestaan zonder voorafgaande schriftelijke toestemming. Officiële downloads mogen via alle door de auteursrechthebbende expliciet aangewezen distributiekanalen worden aangeboden. Zie `LICENSE` voor details.
 
 ## 🤖 Transparantie over het ontstaan
 
