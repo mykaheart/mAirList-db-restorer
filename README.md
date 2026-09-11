@@ -62,7 +62,7 @@ Bei Pushes und Pull Requests führt GitHub Actions zusätzlich automatisch einen
 
 ## 📜 Lizenz
 
-Der mAirList DB Restorer wird als **source-available Freeware** veröffentlicht. Der Quellcode darf eingesehen und für den eigenen privaten bzw. internen Gebrauch angepasst werden. Eine Weiterverteilung, ein Re-Upload, Spiegeln, Verkaufen oder Veröffentlichen veränderter oder unveränderter Fassungen ist ohne vorherige schriftliche Genehmigung nicht gestattet. Offizielle Downloads dürfen über alle vom Rechteinhaber ausdrücklich benannten Vertriebskanäle angeboten werden. Details stehen in `LICENSE.txt`.
+Der mAirList DB Restorer wird als **source-available Freeware** veröffentlicht. Der Quellcode darf eingesehen und für den eigenen privaten bzw. internen Gebrauch angepasst werden. Eine Weiterverteilung, ein Re-Upload, Spiegeln, Verkaufen oder Veröffentlichen veränderter oder unveränderter Fassungen ist ohne vorherige schriftliche Genehmigung nicht gestattet. Offizielle Downloads dürfen über alle vom Rechteinhaber ausdrücklich benannten Vertriebskanäle angeboten werden. Details stehen in `LICENSE`.
 
 ## 🤖 Transparenz zur Entstehung
 
