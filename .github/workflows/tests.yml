@@ -1,0 +1,27 @@
+name: Restorer regression tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Compile Python sources
+        run: python -m compileall -q main.py api.py db.py utils.py
+
+      - name: Run regression tests
+        run: python -m unittest discover -s tests -v
