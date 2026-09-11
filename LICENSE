@@ -1,19 +1,37 @@
-mAirList DB Restorer - Custom Freeware License
+mAirList DB Restorer - Source-Available Freeware License
 
 Copyright (c) 2026 Myka Vormeng
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to use
-and modify the Software for personal or internal operations, subject to the 
-following conditions:
+The source code of this project is publicly available for transparency, review,
+learning, and permitted private/internal modification. This is a source-available
+freeware license and does not grant general redistribution rights.
 
-1. REDISTRIBUTION PROHIBITED: You may not distribute, re-upload, publish, 
-   sublicense, or sell copies of the Software, whether modified or unmodified, 
-   on any other platforms, forums, or websites. The Software may exclusively 
-   be obtained from its official GitHub repository.
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to use and
+modify the Software for personal or internal operations, subject to the following
+conditions:
 
-2. The above copyright notice and this permission notice shall be included in 
-   all copies or substantial portions of the Software.
+1. REDISTRIBUTION PROHIBITED
+   You may not distribute, re-upload, mirror, publish, sublicense, rent, sell, or
+   otherwise make copies of the Software available to third parties, whether the
+   Software is modified or unmodified, without prior written permission from the
+   copyright holder.
+
+2. OFFICIAL DISTRIBUTION CHANNELS
+   Original releases of the Software may only be obtained through distribution
+   channels explicitly designated as official by the copyright holder. Such
+   channels may include the official GitHub repository, download links published
+   by the copyright holder, or other official project pages or release threads.
+
+3. PRIVATE AND INTERNAL MODIFICATIONS
+   You may create and use modified versions of the Software for your own personal
+   or internal operations. Modified versions may not be distributed, published,
+   uploaded, sold, sublicensed, or otherwise made available to third parties
+   without prior written permission from the copyright holder.
+
+4. COPYRIGHT AND LICENSE NOTICE
+   This copyright notice and this license text must be retained in all permitted
+   copies and modified versions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
