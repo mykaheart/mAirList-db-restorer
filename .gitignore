@@ -14,6 +14,7 @@ __pycache__/
 venv/
 
 # Build output / local executables
+cat_icon.ico
 build/
 dist/
 *.spec
