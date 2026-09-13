@@ -1,22 +1,34 @@
 import requests
 import threading
 import time
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 import utils
 
 MB_MIN_INTERVAL = 1.05
 DISCOGS_MIN_INTERVAL = 1.0
+ACOUSTICBRAINZ_MIN_INTERVAL = 1.05
 API_MAX_ATTEMPTS = 3
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 
 _last_mb_request = 0.0
 _last_discogs_request = 0.0
+_last_acousticbrainz_request = 0.0
 _mb_lock = threading.Lock()
 _discogs_lock = threading.Lock()
+_acousticbrainz_lock = threading.Lock()
 LABEL_CODE_CACHE = {}
 
 
 class APIRequestError(RuntimeError):
     """Raised after a remote API request failed permanently for this attempt."""
+
+    def __init__(self, message, service='', kind='api', status_code=None, retry_after=None):
+        super().__init__(message)
+        self.service = service
+        self.kind = kind
+        self.status_code = status_code
+        self.retry_after = retry_after
 
 
 def _wait(min_interval, last_time):
@@ -35,30 +47,63 @@ def _log_api_error(context, exc=None, status_code=None):
     utils.log_change("API_ERROR", details)
 
 
-def _retry_delay(response, attempt):
-    retry_after = None
-    if response is not None:
-        raw = response.headers.get('Retry-After')
-        if raw:
+def _response_retry_after(response):
+    """Return a server-advertised retry delay in seconds, if present."""
+    if response is None:
+        return None
+
+    raw = response.headers.get('Retry-After')
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
             try:
-                retry_after = max(0.0, float(raw))
-            except (TypeError, ValueError):
-                retry_after = None
-    if retry_after is not None:
-        return retry_after
+                target = parsedate_to_datetime(raw)
+                if target.tzinfo is None:
+                    target = target.replace(tzinfo=timezone.utc)
+                return max(0.0, (target - datetime.now(timezone.utc)).total_seconds())
+            except (TypeError, ValueError, OverflowError):
+                pass
+
+    raw = response.headers.get('X-RateLimit-Reset-In')
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def _retry_delay(response, attempt):
+    server_delay = _response_retry_after(response)
+    if server_delay is not None:
+        return server_delay
     return min(8.0, 1.5 * attempt)
 
 
+def _respect_acousticbrainz_rate_headers(response):
+    """Honor AcousticBrainz' dynamic rate-limit window when headers are present."""
+    try:
+        remaining = int(response.headers.get('X-RateLimit-Remaining', ''))
+        reset_in = float(response.headers.get('X-RateLimit-Reset-In', ''))
+    except (TypeError, ValueError):
+        return
+    if remaining <= 0 and reset_in > 0:
+        time.sleep(reset_in + 0.05)
+
+
 def _request_with_retry(service, url, params, timeout, min_interval, lock, last_request_name):
-    global _last_mb_request, _last_discogs_request
+    global _last_mb_request, _last_discogs_request, _last_acousticbrainz_request
 
     last_error = None
     for attempt in range(1, API_MAX_ATTEMPTS + 1):
         with lock:
             if last_request_name == 'mb':
                 _last_mb_request = _wait(min_interval, _last_mb_request)
-            else:
+            elif last_request_name == 'discogs':
                 _last_discogs_request = _wait(min_interval, _last_discogs_request)
+            else:
+                _last_acousticbrainz_request = _wait(min_interval, _last_acousticbrainz_request)
 
         response = None
         try:
@@ -69,12 +114,20 @@ def _request_with_retry(service, url, params, timeout, min_interval, lock, last_
             if attempt < API_MAX_ATTEMPTS:
                 time.sleep(_retry_delay(None, attempt))
                 continue
-            raise APIRequestError(f"{service}: Netzwerkfehler nach {API_MAX_ATTEMPTS} Versuchen: {exc}") from exc
+            raise APIRequestError(
+                f"{service}: Netzwerkfehler nach {API_MAX_ATTEMPTS} Versuchen: {exc}",
+                service=service, kind='network'
+            ) from exc
         except Exception as exc:
             _log_api_error(f"{service} unexpected request error", exc=exc)
-            raise APIRequestError(f"{service}: unerwarteter Request-Fehler: {exc}") from exc
+            raise APIRequestError(
+                f"{service}: unerwarteter Request-Fehler: {exc}",
+                service=service, kind='unexpected'
+            ) from exc
 
         if response.status_code < 400:
+            if service == 'AcousticBrainz':
+                _respect_acousticbrainz_rate_headers(response)
             return response
 
         _log_api_error(
@@ -87,14 +140,23 @@ def _request_with_retry(service, url, params, timeout, min_interval, lock, last_
             continue
 
         if response.status_code in RETRY_STATUS_CODES:
+            kind = 'rate_limit' if response.status_code == 429 else 'server'
             raise APIRequestError(
-                f"{service}: HTTP {response.status_code} nach {API_MAX_ATTEMPTS} Versuchen"
+                f"{service}: HTTP {response.status_code} nach {API_MAX_ATTEMPTS} Versuchen",
+                service=service, kind=kind, status_code=response.status_code,
+                retry_after=_response_retry_after(response)
             )
 
         # 4xx errors such as bad credentials or malformed requests are not transient.
-        raise APIRequestError(f"{service}: HTTP {response.status_code}")
+        raise APIRequestError(
+            f"{service}: HTTP {response.status_code}",
+            service=service, kind='http', status_code=response.status_code
+        )
 
-    raise APIRequestError(f"{service}: Anfrage fehlgeschlagen: {last_error or 'unbekannter Fehler'}")
+    raise APIRequestError(
+        f"{service}: Anfrage fehlgeschlagen: {last_error or 'unbekannter Fehler'}",
+        service=service, kind='api'
+    )
 
 
 def mb_get(url, params, timeout=5):
@@ -108,6 +170,13 @@ def discogs_get(url, params, timeout=5):
     return _request_with_retry(
         'Discogs', url, params, timeout,
         DISCOGS_MIN_INTERVAL, _discogs_lock, 'discogs'
+    )
+
+
+def acousticbrainz_get(url, params=None, timeout=8):
+    return _request_with_retry(
+        'AcousticBrainz', url, params or {}, timeout,
+        ACOUSTICBRAINZ_MIN_INTERVAL, _acousticbrainz_lock, 'acousticbrainz'
     )
 
 
@@ -320,6 +389,351 @@ def fetch_musicbrainz_details(artist, title, target_year=None, target_album=None
     # The empty fifth return value intentionally keeps manual language review intact.
     return year, confidence, isrc, (orig_album or fallback_album or ""), ""
 
+
+
+def _clean_isrc(value):
+    import re
+    clean = re.sub(r'[^A-Za-z0-9]', '', str(value or '')).upper()
+    return clean if len(clean) == 12 else ''
+
+
+def _artist_credit_text(recording):
+    parts = []
+    for credit in recording.get('artist-credit', []) or []:
+        name = credit.get('name') or (credit.get('artist') or {}).get('name') or ''
+        if name:
+            parts.append(name)
+        joinphrase = credit.get('joinphrase') or ''
+        if joinphrase:
+            parts.append(joinphrase)
+    return ''.join(parts).strip()
+
+
+def _normalize_match_text(value):
+    import re
+    text = str(value or '').casefold()
+    text = re.sub(r'[´`‘’]', "'", text)
+    text = re.sub(r'\b(featuring|feat\.?|ft\.?)\b', ' feat ', text)
+    text = re.sub(r'[^a-z0-9à-öø-ÿ]+', ' ', text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _similarity(a, b):
+    return utils.string_similarity(_normalize_match_text(a), _normalize_match_text(b))
+
+
+def _safe_recording_candidate(recording, artist, title, local_duration_sec=0, via_isrc=False):
+    rec_title = recording.get('title', '')
+    rec_artist = _artist_credit_text(recording)
+    title_sim = _similarity(title, rec_title)
+    artist_sim = _similarity(artist, rec_artist) if rec_artist else 0.0
+    rec_len = recording.get('length')
+    duration_diff = None
+    if rec_len and local_duration_sec and float(local_duration_sec) > 0:
+        try:
+            duration_diff = abs(float(rec_len) / 1000.0 - float(local_duration_sec))
+        except (TypeError, ValueError):
+            duration_diff = None
+
+    if via_isrc:
+        if title_sim < 0.72 or artist_sim < 0.60:
+            return None
+        if duration_diff is not None and duration_diff > 30:
+            return None
+        search_score = 100
+    else:
+        try:
+            search_score = int(recording.get('score', 0))
+        except (TypeError, ValueError):
+            search_score = 0
+        if search_score < 90 or title_sim < 0.88 or artist_sim < 0.78:
+            return None
+        if local_duration_sec and float(local_duration_sec) > 0:
+            if duration_diff is None or duration_diff > 18:
+                return None
+        elif search_score < 95 or title_sim < 0.95 or artist_sim < 0.88:
+            return None
+
+    return {
+        'mbid': str(recording.get('id', '')).strip(),
+        'title': rec_title,
+        'artist': rec_artist,
+        'score': search_score,
+        'title_similarity': title_sim,
+        'artist_similarity': artist_sim,
+        'duration_diff': duration_diff,
+        'matched_by': 'ISRC' if via_isrc else 'Artist/Title',
+    }
+
+
+def find_musicbrainz_recording_for_bpm(artist, title, isrc='', local_duration_sec=0):
+    """Return a conservative MusicBrainz recording match for BPM lookup, or None.
+
+    ISRC lookup is preferred. Without ISRC, title/artist, MusicBrainz score and
+    duration must all agree closely. This function never guesses between versions.
+    """
+    artist = str(artist or '').strip()
+    title = str(title or '').strip()
+    if not artist or not title:
+        return None
+
+    clean_isrc = _clean_isrc(isrc)
+    recordings = []
+    via_isrc = False
+    if clean_isrc:
+        try:
+            # Use recording search rather than /isrc/<code>: an unknown but
+            # syntactically valid ISRC then yields an empty result instead of a
+            # 404, allowing a safe Artist/Title fallback.
+            res = mb_get(
+                "https://musicbrainz.org/ws/2/recording/",
+                {'query': f'isrc:{clean_isrc}', 'fmt': 'json', 'limit': 10}
+            )
+            recordings = res.json().get('recordings', []) or []
+            via_isrc = bool(recordings)
+        except APIRequestError:
+            raise
+        except Exception as exc:
+            _log_api_error(f"MusicBrainz ISRC lookup failed for '{clean_isrc}'", exc=exc)
+
+    if not recordings:
+        safe_artist = artist.replace('\\', '\\\\').replace('"', '\\"')
+        safe_title = title.replace('\\', '\\\\').replace('"', '\\"')
+        res = mb_get(
+            "https://musicbrainz.org/ws/2/recording/",
+            {'query': f'artist:"{safe_artist}" AND recording:"{safe_title}"', 'fmt': 'json', 'limit': 10}
+        )
+        recordings = res.json().get('recordings', []) or []
+        via_isrc = False
+
+    candidates = []
+    for rec in recordings:
+        match = _safe_recording_candidate(rec, artist, title, local_duration_sec, via_isrc=via_isrc)
+        if match and match['mbid']:
+            candidates.append(match)
+
+    if not candidates:
+        return None
+
+    def sort_key(match):
+        diff = match['duration_diff'] if match['duration_diff'] is not None else 9999.0
+        return (
+            1 if match['matched_by'] == 'ISRC' else 0,
+            match['score'],
+            match['title_similarity'] + match['artist_similarity'],
+            -diff,
+        )
+
+    candidates.sort(key=sort_key, reverse=True)
+    best = candidates[0]
+
+    # If two non-ISRC candidates are virtually tied but point at different
+    # recordings, refuse to guess.
+    if not via_isrc and len(candidates) > 1:
+        second = candidates[1]
+        if (
+            best['score'] - second['score'] <= 2
+            and abs((best['duration_diff'] or 0) - (second['duration_diff'] or 0)) <= 2
+            and abs((best['title_similarity'] + best['artist_similarity']) - (second['title_similarity'] + second['artist_similarity'])) <= 0.03
+        ):
+            return None
+    return best
+
+
+def _cluster_bpm_values(values, tolerance=2.5):
+    clean = []
+    for value in values:
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            continue
+        if 30 <= value <= 300:
+            clean.append(value)
+    values = sorted(clean)
+    clusters = []
+    for value in values:
+        placed = False
+        for cluster in clusters:
+            center = sum(cluster) / len(cluster)
+            if abs(value - center) <= tolerance:
+                cluster.append(value)
+                placed = True
+                break
+        if not placed:
+            clusters.append([value])
+    clusters.sort(key=lambda c: (len(c), -((max(c)-min(c)) if len(c)>1 else 0)), reverse=True)
+    return clusters
+
+
+def select_acousticbrainz_bpm(values):
+    """Choose a conservative BPM consensus from AcousticBrainz submissions.
+
+    A single valid submission is accepted. With multiple submissions, at least
+    two must agree within 2.5 BPM; otherwise the recording is treated as ambiguous.
+    """
+    clusters = _cluster_bpm_values(values)
+    if not clusters:
+        return None
+    if sum(len(c) for c in clusters) == 1:
+        value = clusters[0][0]
+        return {'bpm': int(value + 0.5), 'agree': 1, 'total': 1}
+    best = clusters[0]
+    total = sum(len(c) for c in clusters)
+    if len(best) < 2:
+        return None
+    # For 3+ submissions, require a real majority to avoid 86/172-style
+    # half/double-time ambiguity.
+    if total >= 3 and len(best) <= total / 2:
+        return None
+    median = sorted(best)[len(best)//2] if len(best) % 2 else sum(sorted(best)[len(best)//2-1:len(best)//2+1]) / 2
+    return {'bpm': int(median + 0.5), 'agree': len(best), 'total': total}
+
+
+def fetch_acousticbrainz_bpms(recording_mbids, max_submissions=3, include_status=False):
+    """Fetch BPM-only low-level data for MusicBrainz recording IDs.
+
+    By default returns {mbid: {'bpm', 'agree', 'total'}} for recordings with a
+    safe BPM consensus. With include_status=True it returns (result, status),
+    where status classifies missing data, ambiguous analyses and per-chunk API
+    failures without aborting the entire maintenance scan.
+    """
+    mbids = []
+    for mbid in recording_mbids:
+        text = str(mbid or '').strip().lower()
+        if text and text not in mbids:
+            mbids.append(text)
+    if not mbids:
+        return ({}, {}) if include_status else {}
+
+    status = {mbid: {'status': 'pending'} for mbid in mbids}
+    counts = {}
+    failed_mbids = set()
+
+    for start in range(0, len(mbids), 25):
+        chunk = mbids[start:start+25]
+        try:
+            res = acousticbrainz_get(
+                'https://acousticbrainz.org/api/v1/count',
+                {'recording_ids': ';'.join(chunk)}
+            )
+            data = res.json()
+        except APIRequestError as exc:
+            for mbid in chunk:
+                failed_mbids.add(mbid)
+                status[mbid] = {
+                    'status': 'api_error',
+                    'kind': getattr(exc, 'kind', 'api'),
+                    'http_status': getattr(exc, 'status_code', None),
+                    'message': str(exc),
+                }
+            continue
+        except Exception as exc:
+            for mbid in chunk:
+                failed_mbids.add(mbid)
+                status[mbid] = {
+                    'status': 'api_error', 'kind': 'unexpected',
+                    'http_status': None, 'message': str(exc),
+                }
+            continue
+
+        for mbid in chunk:
+            try:
+                counts[mbid] = max(0, int((data.get(mbid) or {}).get('count', 0)))
+            except (TypeError, ValueError):
+                counts[mbid] = 0
+            if counts[mbid] <= 0:
+                status[mbid] = {'status': 'no_data'}
+
+    requested = []
+    for mbid in mbids:
+        if mbid in failed_mbids:
+            continue
+        count = counts.get(mbid, 0)
+        if count <= 0:
+            continue
+        if count <= max_submissions:
+            offsets = list(range(count))
+        elif max_submissions >= 3:
+            offsets = sorted({0, count // 2, count - 1})[:max_submissions]
+        else:
+            offsets = list(range(max_submissions))
+        for offset in offsets:
+            requested.append(f'{mbid}:{offset}')
+
+    values = {mbid: [] for mbid in mbids}
+    for start in range(0, len(requested), 25):
+        chunk = requested[start:start+25]
+        chunk_mbids = {token.split(':', 1)[0] for token in chunk}
+        try:
+            res = acousticbrainz_get(
+                'https://acousticbrainz.org/api/v1/low-level',
+                {
+                    'recording_ids': ';'.join(chunk),
+                    'features': 'rhythm.bpm',
+                }
+            )
+            data = res.json()
+        except APIRequestError as exc:
+            for mbid in chunk_mbids:
+                failed_mbids.add(mbid)
+                status[mbid] = {
+                    'status': 'api_error',
+                    'kind': getattr(exc, 'kind', 'api'),
+                    'http_status': getattr(exc, 'status_code', None),
+                    'message': str(exc),
+                }
+            continue
+        except Exception as exc:
+            for mbid in chunk_mbids:
+                failed_mbids.add(mbid)
+                status[mbid] = {
+                    'status': 'api_error', 'kind': 'unexpected',
+                    'http_status': None, 'message': str(exc),
+                }
+            continue
+
+        for key, offsets in data.items():
+            if key == 'mbid_mapping' or key not in values or not isinstance(offsets, dict):
+                continue
+            for document in offsets.values():
+                if not isinstance(document, dict):
+                    continue
+                bpm = (document.get('rhythm') or {}).get('bpm')
+                try:
+                    bpm = float(bpm)
+                except (TypeError, ValueError):
+                    continue
+                if 30 <= bpm <= 300:
+                    values[key].append(bpm)
+
+    result = {}
+    for mbid in mbids:
+        if mbid in failed_mbids:
+            continue
+        count = counts.get(mbid, 0)
+        if count <= 0:
+            continue
+        bpm_values = values.get(mbid, [])
+        if not bpm_values:
+            status[mbid] = {'status': 'no_bpm', 'submissions': count}
+            continue
+        selected = select_acousticbrainz_bpm(bpm_values)
+        if selected:
+            result[mbid] = selected
+            status[mbid] = {
+                'status': 'ok',
+                'agree': selected['agree'],
+                'total': selected['total'],
+                'submissions': count,
+            }
+        else:
+            status[mbid] = {
+                'status': 'ambiguous',
+                'sampled': len(bpm_values),
+                'submissions': count,
+            }
+
+    return (result, status) if include_status else result
 
 def fetch_discogs_details(artist, title, target_year=None, target_album=None):
     years, mapped_genre, discogs_id, styles_list = [], None, "", []

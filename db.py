@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import sys
 import re
+import ntpath
 import utils
 
 from rich.console import Console
@@ -227,6 +228,58 @@ def load_dataframe_from_mldb(db_path, ignored_folders=None):
     for col in utils.MLDB_ATTRIBUTE_FIELDS:
         if col not in df.columns: df[col] = ''
     return df
+
+def get_resolved_item_paths(db_path, item_ids=None):
+    """Return absolute/canonical Windows-style audio paths keyed by item ID.
+
+    mAirList usually stores filenames relative to a storage location. This helper
+    combines items.filename with storages.defaultLocation in read-only mode. It
+    deliberately does not require the files to exist on the machine running the
+    Restorer; the paths are also useful for matching external library exports
+    such as rekordbox XML.
+    """
+    wanted = None
+    if item_ids is not None:
+        wanted = {str(item_id).strip() for item_id in item_ids if str(item_id).strip()}
+        if not wanted:
+            return {}
+
+    uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    try:
+        storage_rows = conn.execute(
+            "SELECT idx, defaultLocation FROM storages"
+        ).fetchall()
+        storage_roots = {
+            int(idx): str(root or '').strip()
+            for idx, root in storage_rows
+        }
+
+        rows = conn.execute(
+            "SELECT idx, storage, filename FROM items"
+        ).fetchall()
+        result = {}
+        for item_id, storage_id, filename in rows:
+            sid = str(item_id)
+            if wanted is not None and sid not in wanted:
+                continue
+            raw = str(filename or '').strip()
+            if not raw:
+                continue
+            raw = raw.replace('/', '\\')
+            if ntpath.isabs(raw):
+                full = raw
+            else:
+                try:
+                    root = storage_roots.get(int(storage_id), '') if storage_id is not None else ''
+                except (TypeError, ValueError):
+                    root = ''
+                full = ntpath.join(root.replace('/', '\\'), raw) if root else raw
+            result[sid] = ntpath.normpath(full)
+        return result
+    finally:
+        conn.close()
+
 
 def apply_dataframe_to_mldb(df, db_path, mark_restauriert=True):
     db_lang = detect_db_language(db_path, utils.CURRENT_LANG)
@@ -469,6 +522,240 @@ def apply_duplicate_flags(db_path, candidate_ids):
         'unchanged': len(unchanged_ids),
         'removed': len(stale_ids),
         'written': len(new_or_changed_ids) + len(stale_ids),
+    }
+
+
+def _parse_bpm_value(value):
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            parsed = _parse_bpm_value(item)
+            if parsed is not None:
+                return parsed
+        return None
+    if hasattr(value, 'text'):
+        return _parse_bpm_value(getattr(value, 'text'))
+    match = re.search(r'(\d+(?:[\.,]\d+)?)', str(value))
+    if not match:
+        return None
+    try:
+        bpm = float(match.group(1).replace(',', '.'))
+    except ValueError:
+        return None
+    if not 30 <= bpm <= 300:
+        return None
+    return int(bpm + 0.5)
+
+
+def _valid_recording_mbid(value):
+    text = str(value or '').strip().lower()
+    if re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', text):
+        return text
+    return ''
+
+
+def resolve_audio_path(raw_filename, base_dirs=None):
+    """Resolve a database filename without modifying the stored path."""
+    base_dirs = base_dirs or []
+    raw = str(raw_filename or '').strip().strip('"').strip("'")
+    if not raw or raw.lower() in ('nan', 'none'):
+        return None
+
+    candidates = [raw, raw.replace('\\', os.sep), raw.replace('/', os.sep)]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+
+    rel_variants = {
+        raw.lstrip('\\/'),
+        raw.replace('\\', os.sep).lstrip(os.sep),
+        raw.replace('/', os.sep).lstrip(os.sep),
+    }
+    for base_dir in base_dirs:
+        if not base_dir:
+            continue
+        for rel in rel_variants:
+            candidate = os.path.join(base_dir, rel)
+            if os.path.isfile(candidate):
+                return os.path.abspath(candidate)
+    return None
+
+
+def read_audio_bpm_metadata(raw_filename, base_dirs=None):
+    """Read existing BPM and optional MusicBrainz recording ID from an audio file.
+
+    This is metadata-only: no audio analysis and no file modification is performed.
+    The returned ``file_status`` is diagnostic only; unavailable files still fall
+    back to the online MusicBrainz/AcousticBrainz path.
+    """
+    raw_filename = '' if raw_filename is None else str(raw_filename).strip()
+    actual_path = resolve_audio_path(raw_filename, base_dirs)
+    result = {'path': actual_path, 'bpm': None, 'mbid': '', 'file_status': 'ok'}
+    if not raw_filename:
+        result['file_status'] = 'no_filename'
+        return result
+    if not actual_path:
+        result['file_status'] = 'not_found'
+        return result
+
+    try:
+        import mutagen
+        audio = mutagen.File(actual_path, easy=False)
+    except Exception as exc:
+        result['file_status'] = 'read_error'
+        result['file_error'] = str(exc)
+        utils.log_change('BPM', f"Audio-Metadaten konnten nicht gelesen werden: {actual_path}: {exc}")
+        return result
+
+    if audio is None or not getattr(audio, 'tags', None):
+        result['file_status'] = 'no_tags'
+        return result
+    tags = audio.tags
+
+    # ID3 (MP3/AIFF): standard BPM frame is TBPM. Picard stores the
+    # MusicBrainz recording ID in UFID owned by http://musicbrainz.org.
+    if hasattr(tags, 'getall'):
+        try:
+            frames = tags.getall('TBPM')
+            if frames:
+                result['bpm'] = _parse_bpm_value(frames[0])
+        except Exception:
+            pass
+        try:
+            for frame in tags.getall('UFID'):
+                owner = str(getattr(frame, 'owner', '') or '').lower()
+                if 'musicbrainz.org' not in owner:
+                    continue
+                raw_data = getattr(frame, 'data', b'')
+                if isinstance(raw_data, bytes):
+                    raw_data = raw_data.decode('ascii', errors='ignore')
+                mbid = _valid_recording_mbid(raw_data)
+                if mbid:
+                    result['mbid'] = mbid
+                    break
+        except Exception:
+            pass
+
+    # Vorbis/FLAC and other dict-like tags.
+    try:
+        if result['bpm'] is None:
+            for key in ('bpm', 'BPM', 'tempo', 'TEMPO'):
+                if key in tags:
+                    parsed = _parse_bpm_value(tags.get(key))
+                    if parsed is not None:
+                        result['bpm'] = parsed
+                        break
+        if not result['mbid']:
+            for key in (
+                'musicbrainz_trackid', 'MUSICBRAINZ_TRACKID',
+                'musicbrainz_recordingid', 'MUSICBRAINZ_RECORDINGID',
+            ):
+                if key not in tags:
+                    continue
+                value = tags.get(key)
+                if isinstance(value, (list, tuple)) and value:
+                    value = value[0]
+                mbid = _valid_recording_mbid(value)
+                if mbid:
+                    result['mbid'] = mbid
+                    break
+    except Exception:
+        pass
+    return result
+
+
+def get_bpm_flag_state(db_path):
+    """Return existing BPM attributes keyed by item ID (case-insensitive name)."""
+    conn = None
+    try:
+        uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True)
+        rows = conn.execute(
+            "SELECT item, name, value FROM item_attributes WHERE LOWER(name) = 'bpm'"
+        ).fetchall()
+        state = {}
+        for item_id, name, value in rows:
+            state.setdefault(str(item_id), []).append((str(name), '' if value is None else str(value)))
+        return state
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def apply_bpm_values(db_path, bpm_values):
+    """Atomically fill BPM only where no valid BPM value exists yet."""
+    clean = {}
+    for item_id, bpm in (bpm_values or {}).items():
+        parsed = _parse_bpm_value(bpm)
+        if parsed is not None:
+            clean[str(item_id)] = parsed
+    if not clean:
+        return {'written': 0, 'skipped_existing': 0, 'skipped_missing_item': 0}
+
+    conn = sqlite3.connect(db_path)
+    try:
+        cur = conn.cursor()
+        cur.execute('BEGIN IMMEDIATE')
+        ids = [int(item_id) for item_id in clean]
+        placeholders = ','.join('?' for _ in ids)
+
+        valid_items = {
+            int(row[0]) for row in cur.execute(
+                f"SELECT idx FROM items WHERE idx IN ({placeholders})", ids
+            ).fetchall()
+        } if ids else set()
+
+        existing_valid = set()
+        if ids:
+            rows = cur.execute(
+                f"SELECT item, value FROM item_attributes WHERE LOWER(name) = 'bpm' AND item IN ({placeholders})",
+                ids,
+            ).fetchall()
+            for item_id, value in rows:
+                if _parse_bpm_value(value) is not None:
+                    existing_valid.add(int(item_id))
+
+        writable_ids = {
+            int(item_id) for item_id in clean
+            if int(item_id) in valid_items and int(item_id) not in existing_valid
+        }
+
+        # Remove only empty/invalid BPM spellings for items we are about to fill,
+        # then write one canonical BPM attribute. Valid existing BPM never reach
+        # this branch and are therefore never overwritten.
+        for item_id in sorted(writable_ids):
+            cur.execute(
+                "DELETE FROM item_attributes WHERE item = ? AND LOWER(name) = 'bpm'",
+                (item_id,)
+            )
+        to_write = [
+            (item_id, 'BPM', str(clean[str(item_id)]))
+            for item_id in sorted(writable_ids)
+        ]
+        if to_write:
+            cur.executemany(
+                "INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, ?, ?)",
+                to_write,
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    skipped_existing = len(existing_valid & set(ids))
+    skipped_missing_item = len(set(ids) - valid_items)
+    utils.log_change(
+        'MAINTENANCE',
+        f"BPM ergänzt: {len(to_write)} geschrieben, {skipped_existing} wegen vorhandener BPM übersprungen, "
+        f"{skipped_missing_item} nicht mehr vorhandene Elemente übersprungen."
+    )
+    return {
+        'written': len(to_write),
+        'skipped_existing': skipped_existing,
+        'skipped_missing_item': skipped_missing_item,
     }
 
 

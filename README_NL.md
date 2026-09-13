@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.63.00 BETA
+# mAirList DB Restorer v0.64.00 BETA
 **De intelligente metadata-reparatietool voor lokale mAirList databases**
 
 *(Note: German and English documentation / manuals are available in the repository!)*
@@ -27,9 +27,10 @@ Dit script zoekt niet zomaar blindelings, maar werkt met meerdere veiligheidsnet
 *   **OAD-bescherming (Ignore-Lists):** Virtuele en fysieke mappen met namen als "OAD" (On Air Design) of "Jingles" kunnen consequent worden uitgesloten van de zoekopdracht.
 *   **Ergonomisch Review-proces:** Alle API-suggesties kunnen voor het opslaan in de database in een snelle terminal-workflow worden gecontroleerd, aangepast of met één druk op de knop (terugvallen op de originele waarde) worden afgewezen.
 *   **Massabewerking (Onderhoudsmodus):** Een apart menu kan genres standaardiseren, hoofdletters/kleine letters en apostrofs corrigeren en gecontroleerde metadata naar lokale FLAC-, MP3- en AIFF-bestanden schrijven.
-*   **Hardening & veilig hervatten:** API-fouten worden automatisch opnieuw geprobeerd en blijven openstaan als ze definitief mislukken. Sessie-CSV's worden atomair opgeslagen en per databasepad gescheiden, zodat werkstanden niet beschadigd raken of tussen gelijknamige databases worden gemengd.
+*   **Hardening & veilig hervatten:** Afzonderlijke API-requests worden automatisch herhaald; bij tijdelijke netwerk-/429-/5xx-fouten wordt daarnaast de volledige trackopzoeking maximaal drie keer opnieuw gestart met 2/5/10-seconden-backoff. Pas daarna blijft de track open. Sessie-CSV's worden atomair opgeslagen en per databasepad gescheiden, zodat werkstanden niet beschadigd raken of tussen gelijknamige databases worden gemengd.
 *   **Veiliger opslaan:** Voor het definitieve schrijven toont de Restorer een wijzigingsoverzicht, controleert de SQLite-integriteit, maakt een back-up en controleert de database na het schrijven opnieuw.
 *   **Controle op dubbelen:** Onderhoud kan actuele dubbele kandidaten op basis van gelijke Artiest/Titel-combinaties, bestandspaden of geldige ISRCs markeren met `DOPPELUNG=JA`. Bij een volgende scan worden afgehandelde markeringen automatisch verwijderd; de Restorer verwijdert nooit automatisch items.
+*   **BPM-restauratie in normale Fetch + onderhoud:** Sinds 0.64 draait de BPM-keten ook mee in de normale Fetch. De primaire bron is een optionele rekordbox-XML-export die per database wordt onthouden: `AverageBpm` wordt alleen via exact bestandspad gekoppeld. Daarna volgen BPM-tags uit audiobestanden en als laatste fallback MusicBrainz + AcousticBrainz. Bestaande geldige BPM blijft ook bij Full Fetch beschermd. Onderhoudsoptie [6] blijft beschikbaar voor snelle BPM-only-nazorg met review-CSV, diagnose per oorzaak en half/double-time-conflicten.
 
 ---
 

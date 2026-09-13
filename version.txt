@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(0, 63, 0, 0),
-    prodvers=(0, 63, 0, 0),
+    filevers=(0, 64, 0, 0),
+    prodvers=(0, 64, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
         '040704b0',
         [StringStruct('CompanyName', 'RainbowRadio'),
         StringStruct('FileDescription', 'mAirList DB Restorer'),
-        StringStruct('FileVersion', '0.63.0.0'),
+        StringStruct('FileVersion', '0.64.0.0'),
         StringStruct('InternalName', 'Restorer'),
         StringStruct('LegalCopyright', '(c) 2026 by Myka Vormeng'),
         StringStruct('OriginalFilename', 'Restorer.exe'),
         StringStruct('ProductName', 'mAirList Datenbank-Assistent'),
-        StringStruct('ProductVersion', '0.63.0.0 Beta')])
+        StringStruct('ProductVersion', '0.64.0.0 Beta')])
       ]),
     VarFileInfo([VarStruct('Translation', [1031, 1200])])
   ]
