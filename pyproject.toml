@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mAirList-db-restorer"
-version = "0.63.00"
+version = "0.64.00"
 description = "Intelligentes Metadaten-Reparatur-Tool für lokale mAirList Datenbanken"
 readme = "README.md"
 license = {file = "LICENSE"}

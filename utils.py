@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.63.00 BETA"
+APP_VERSION = "0.64.00 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -32,7 +32,7 @@ CUSTOM_LANGS = []
 
 MLDB_ATTRIBUTE_FIELDS = [
     'Jahr', 'Genre', 'Album', 'STYLE', 'DISCOGS_RELEASE_ID',
-    'Label', 'Labelcode', 'ISRC', 'Sprache', 'Typ', 'RESTAURIERT', 'DOPPELUNG'
+    'Label', 'Labelcode', 'ISRC', 'Sprache', 'Typ', 'BPM', 'RESTAURIERT', 'DOPPELUNG'
 ]
 
 ITEM_TYPE_MAPPINGS = {
@@ -145,13 +145,19 @@ T = {
         'fetch_new_tracks': "[green]-> {count} neue Track(s) aus '{db}' ergänzt.[/green]",
         'fetch_reset': "[yellow]-> {count} Track(s) in mAirList zurückgesetzt – werden neu gefetcht![/yellow]",
         'fetch_first': "[cyan]Erster Lauf: Lese direkt aus SQLite-Kopie '{db}'.[/cyan]",
+        'fetch_bpm_rb_prompt': "rekordbox XML für BPM (optional; Enter = {default}, '-' = ohne XML): ",
+        'fetch_bpm_rb_none': "ohne XML",
+        'fetch_bpm_rb_missing': "[yellow]rekordbox XML nicht gefunden: {path} – Fetch läuft mit Datei-Tags/API-Fallback weiter.[/yellow]",
+        'fetch_bpm_rb_invalid': "[yellow]rekordbox XML konnte nicht gelesen werden ({details}) – Fetch läuft mit Datei-Tags/API-Fallback weiter.[/yellow]",
+        'fetch_bpm_rb_loaded': "[green]✓ BPM-Quelle rekordbox XML:[/green] {entries} Einträge, {valid} mit gültigem BPM.",
         'fetch_full': "[bold yellow]Vollständige Neuprüfung angefordert (--full)[/bold yellow]",
         'fetch_start': "[bold green]Starte automatischen Fetch[/bold green]\nOffene Tracks: [bold yellow]{offen}[/bold yellow] von [bold]{total}[/bold] Gesamt",
         'fetch_done_already': "[bold green]✓ Alle Tracks sind bereits auf dem neuesten Stand![/bold green]",
         'fetch_progress': "[bold magenta]Fetching Metadaten...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jahr: [bold cyan]{jahr}[/bold cyan], Konfidenz: [{c_color}]{conf}[/{c_color}])",
-        'fetch_track_error': "[bold yellow]⚠ ID {id}: API-/Netzwerkfehler. Track bleibt offen und wird später erneut versucht.[/bold yellow]",
-        'fetch_done_with_errors': "\n[bold yellow]⚠ Abruf beendet, aber {count} Track(s) konnten wegen API-/Netzwerkfehlern nicht abgeschlossen werden. Sie bleiben offen und werden beim nächsten Abruf erneut versucht.[/bold yellow]",
+        'fetch_track_retry': "[bold yellow]⚠ ID {id}: vorübergehender API-/Netzwerkfehler – automatischer Wiederholungsversuch {retry}/{max_retry} in {delay} s.[/bold yellow]",
+        'fetch_track_error': "[bold yellow]⚠ ID {id}: API-/Netzwerkfehler trotz automatischer Wiederholungen. Track bleibt offen und wird beim nächsten Abruf erneut versucht.[/bold yellow]",
+        'fetch_done_with_errors': "\n[bold yellow]⚠ Abruf beendet, aber {count} Track(s) konnten trotz automatischer Wiederholungen wegen API-/Netzwerkfehlern nicht abgeschlossen werden. Sie bleiben offen und werden beim nächsten Abruf erneut versucht.[/bold yellow]",
         'fetch_interrupt': "\n[bold yellow]Abruf unterbrochen. Fortschritt sicher gespeichert.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch erfolgreich abgeschlossen![/bold green] Nächster Schritt: [bold cyan]Option [4] oder [5] im Hauptmenü (Review)[/bold cyan]",
         'fetch_paused_review': "\n[bold cyan]Abruf nach diesem Block pausiert.[/bold cyan] Du kannst die geladenen Tracks jetzt mit Option 4 oder 5 prüfen. Option 1 setzt den Abruf später fort.",
@@ -172,6 +178,7 @@ T = {
         'rev_album': "  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
+        'rev_bpm_auto': "  [cyan]BPM[/cyan]     -> [bold green]{sugg}[/bold green] [dim](automatisch aus {source}; vorhandene BPM werden geschützt)[/dim]",
         'no_sugg': "- (Kein Vorschlag) -",
         'rev_interim': "[dim]  (Zwischenstand gespeichert)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review unterbrochen. Bisherige Entscheidungen sind gespeichert.[/bold yellow]",
@@ -205,8 +212,54 @@ T = {
         'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadaten aus DB in Audio-Dateien schreiben)",
         'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben (1-2) nacheinander ausführen",
         'maint_opt5': "  [[green]5[/green]] Dopplungs-Kandidaten markieren / Status aktualisieren",
+        'maint_opt6': "  [[green]6[/green]] Fehlende BPM ergänzen (rekordbox XML / Datei-Tags / MusicBrainz + AcousticBrainz)",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-5]: ",
+        'maint_prompt': "Auswahl [0-6]: ",
+        'maint_bpm_intro': "[cyan]Suche fehlende BPM-Werte...[/cyan]\n[dim]Vorhandene BPM werden niemals überschrieben. Priorität: rekordbox XML per exaktem Dateipfad, danach Datei-Tag, danach MusicBrainz + AcousticBrainz als Fallback.[/dim]",
+        'maint_bpm_rb_prompt': "rekordbox XML (optional, Enter = ohne XML): ",
+        'maint_bpm_rb_invalid': "[red]rekordbox XML wurde nicht gefunden oder ist ungültig.[/red]",
+        'maint_bpm_rb_loaded': "[green]✓ rekordbox XML geladen:[/green] {entries} Einträge, {valid} mit gültigem BPM.",
+        'maint_bpm_rb': "Treffer aus rekordbox XML",
+        'maint_bpm_rb_unmatched': "Nicht aus rekordbox übernommen (Fallback)",
+        'maint_bpm_rb_conflicts': "Vorhandene BPM mit deutlicher rekordbox-Abweichung",
+        'maint_bpm_source_rb': "rekordbox XML",
+        'maint_bpm_path_intro': "[cyan]Optionale lokale Pfad-Zuordnung[/cyan]\nFalls mAirList relative Speicherort-Pfade nutzt, kannst du hier Basisordner hinzufügen. Enter ohne Eingabe startet die Prüfung.",
+        'maint_bpm_path_prompt': "Basis-Ordner (optional, Enter = weiter): ",
+        'maint_bpm_path_added': "[green]✓ Ordner hinzugefügt:[/green] {path}",
+        'maint_bpm_path_invalid': "[red]Ordner existiert nicht oder ist ungültig.[/red]",
+        'maint_bpm_summary_title': "BPM-Prüfung",
+        'maint_bpm_missing': "Tracks ohne BPM",
+        'maint_bpm_existing': "Bereits mit BPM",
+        'maint_bpm_file': "Treffer aus Datei-Tag",
+        'maint_bpm_ab': "Treffer aus AcousticBrainz",
+        'maint_bpm_nomatch': "Kein sicherer BPM-Treffer",
+        'maint_bpm_errors': "API-/Lesefehler",
+        'maint_bpm_diag_title': "BPM-Diagnose",
+        'maint_bpm_diag_kind': "Grund",
+        'maint_bpm_diag_file_unreachable': "Audiodatei nicht erreichbar (Tag-Prüfung übersprungen)",
+        'maint_bpm_diag_file_read': "Audiodatei/Tags nicht lesbar",
+        'maint_bpm_diag_mb_nomatch': "MusicBrainz: kein eindeutiges Recording",
+        'maint_bpm_diag_mb_network': "MusicBrainz: Netzwerk/Timeout",
+        'maint_bpm_diag_mb_rate': "MusicBrainz: Rate Limit (429)",
+        'maint_bpm_diag_mb_server': "MusicBrainz: Serverfehler (5xx)",
+        'maint_bpm_diag_mb_http': "MusicBrainz: sonstiger HTTP-Fehler",
+        'maint_bpm_diag_mb_other': "MusicBrainz: sonstiger API-Fehler",
+        'maint_bpm_diag_ab_nodata': "AcousticBrainz: kein Datensatz",
+        'maint_bpm_diag_ab_nobpm': "AcousticBrainz: Datensatz ohne nutzbares BPM",
+        'maint_bpm_diag_ab_ambiguous': "AcousticBrainz: kein sicherer BPM-Konsens",
+        'maint_bpm_diag_ab_network': "AcousticBrainz: Netzwerk/Timeout",
+        'maint_bpm_diag_ab_rate': "AcousticBrainz: Rate Limit (429)",
+        'maint_bpm_diag_ab_server': "AcousticBrainz: Serverfehler (5xx)",
+        'maint_bpm_diag_ab_http': "AcousticBrainz: sonstiger HTTP-Fehler",
+        'maint_bpm_diag_ab_other': "AcousticBrainz: sonstiger API-Fehler",
+        'maint_bpm_review_saved': "[green]✓ Vollständige BPM-Review-Liste gespeichert: {path}[/green]",
+        'maint_bpm_preview': "Gefundene BPM-Vorschläge",
+        'maint_bpm_source_file': "Datei-Tag",
+        'maint_bpm_source_ab': "AcousticBrainz ({agree}/{total})",
+        'maint_bpm_nochange': "[yellow]Keine fehlenden BPM konnten sicher ergänzt werden. Es wurde nichts geschrieben.[/yellow]",
+        'maint_bpm_confirm': "{count} BPM-Wert(e) in die Datenbank schreiben? [j/N]: ",
+        'maint_bpm_cancel': "[yellow]BPM-Übernahme abgebrochen. Die Datenbank wurde nicht verändert.[/yellow]",
+        'maint_bpm_done': "[bold green]✓ BPM ergänzt:[/bold green] {written} Wert(e) geschrieben, {skipped} inzwischen vorhandene BPM übersprungen.",
         'maint_dup_scan': "[cyan]Prüfe die Datenbank auf aktuelle Dopplungs-Kandidaten...[/cyan]",
         'maint_dup_summary_title': "Dopplungsprüfung",
         'maint_dup_groups': "Gefundene Gruppen",
@@ -283,13 +336,19 @@ T = {
         'fetch_new_tracks': "[green]-> Added {count} new track(s) from '{db}'.[/green]",
         'fetch_reset': "[yellow]-> {count} track(s) reset in mAirList – will be re-fetched![/yellow]",
         'fetch_first': "[cyan]First run: Reading directly from SQLite copy '{db}'.[/cyan]",
+        'fetch_bpm_rb_prompt': "rekordbox XML for BPM (optional; Enter = {default}, '-' = no XML): ",
+        'fetch_bpm_rb_none': "no XML",
+        'fetch_bpm_rb_missing': "[yellow]rekordbox XML not found: {path} – Fetch continues with file tags/API fallback.[/yellow]",
+        'fetch_bpm_rb_invalid': "[yellow]rekordbox XML could not be read ({details}) – Fetch continues with file tags/API fallback.[/yellow]",
+        'fetch_bpm_rb_loaded': "[green]✓ BPM source rekordbox XML:[/green] {entries} entries, {valid} with valid BPM.",
         'fetch_full': "[bold yellow]Full re-check requested (--full)[/bold yellow]",
         'fetch_start': "[bold green]Starting automatic fetch[/bold green]\nPending tracks: [bold yellow]{offen}[/bold yellow] of [bold]{total}[/bold] total",
         'fetch_done_already': "[bold green]✓ All tracks are already up to date![/bold green]",
         'fetch_progress': "[bold magenta]Fetching metadata...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Year: [bold cyan]{jahr}[/bold cyan], Confidence: [{c_color}]{conf}[/{c_color}])",
-        'fetch_track_error': "[bold yellow]⚠ ID {id}: API/network error. Track stays pending and will be retried later.[/bold yellow]",
-        'fetch_done_with_errors': "\n[bold yellow]⚠ Fetch finished, but {count} track(s) could not be completed because of API/network errors. They remain pending and will be retried on the next fetch.[/bold yellow]",
+        'fetch_track_retry': "[bold yellow]⚠ ID {id}: temporary API/network error – automatic retry {retry}/{max_retry} in {delay} s.[/bold yellow]",
+        'fetch_track_error': "[bold yellow]⚠ ID {id}: API/network error persisted after automatic retries. Track stays pending and will be retried on the next fetch.[/bold yellow]",
+        'fetch_done_with_errors': "\n[bold yellow]⚠ Fetch finished, but {count} track(s) still could not be completed after automatic retries because of API/network errors. They remain pending and will be retried on the next fetch.[/bold yellow]",
         'fetch_interrupt': "\n[bold yellow]Fetch interrupted. Progress safely saved.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch completed successfully![/bold green] Next step: [bold cyan]Option [4] or [5] in the main menu (Review)[/bold cyan]",
         'fetch_paused_review': "\n[bold cyan]Fetch paused after this batch.[/bold cyan] You can review the loaded tracks with option 4 or 5 now. Option 1 resumes the fetch later.",
@@ -310,6 +369,7 @@ T = {
         'rev_album': "  [cyan]Album[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
+        'rev_bpm_auto': "  [cyan]BPM[/cyan]     -> [bold green]{sugg}[/bold green] [dim](automatic from {source}; existing BPM is protected)[/dim]",
         'no_sugg': "- (No suggestion) -",
         'rev_interim': "[dim]  (Intermediate progress saved)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review interrupted. Previous decisions are saved.[/bold yellow]",
@@ -343,8 +403,54 @@ T = {
         'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Write DB metadata directly into physical audio files)",
         'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks (1-2) sequentially",
         'maint_opt5': "  [[green]5[/green]] Mark duplicate candidates / refresh status",
+        'maint_opt6': "  [[green]6[/green]] Fill missing BPM (rekordbox XML / file tags / MusicBrainz + AcousticBrainz)",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-5]: ",
+        'maint_prompt': "Choice [0-6]: ",
+        'maint_bpm_intro': "[cyan]Searching for missing BPM values...[/cyan]\n[dim]Existing BPM values are never overwritten. Priority: rekordbox XML by exact file path, then file tag, then MusicBrainz + AcousticBrainz as fallback.[/dim]",
+        'maint_bpm_rb_prompt': "rekordbox XML (optional, Enter = no XML): ",
+        'maint_bpm_rb_invalid': "[red]rekordbox XML was not found or is invalid.[/red]",
+        'maint_bpm_rb_loaded': "[green]✓ rekordbox XML loaded:[/green] {entries} entries, {valid} with valid BPM.",
+        'maint_bpm_rb': "Matches from rekordbox XML",
+        'maint_bpm_rb_unmatched': "Not filled from rekordbox (fallback)",
+        'maint_bpm_rb_conflicts': "Existing BPM with material rekordbox difference",
+        'maint_bpm_source_rb': "rekordbox XML",
+        'maint_bpm_path_intro': "[cyan]Optional local path mapping[/cyan]\nIf mAirList uses relative storage-location paths, add base folders here. Press Enter with no input to start.",
+        'maint_bpm_path_prompt': "Base folder (optional, Enter = continue): ",
+        'maint_bpm_path_added': "[green]✓ Folder added:[/green] {path}",
+        'maint_bpm_path_invalid': "[red]Folder does not exist or is invalid.[/red]",
+        'maint_bpm_summary_title': "BPM scan",
+        'maint_bpm_missing': "Tracks without BPM",
+        'maint_bpm_existing': "Already have BPM",
+        'maint_bpm_file': "Matches from file tags",
+        'maint_bpm_ab': "Matches from AcousticBrainz",
+        'maint_bpm_nomatch': "No safe BPM match",
+        'maint_bpm_errors': "API/read errors",
+        'maint_bpm_diag_title': "BPM diagnostics",
+        'maint_bpm_diag_kind': "Reason",
+        'maint_bpm_diag_file_unreachable': "Audio file unavailable (tag check skipped)",
+        'maint_bpm_diag_file_read': "Audio file/tags unreadable",
+        'maint_bpm_diag_mb_nomatch': "MusicBrainz: no unambiguous recording",
+        'maint_bpm_diag_mb_network': "MusicBrainz: network/timeout",
+        'maint_bpm_diag_mb_rate': "MusicBrainz: rate limit (429)",
+        'maint_bpm_diag_mb_server': "MusicBrainz: server error (5xx)",
+        'maint_bpm_diag_mb_http': "MusicBrainz: other HTTP error",
+        'maint_bpm_diag_mb_other': "MusicBrainz: other API error",
+        'maint_bpm_diag_ab_nodata': "AcousticBrainz: no dataset entry",
+        'maint_bpm_diag_ab_nobpm': "AcousticBrainz: dataset has no usable BPM",
+        'maint_bpm_diag_ab_ambiguous': "AcousticBrainz: no safe BPM consensus",
+        'maint_bpm_diag_ab_network': "AcousticBrainz: network/timeout",
+        'maint_bpm_diag_ab_rate': "AcousticBrainz: rate limit (429)",
+        'maint_bpm_diag_ab_server': "AcousticBrainz: server error (5xx)",
+        'maint_bpm_diag_ab_http': "AcousticBrainz: other HTTP error",
+        'maint_bpm_diag_ab_other': "AcousticBrainz: other API error",
+        'maint_bpm_review_saved': "[green]✓ Complete BPM review list saved: {path}[/green]",
+        'maint_bpm_preview': "BPM proposals found",
+        'maint_bpm_source_file': "File tag",
+        'maint_bpm_source_ab': "AcousticBrainz ({agree}/{total})",
+        'maint_bpm_nochange': "[yellow]No missing BPM values could be filled safely. Nothing was written.[/yellow]",
+        'maint_bpm_confirm': "Write {count} BPM value(s) to the database? [y/N]: ",
+        'maint_bpm_cancel': "[yellow]BPM write cancelled. The database was not changed.[/yellow]",
+        'maint_bpm_done': "[bold green]✓ BPM updated:[/bold green] {written} value(s) written, {skipped} BPM value(s) that appeared meanwhile were skipped.",
         'maint_dup_scan': "[cyan]Scanning the database for current duplicate candidates...[/cyan]",
         'maint_dup_summary_title': "Duplicate scan",
         'maint_dup_groups': "Candidate groups found",
@@ -421,13 +527,19 @@ T = {
         'fetch_new_tracks': "[green]-> {count} nieuwe track(s) uit '{db}' toegevoegd.[/green]",
         'fetch_reset': "[yellow]-> {count} track(s) gereset in mAirList – worden opnieuw opgehaald![/yellow]",
         'fetch_first': "[cyan]Eerste run: Lezen direct uit SQLite-kopie '{db}'.[/cyan]",
+        'fetch_bpm_rb_prompt': "rekordbox XML voor BPM (optioneel; Enter = {default}, '-' = zonder XML): ",
+        'fetch_bpm_rb_none': "zonder XML",
+        'fetch_bpm_rb_missing': "[yellow]rekordbox XML niet gevonden: {path} – Fetch gaat verder met bestandstags/API-fallback.[/yellow]",
+        'fetch_bpm_rb_invalid': "[yellow]rekordbox XML kon niet worden gelezen ({details}) – Fetch gaat verder met bestandstags/API-fallback.[/yellow]",
+        'fetch_bpm_rb_loaded': "[green]✓ BPM-bron rekordbox XML:[/green] {entries} items, {valid} met geldige BPM.",
         'fetch_full': "[bold yellow]Volledige hercontrole aangevraagd (--full)[/bold yellow]",
         'fetch_start': "[bold green]Start automatische fetch[/bold green]\nOpenstaande tracks: [bold yellow]{offen}[/bold yellow] van [bold]{total}[/bold] totaal",
         'fetch_done_already': "[bold green]✓ Alle tracks zijn al up-to-date![/bold green]",
         'fetch_progress': "[bold magenta]Metadata ophalen...",
         'fetch_track_info': "  [dim]ID {id}:[/dim] [bold]{art} - {tit}[/bold] (Jaar: [bold cyan]{jahr}[/bold cyan], Betrouwbaarheid: [{c_color}]{conf}[/{c_color}])",
-        'fetch_track_error': "[bold yellow]⚠ ID {id}: API-/netwerkfout. Track blijft open en wordt later opnieuw geprobeerd.[/bold yellow]",
-        'fetch_done_with_errors': "\n[bold yellow]⚠ Ophalen voltooid, maar {count} track(s) konden door API-/netwerkfouten niet worden afgerond. Ze blijven open en worden bij de volgende fetch opnieuw geprobeerd.[/bold yellow]",
+        'fetch_track_retry': "[bold yellow]⚠ ID {id}: tijdelijke API-/netwerkfout – automatische herpoging {retry}/{max_retry} over {delay} s.[/bold yellow]",
+        'fetch_track_error': "[bold yellow]⚠ ID {id}: API-/netwerkfout bleef bestaan na automatische herpogingen. Track blijft open en wordt bij de volgende fetch opnieuw geprobeerd.[/bold yellow]",
+        'fetch_done_with_errors': "\n[bold yellow]⚠ Ophalen voltooid, maar {count} track(s) konden ondanks automatische herpogingen door API-/netwerkfouten niet worden afgerond. Ze blijven open en worden bij de volgende fetch opnieuw geprobeerd.[/bold yellow]",
         'fetch_interrupt': "\n[bold yellow]Ophalen onderbroken. Voortgang veilig opgeslagen.[/bold yellow]",
         'fetch_success': "\n[bold green]✓ Fetch succesvol voltooid![/bold green] Volgende stap: [bold cyan]Optie [4] of [5] in het hoofdmenu (Review)[/bold cyan]",
         'fetch_paused_review': "\n[bold cyan]Ophalen na dit blok gepauzeerd.[/bold cyan] Je kunt de geladen tracks nu met optie 4 of 5 controleren. Optie 1 hervat het ophalen later.",
@@ -448,6 +560,7 @@ T = {
         'rev_album': "  [cyan]Album[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
         'rev_lang':  "  [cyan]Taal[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
+        'rev_bpm_auto': "  [cyan]BPM[/cyan]     -> [bold green]{sugg}[/bold green] [dim](automatisch uit {source}; bestaande BPM wordt beschermd)[/dim]",
         'no_sugg': "- (Geen suggestie) -",
         'rev_interim': "[dim]  (Tussenstand opgeslagen)[/dim]",
         'rev_interrupt': "\n\n[bold yellow]Review onderbroken. Eerdere beslissingen zijn opgeslagen.[/bold yellow]",
@@ -481,8 +594,54 @@ T = {
         'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadata uit DB direct naar audiobestanden schrijven)",
         'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken (1-2) achter elkaar uitvoeren",
         'maint_opt5': "  [[green]5[/green]] Dubbele kandidaten markeren / status bijwerken",
+        'maint_opt6': "  [[green]6[/green]] Ontbrekende BPM aanvullen (rekordbox XML / bestandstags / MusicBrainz + AcousticBrainz)",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-5]: ",
+        'maint_prompt': "Keuze [0-6]: ",
+        'maint_bpm_intro': "[cyan]Zoeken naar ontbrekende BPM-waarden...[/cyan]\n[dim]Bestaande BPM-waarden worden nooit overschreven. Prioriteit: rekordbox XML via exact bestandspad, daarna bestandstag, daarna MusicBrainz + AcousticBrainz als fallback.[/dim]",
+        'maint_bpm_rb_prompt': "rekordbox XML (optioneel, Enter = zonder XML): ",
+        'maint_bpm_rb_invalid': "[red]rekordbox XML is niet gevonden of ongeldig.[/red]",
+        'maint_bpm_rb_loaded': "[green]✓ rekordbox XML geladen:[/green] {entries} items, {valid} met geldige BPM.",
+        'maint_bpm_rb': "Treffers uit rekordbox XML",
+        'maint_bpm_rb_unmatched': "Niet uit rekordbox overgenomen (fallback)",
+        'maint_bpm_rb_conflicts': "Bestaande BPM met duidelijke rekordbox-afwijking",
+        'maint_bpm_source_rb': "rekordbox XML",
+        'maint_bpm_path_intro': "[cyan]Optionele lokale padtoewijzing[/cyan]\nAls mAirList relatieve opslaglocatiepaden gebruikt, kun je hier basismappen toevoegen. Druk Enter zonder invoer om te starten.",
+        'maint_bpm_path_prompt': "Basismap (optioneel, Enter = verder): ",
+        'maint_bpm_path_added': "[green]✓ Map toegevoegd:[/green] {path}",
+        'maint_bpm_path_invalid': "[red]Map bestaat niet of is ongeldig.[/red]",
+        'maint_bpm_summary_title': "BPM-controle",
+        'maint_bpm_missing': "Tracks zonder BPM",
+        'maint_bpm_existing': "Hebben al BPM",
+        'maint_bpm_file': "Treffers uit bestandstag",
+        'maint_bpm_ab': "Treffers uit AcousticBrainz",
+        'maint_bpm_nomatch': "Geen veilige BPM-treffer",
+        'maint_bpm_errors': "API-/leesfouten",
+        'maint_bpm_diag_title': "BPM-diagnose",
+        'maint_bpm_diag_kind': "Reden",
+        'maint_bpm_diag_file_unreachable': "Audiobestand niet bereikbaar (tagcontrole overgeslagen)",
+        'maint_bpm_diag_file_read': "Audiobestand/tags niet leesbaar",
+        'maint_bpm_diag_mb_nomatch': "MusicBrainz: geen eenduidige opname",
+        'maint_bpm_diag_mb_network': "MusicBrainz: netwerk/time-out",
+        'maint_bpm_diag_mb_rate': "MusicBrainz: rate limit (429)",
+        'maint_bpm_diag_mb_server': "MusicBrainz: serverfout (5xx)",
+        'maint_bpm_diag_mb_http': "MusicBrainz: andere HTTP-fout",
+        'maint_bpm_diag_mb_other': "MusicBrainz: andere API-fout",
+        'maint_bpm_diag_ab_nodata': "AcousticBrainz: geen datasetrecord",
+        'maint_bpm_diag_ab_nobpm': "AcousticBrainz: dataset zonder bruikbare BPM",
+        'maint_bpm_diag_ab_ambiguous': "AcousticBrainz: geen veilige BPM-consensus",
+        'maint_bpm_diag_ab_network': "AcousticBrainz: netwerk/time-out",
+        'maint_bpm_diag_ab_rate': "AcousticBrainz: rate limit (429)",
+        'maint_bpm_diag_ab_server': "AcousticBrainz: serverfout (5xx)",
+        'maint_bpm_diag_ab_http': "AcousticBrainz: andere HTTP-fout",
+        'maint_bpm_diag_ab_other': "AcousticBrainz: andere API-fout",
+        'maint_bpm_review_saved': "[green]✓ Volledige BPM-reviewlijst opgeslagen: {path}[/green]",
+        'maint_bpm_preview': "Gevonden BPM-voorstellen",
+        'maint_bpm_source_file': "Bestandstag",
+        'maint_bpm_source_ab': "AcousticBrainz ({agree}/{total})",
+        'maint_bpm_nochange': "[yellow]Er konden geen ontbrekende BPM-waarden veilig worden aangevuld. Er is niets geschreven.[/yellow]",
+        'maint_bpm_confirm': "{count} BPM-waarde(n) naar de database schrijven? [j/N]: ",
+        'maint_bpm_cancel': "[yellow]BPM-overname geannuleerd. De database is niet gewijzigd.[/yellow]",
+        'maint_bpm_done': "[bold green]✓ BPM aangevuld:[/bold green] {written} waarde(n) geschreven, {skipped} inmiddels aanwezige BPM-waarde(n) overgeslagen.",
         'maint_dup_scan': "[cyan]Database controleren op actuele dubbele kandidaten...[/cyan]",
         'maint_dup_summary_title': "Controle op dubbelen",
         'maint_dup_groups': "Gevonden kandidaatgroepen",
@@ -680,6 +839,43 @@ def get_saved_ignored_folders(db_path):
     except Exception:
         return []
 
+
+
+def get_saved_rekordbox_xml(db_path):
+    """Return the per-database rekordbox XML path stored in config.json."""
+    db_abs = os.path.abspath(db_path)
+    if not os.path.exists(CONFIG_FILE):
+        return ''
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        value = config.get('DB_REKORDBOX_XML', {}).get(db_abs, '')
+        return str(value or '').strip()
+    except Exception:
+        return ''
+
+
+def save_rekordbox_xml(db_path, xml_path):
+    """Persist the preferred rekordbox XML path for one database."""
+    db_abs = os.path.abspath(db_path)
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception:
+            config = {}
+    mapping = config.get('DB_REKORDBOX_XML', {})
+    if not isinstance(mapping, dict):
+        mapping = {}
+    clean = str(xml_path or '').strip()
+    if clean:
+        mapping[db_abs] = clean
+    else:
+        mapping.pop(db_abs, None)
+    config['DB_REKORDBOX_XML'] = mapping
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4)
 
 def setup_ignored_folders(db_path):
     db_abs = os.path.abspath(db_path)

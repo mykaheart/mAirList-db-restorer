@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.63.00 BETA
+# mAirList DB Restorer v0.64.00 BETA
 **Das intelligente Metadaten-Reparatur-Tool für lokale mAirList Datenbanken**
 
 *(Note: English and Dutch documentation / manuals are available in the repository!)*
@@ -27,9 +27,10 @@ Dieses Skript sucht nicht einfach blind drauflos, sondern arbeitet mit mehreren 
 *   **OAD-Schutz (Ignore-Lists):** Virtuelle und physische Ordner, die z. B. "OAD" (On Air Design) oder "Jingles" heißen, können konsequent von der Suche ausgeschlossen werden.
 *   **Ergonomischer Review-Prozess:** Alle API-Vorschläge können vor dem Speichern in die Datenbank in einem schnellen Terminal-Workflow geprüft, angepasst oder mit einem Tastendruck (Rückgriff auf den Original-Wert) abgelehnt werden.
 *   **Massenbearbeitung (Wartungs-Modus):** Ein separates Menü erlaubt die nachträgliche Standardisierung von Genres, das Korrigieren von Groß-/Kleinschreibung und Apostrophen sowie das Schreiben geprüfter Metadaten in lokale FLAC-, MP3- und AIFF-Dateien.
-*   **Hardening & Wiederaufnahme:** API-Fehler werden automatisch erneut versucht und bleiben bei endgültigem Fehlschlag als offen markiert. Sitzungs-CSVs werden atomar gespeichert und pro Datenbankpfad getrennt, damit Arbeitsstände weder beschädigt noch zwischen gleichnamigen Datenbanken vermischt werden.
+*   **Hardening & Wiederaufnahme:** Einzelne API-Requests werden automatisch wiederholt; bei transienten Netzwerk-/429-/5xx-Fehlern startet zusätzlich der komplette Track bis zu dreimal mit 2/5/10-s-Backoff neu. Erst danach bleibt er als offen markiert. Sitzungs-CSVs werden atomar gespeichert und pro Datenbankpfad getrennt, damit Arbeitsstände weder beschädigt noch zwischen gleichnamigen Datenbanken vermischt werden.
 *   **Sicheres Speichern:** Vor dem finalen Schreiben zeigt der Restorer eine Änderungsübersicht, prüft die SQLite-Integrität, erstellt ein Backup und prüft die Datenbank nach dem Schreiben erneut.
 *   **Dopplungsprüfung:** Die Wartung kann aktuelle Dopplungs-Kandidaten anhand identischer Artist/Titel-Kombinationen, Dateipfade oder gültiger ISRCs mit `DOPPELUNG=JA` markieren. Beim nächsten Lauf werden erledigte Markierungen automatisch wieder entfernt; Elemente werden niemals automatisch gelöscht.
+*   **BPM-Restauration im normalen Fetch + als Wartung:** Seit 0.64 läuft die BPM-Kette auch im normalen Fetch. Primäre Quelle ist ein optionaler, pro Datenbank gemerkter rekordbox-XML-Export: `AverageBpm` wird ausschließlich über den exakt passenden Dateipfad zugeordnet. Danach folgen Audio-Datei-Tags und als letzter Fallback MusicBrainz + AcousticBrainz. Bestehende gültige BPM werden auch beim Full Fetch niemals überschrieben. Wartungsoption [6] bleibt als schneller BPM-only-Nachpflegeweg mit Review-CSV, Ursachen-Diagnose und Half-/Double-Time-Konfliktanzeige erhalten.
 
 ---
 

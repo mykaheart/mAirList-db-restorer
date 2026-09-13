@@ -9,4 +9,6 @@ python -m unittest discover -s tests -v
 ```
 
 They cover the safety-critical behavior around cache separation, atomic CSV writes,
-SQLite integrity checks, Full-Fetch apply protection, API retries/error states, year filtering, and duplicate-flag lifecycle cleanup.
+SQLite integrity checks, Full-Fetch apply protection, API request retries, track-level retries/error states, year filtering, and duplicate-flag lifecycle cleanup.
+
+The suite also covers BPM in normal Fetch and in maintenance mode, rekordbox XML parsing and exact-path priority, protection of existing BPM even during Full Fetch, Review handling after manual identity changes, protected half/double-time conflict review, conservative AcousticBrainz consensus, overwrite protection, complete review-CSV output, diagnostic error classification, and AcousticBrainz rate-limit handling. Current suite: 33 tests.

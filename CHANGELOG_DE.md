@@ -2,6 +2,35 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.64.00 Beta] - 2026-09-13
+### Hinzugefügt
+- **BPM jetzt auch im normalen Fetch:** Fehlende `BPM`-Werte werden im regulären Fetch als `BPM_Vorschlag` ermittelt und im Review automatisch übernommen. Vorhandene gültige BPM bleiben auch beim Full Fetch geschützt.
+- **rekordbox XML als primäre BPM-Quelle:** `AverageBpm` wird ausschließlich über den exakt passenden Dateipfad aus `Location` zugeordnet; Artist/Titel-Fuzzy-Matching findet dabei nicht statt.
+- **rekordbox-Pfad pro Datenbank gespeichert:** Der im normalen Fetch gewählte XML-Pfad wird in `Data/config.json` je `.mldb` gemerkt. `Enter` übernimmt den Standard, `-` deaktiviert und entfernt ihn; `rekordbox.xml` neben der Anwendung bzw. in `Data` wird bei fehlendem gespeicherten Pfad automatisch erkannt.
+- **Mehrstufige BPM-Kette:** rekordbox XML → Audio-Datei-Tag → konservatives MusicBrainz-Recording-Matching → AcousticBrainz Low-Level BPM.
+- **BPM-Restauration als Wartungsoption [6] bleibt erhalten:** Reine BPM-Nachpflege kann weiterhin direkt, ohne vollständigen Metadaten-Fetch, ausgeführt werden.
+- **MusicBrainz-Matching mit Sicherheitsfiltern:** ISRC wird bevorzugt; ohne sicheren ISRC-Treffer müssen Artist, Titel, MusicBrainz-Score und Laufzeit eng zusammenpassen. Mehrdeutige Recording-Kandidaten werden verworfen.
+- **AcousticBrainz-Konsens:** Bei mehreren Analysen werden nur eng übereinstimmende BPM-Werte akzeptiert. Half-/Double-Time-Konflikte bleiben bewusst leer.
+- **Vollständige BPM-Review-CSV in Wartung [6]:** Jeder Lauf speichert BPM-Vorschläge plus geschützte deutliche rekordbox-Abweichungen im `Data`-Ordner; enthalten sind vorhandener BPM, ursprünglicher Quellen-BPM, Status, Quelle, Konsens, Recording-MBID und Matching-Methode.
+- **Detaillierte BPM-Diagnose:** Nichttreffer und Fehler werden getrennt nach Ursache ausgewiesen, u. a. nicht erreichbare Audiodatei, kein eindeutiges MusicBrainz-Recording, AcousticBrainz ohne Datensatz/Konsens, Netzwerk, HTTP 429 und Serverfehler.
+- **CLI-Erweiterung:** `fetch` akzeptiert jetzt optional `--rekordbox-xml <pfad>`.
+
+### Sicherheit
+- **Kein BPM-Überschreiben:** Bestehende gültige `BPM`-Attribute werden weder im normalen Fetch noch in Wartung [6] automatisch ersetzt.
+- **Identitätsänderung im Review:** Wird Artist/Titel/Jahr/Album manuell korrigiert, wird ein zuvor über AcousticBrainz ermittelter BPM-Vorschlag verworfen, damit keine alte Recording-Zuordnung mitgeschrieben wird. rekordbox- und Datei-Tag-BPM bleiben an die Datei gebunden.
+- **Keine Audioanalyse im BPM-Modul:** BPM wird nur aus vorhandenen rekordbox-Daten, Datei-Tags oder externen Metadaten gelesen. Audiodateien werden dadurch nicht analysiert oder verändert.
+- **Bewährte Datenbank-Airbags:** Apply, Dopplungsstatus und BPM-Wartung nutzen Integritätsprüfungen; sicherheitskritische Wartung erzeugt Backups und prüft danach erneut. `RESTAURIERT` bleibt bei Wartung [6] unangetastet.
+- **Rate-Limit-Härtung:** AcousticBrainz nutzt mindestens 1,05 s Request-Abstand und beachtet dynamische `X-RateLimit-Remaining`-/`X-RateLimit-Reset-In`-Header.
+- **Track-Level-Retry im normalen Fetch:** Bleibt ein kompletter Track nach den internen Request-Retries wegen Netzwerk/Timeout, HTTP 429 oder retrybarem 5xx fehlerhaft, wird der gesamte Track automatisch bis zu dreimal neu gestartet (2/5/10 s). `Retry-After` und Rate-Limit-Reset-Hinweise können die Pause verlängern; nicht-transiente 4xx-Fehler werden nicht wiederholt.
+- **Regressionstests erweitert:** 33 Tests decken jetzt zusätzlich normalen Fetch → rekordbox-BPM, Schutz vorhandener BPM beim Full Fetch, BPM-Schreiben über Apply, das Verwerfen identitätsabhängiger AcousticBrainz-Vorschläge sowie Track-Level-Retry und `Retry-After` ab.
+
+### Dokumentation
+- **Manuals DE/EN/NL vollständig neu strukturiert:** Sicherheitsmodell, `Data`-Workspace, Resume/Reset, `RESTAURIERT`/`FORCE_APPLY`, alle Fetch-Felder, Review, Apply, Wartung, Datei-Tagger, Dopplungen, BPM, rekordbox-Workflow, Diagnose und CLI sind jetzt als zusammenhängendes Referenzhandbuch beschrieben.
+- **README DE/EN/NL aktualisiert:** BPM im normalen Fetch, Wartungs-Fallback und aktuelle Lizenzdatei `LICENSE` dokumentiert.
+
+### Geändert
+- **Version:** Anwendung und Windows-Versionsressource bleiben bei `0.64.00 BETA` / `0.64.0.0 Beta`; die neuen Funktionen sind Bestandteil dieses 0.64-Release-Stands.
+
 ## [0.63.00 Beta] - 2026-09-10
 ### Hinzugefügt
 - **Dopplungsprüfung neu konzipiert:** Wartungsoption `[5]` erkennt aktuelle Dopplungs-Kandidaten anhand identischer normalisierter Artist/Titel-Kombinationen, identischer gespeicherter Dateipfade oder gleicher gültiger ISRCs und markiert die betroffenen Musik-Elemente mit `DOPPELUNG=JA`.

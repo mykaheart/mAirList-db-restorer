@@ -2,6 +2,35 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.64.00 Beta] - 2026-09-13
+### Toegevoegd
+- **BPM maakt nu deel uit van de normale Fetch:** Ontbrekende `BPM`-waarden worden tijdens de gewone Fetch als `BPM_Vorschlag` gevonden en in Review automatisch overgenomen. Bestaande geldige BPM blijft ook bij Full Fetch beschermd.
+- **rekordbox XML als primaire BPM-bron:** `AverageBpm` wordt uitsluitend via het exacte bestandspad uit `Location` gekoppeld; er wordt geen fuzzy matching op Artiest/Titel gebruikt.
+- **rekordbox-pad per database onthouden:** Het in de normale Fetch gekozen XML-pad wordt per `.mldb` in `Data/config.json` opgeslagen. `Enter` gebruikt de standaard, `-` schakelt uit en verwijdert het pad; `rekordbox.xml` naast de toepassing of in `Data` wordt automatisch gevonden wanneer nog geen pad is opgeslagen.
+- **Meerstaps BPM-keten:** rekordbox XML → audiobestandstag → conservatieve MusicBrainz Recording-match → AcousticBrainz Low-Level BPM.
+- **BPM-onderhoudsoptie [6] blijft bestaan:** BPM-only-nazorg blijft mogelijk zonder volledige metadata-Fetch.
+- **Conservatieve MusicBrainz-matching:** ISRC heeft voorrang; zonder veilige ISRC-match moeten Artiest, Titel, MusicBrainz-score en speelduur nauw overeenkomen. Dubbelzinnige recordings worden verworpen.
+- **AcousticBrainz-consensus:** Meerdere analyses worden alleen geaccepteerd wanneer ze nauw overeenkomen. Half/double-time-conflicten blijven bewust leeg.
+- **Volledige BPM-review-CSV in onderhoud [6]:** Elke run bewaart voorstellen plus beschermde duidelijke rekordbox-afwijkingen in `Data`, inclusief bestaande BPM, oorspronkelijke bron-BPM, status, bron, consensus, recording-MBID en matchmethode.
+- **Gedetailleerde BPM-diagnose:** Niet-treffers en fouten worden per oorzaak opgesplitst, waaronder onbereikbare audiobestanden, geen eenduidige MusicBrainz-recording, AcousticBrainz zonder data/consensus, netwerkfouten, HTTP 429 en serverfouten.
+- **CLI-uitbreiding:** `fetch` accepteert nu optioneel `--rekordbox-xml <pad>`.
+
+### Veiligheid
+- **Geen BPM-overschrijving:** Bestaande geldige `BPM`-attributen worden niet automatisch vervangen in de normale Fetch of onderhoud [6].
+- **Identiteitswijziging tijdens Review:** Als Artiest/Titel/Jaar/Album handmatig wordt gecorrigeerd, wordt een eerder via AcousticBrainz gevonden BPM-voorstel verwijderd zodat geen verouderde Recording-match wordt geschreven. rekordbox- en bestandstag-BPM blijven aan het bestand gekoppeld.
+- **Geen audioanalyse in het BPM-modul:** BPM wordt alleen uit bestaande rekordbox-data, bestandstags of externe metadata gelezen; audiobestanden worden voor BPM niet geanalyseerd of gewijzigd.
+- **Bestaande databasebeveiliging:** Apply, dubbele status en BPM-onderhoud gebruiken integriteitscontroles; veiligheidskritisch onderhoud maakt back-ups en controleert daarna opnieuw. `RESTAURIERT` blijft bij BPM-onderhoud ongewijzigd.
+- **Rate-limit-versterking:** AcousticBrainz gebruikt minimaal 1,05 seconde tussen requests en houdt rekening met dynamische `X-RateLimit-Remaining`-/`X-RateLimit-Reset-In`-headers.
+- **Track-level retry in normale Fetch:** Als een volledige track na de interne request-retries nog mislukt door netwerk/time-out, HTTP 429 of een retrybare 5xx-fout, wordt de volledige trackopzoeking automatisch maximaal drie keer opnieuw gestart (2/5/10 s). `Retry-After` en rate-limit-resetinformatie kunnen de wachttijd verlengen; niet-tijdelijke 4xx-fouten worden niet herhaald.
+- **Regressietests uitgebreid:** 33 tests controleren nu ook normale Fetch → rekordbox BPM, bescherming van bestaande BPM bij Full Fetch, BPM-schrijven via Apply, het verwijderen van identiteitsafhankelijke AcousticBrainz-voorstellen, track-level retry en `Retry-After`.
+
+### Documentatie
+- **Handleidingen DE/EN/NL volledig opnieuw gestructureerd:** Veiligheidsmodel, `Data`-werkmap, hervatten/reset, `RESTAURIERT`/`FORCE_APPLY`, alle Fetch-velden, Review, Apply, onderhoud, bestandstagger, dubbelen, BPM, rekordbox-workflow, diagnose en CLI zijn nu als één samenhangend referentiehandboek beschreven.
+- **README DE/EN/NL bijgewerkt:** BPM in normale Fetch, onderhoudsfallback en de actuele licentiebestandsnaam `LICENSE` zijn gedocumenteerd.
+
+### Gewijzigd
+- **Versie:** Applicatie en Windows-versieresource blijven `0.64.00 BETA` / `0.64.0.0 Beta`; deze aanvullingen horen bij de definitieve 0.64-releasebasis.
+
 ## [0.63.00 Beta] - 2026-09-10
 ### Toegevoegd
 - **Controle op dubbelen opnieuw ontworpen:** Onderhoudsoptie `[5]` zoekt actuele dubbele kandidaten op basis van gelijke genormaliseerde Artiest/Titel-combinaties, opgeslagen bestandspaden of geldige ISRCs en markeert de betrokken muziekitems met `DOPPELUNG=JA`.

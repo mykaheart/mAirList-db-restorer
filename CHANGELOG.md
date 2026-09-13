@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.64.00 Beta] - 2026-09-13
+### Added
+- **BPM is now part of normal Fetch:** Missing `BPM` values are created as `BPM_Vorschlag` during regular Fetch and automatically accepted in Review. Existing valid BPM remains protected even during Full Fetch.
+- **rekordbox XML as primary BPM source:** `AverageBpm` is matched only by the exact file path from `Location`; no Artist/Title fuzzy matching is used.
+- **Per-database rekordbox path memory:** The XML path selected for normal Fetch is stored per `.mldb` in `Data/config.json`. `Enter` accepts the default, `-` disables and clears it, and `rekordbox.xml` next to the application or in `Data` is auto-detected when no saved path exists.
+- **Multi-stage BPM chain:** rekordbox XML → audio-file tag → conservative MusicBrainz Recording match → AcousticBrainz Low-Level BPM.
+- **BPM maintenance option [6] retained:** BPM-only follow-up remains available without running a full metadata Fetch.
+- **Conservative MusicBrainz matching:** ISRC is preferred; without a safe ISRC match, Artist, Title, MusicBrainz score and duration must agree closely. Ambiguous recordings are rejected.
+- **AcousticBrainz consensus:** Multiple submissions are accepted only when they agree closely. Half/double-time conflicts deliberately remain empty.
+- **Complete BPM review CSV in maintenance [6]:** Each run saves proposals plus protected material rekordbox discrepancies in `Data`, including existing BPM, original source BPM, status, source, consensus, recording MBID and match method.
+- **Detailed BPM diagnostics:** Non-matches and failures are split by cause, including unavailable audio files, no unique MusicBrainz recording, AcousticBrainz no-data/no-consensus, network failures, HTTP 429 and server errors.
+- **CLI extension:** `fetch` now accepts optional `--rekordbox-xml <path>`.
+
+### Safety
+- **No BPM overwrite:** Existing valid `BPM` attributes are not automatically replaced in either normal Fetch or maintenance [6].
+- **Identity changes during Review:** If Artist/Title/Year/Album is manually corrected, a BPM proposal previously obtained from AcousticBrainz is discarded so a stale Recording match cannot be written. rekordbox and file-tag BPM remain tied to the file.
+- **No audio analysis in the BPM module:** BPM is read only from existing rekordbox data, file tags or external metadata; audio files are not analysed or modified by BPM lookup.
+- **Existing database safety nets:** Apply, duplicate state and BPM maintenance use integrity checks; safety-critical maintenance creates backups and re-checks afterwards. `RESTAURIERT` remains untouched by BPM maintenance.
+- **Rate-limit hardening:** AcousticBrainz uses at least a 1.05-second request interval and honours dynamic `X-RateLimit-Remaining` / `X-RateLimit-Reset-In` headers.
+- **Track-level retry in normal Fetch:** If a complete track still fails after the internal request retries because of network/timeout, HTTP 429 or a retryable 5xx response, the entire track lookup is restarted automatically up to three times (2/5/10 s). `Retry-After` and rate-limit reset hints may extend the delay; non-transient 4xx errors are not retried.
+- **Regression suite expanded:** 33 tests now also cover normal Fetch → rekordbox BPM, Full-Fetch protection of existing BPM, BPM writing through Apply, discarding identity-dependent AcousticBrainz proposals, track-level retry and `Retry-After` propagation.
+
+### Documentation
+- **DE/EN/NL manuals fully restructured:** The safety model, `Data` workspace, resume/reset behaviour, `RESTAURIERT`/`FORCE_APPLY`, all Fetch fields, Review, Apply, maintenance, file tagger, duplicates, BPM, rekordbox workflow, diagnostics and CLI are now documented as a coherent reference manual.
+- **DE/EN/NL README updated:** Normal-Fetch BPM, maintenance fallback and the current `LICENSE` filename are documented.
+
+### Changed
+- **Version:** Application and Windows version resource remain `0.64.00 BETA` / `0.64.0.0 Beta`; these additions are part of the final 0.64 release state.
+
 ## [0.63.00 Beta] - 2026-09-10
 ### Added
 - **Redesigned duplicate scan:** Maintenance option `[5]` finds current duplicate candidates by matching normalized Artist/Title pairs, stored file paths, or valid ISRCs and marks affected music items with `DOPPELUNG=JA`.
