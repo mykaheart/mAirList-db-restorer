@@ -742,7 +742,7 @@ class BPMFetchIntegrationTests(unittest.TestCase):
                 'Typ': '', 'BPM': '', 'RESTAURIERT': '', 'DOPPELUNG': ''
             }])
             utils.save_safe_csv(frame, fetch_csv)
-            with patch.object(main.console, 'input', side_effect=['Correct Artist', '', '', '']), \
+            with patch.object(main.console, 'input', side_effect=['Correct Artist', '', '', '', '']), \
                  patch.object(main.api, 'fetch_musicbrainz_details', return_value=('', 'niedrig', '', '', '')), \
                  patch.object(main.api, 'fetch_discogs_details', return_value=self._discogs_empty()):
                 main.phase_review(fetch_csv, final_csv, auto_hoch=False)
@@ -761,3 +761,150 @@ class LogicRegressionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Version065GenreAndFileBackupTests(unittest.TestCase):
+    def test_custom_genre_memory_keeps_rock_pop_shortcuts_and_persists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = os.path.join(tmp, 'config.json')
+            old_config = utils.CONFIG_FILE
+            old_custom = list(utils.CUSTOM_GENRES)
+            try:
+                utils.CONFIG_FILE = config_path
+                utils.CUSTOM_GENRES = []
+                utils.add_custom_genre('Funk')
+                utils.add_custom_genre('rock')  # fixed quick choice; must not duplicate
+                mapping = utils.get_genre_quick_map()
+                self.assertEqual(mapping['1'], 'Rock')
+                self.assertEqual(mapping['2'], 'Pop')
+                self.assertIn('Funk', mapping.values())
+                with open(config_path, 'r', encoding='utf-8') as handle:
+                    import json
+                    config = json.load(handle)
+                self.assertEqual(config['CUSTOM_GENRES'], ['Funk'])
+            finally:
+                utils.CONFIG_FILE = old_config
+                utils.CUSTOM_GENRES = old_custom
+
+    def test_mairlist_xml_matches_observed_mmd_shape_and_filters_internal_attributes(self):
+        item = {
+            'title': 'Drop Allgemein 1', 'artist': 'Rainbow Radio', 'type': 'Drop',
+            'duration': 11.821, 'amplification': 2.51524408001096,
+            'level_peak': -3.948, 'level_truepeak': -3.926, 'level_loudness': -20.515,
+        }
+        attributes = [
+            ('Jahr', '2026'), ('Genre', 'Drop'), ('Sprache', 'Deutsch'),
+            ('RESTAURIERT', 'JA'), ('DOPPELUNG', 'JA'), ('LYRICS', 'do not copy'),
+        ]
+        markers = [
+            ('CueIn', 0.068), ('Ramp1', 3.648), ('StartNext', 11.338),
+            ('FadeOut', 11.437), ('CueOut', 11.468),
+        ]
+        xml = db._build_mairlist_xml(item, attributes, markers, declaration=True)
+        self.assertTrue(xml.startswith('<?xml version="1.0" encoding="UTF-8"?>'))
+        self.assertIn('<Amplification>2,51524408001096</Amplification>', xml)
+        self.assertIn('<Duration>11.821</Duration>', xml)
+        self.assertIn('<Marker Type="CueIn" Position="0.068"/>', xml)
+        self.assertIn('<Marker Type="CueOut" Position="11.468"/>', xml)
+        self.assertIn('<Peak>-3.948</Peak>', xml)
+        self.assertIn('<TruePeak>-3.926</TruePeak>', xml)
+        self.assertIn('<Loudness>-20.515</Loudness>', xml)
+        self.assertIn('<Name>Genre</Name><Value>Drop</Value>', xml)
+        self.assertIn('<Name>Sprache</Name><Value>Deutsch</Value>', xml)
+        self.assertNotIn('RESTAURIERT', xml)
+        self.assertNotIn('DOPPELUNG', xml)
+        self.assertNotIn('LYRICS', xml)
+
+    @staticmethod
+    def _create_tagger_db(path, filename):
+        conn = sqlite3.connect(path)
+        cur = conn.cursor()
+        cur.execute('CREATE TABLE config (name TEXT PRIMARY KEY, value TEXT)')
+        cur.execute("INSERT INTO config(name, value) VALUES ('schemaversion', '25')")
+        cur.execute('''CREATE TABLE items (
+            idx INTEGER PRIMARY KEY, title TEXT, artist TEXT, type TEXT, filename TEXT,
+            duration REAL, amplification REAL, level_peak REAL, level_truepeak REAL,
+            level_loudness REAL
+        )''')
+        cur.execute('''CREATE TABLE item_attributes (
+            item INTEGER, name TEXT, value TEXT, PRIMARY KEY(item, name)
+        )''')
+        cur.execute('''CREATE TABLE item_cuemarkers (
+            item INTEGER, type TEXT, value REAL, PRIMARY KEY(item, type)
+        )''')
+        cur.execute(
+            'INSERT INTO items VALUES (1,?,?,?,?,?,?,?,?,?)',
+            ('Test Title', 'Test Artist', 'Music', filename, 123.456, 1.25, -4.1, -3.9, -14.2)
+        )
+        cur.executemany('INSERT INTO item_attributes VALUES (?,?,?)', [
+            (1, 'Jahr', '2004'), (1, 'Genre', 'Rock'), (1, 'Album', 'Album'),
+            (1, 'Label', 'Label'), (1, 'Sprache', 'Deutsch'), (1, 'BPM', '128'),
+            (1, 'ISRC', 'DEABC0400001'), (1, 'RESTAURIERT', 'JA'),
+        ])
+        cur.executemany('INSERT INTO item_cuemarkers VALUES (?,?,?)', [
+            (1, 'CueIn', 0.125), (1, 'Ramp1', 12.5), (1, 'StartNext', 120.1),
+            (1, 'FadeOut', 121.2), (1, 'CueOut', 122.9),
+        ])
+        conn.commit()
+        conn.close()
+
+    def test_full_tagger_writes_flac_portable_tags_and_mmd_sidecar(self):
+        class FLAC(dict):
+            def save(self):
+                self.saved = True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            media = os.path.join(tmp, 'song.flac')
+            Path(media).write_bytes(b'placeholder')
+            db_path = os.path.join(tmp, 'test.mldb')
+            self._create_tagger_db(db_path, media)
+            fake_audio = FLAC()
+            fake_audio.saved = False
+            with patch('mutagen.File', return_value=fake_audio):
+                count = db.run_maintenance_file_tagger(db_path, metadata_mode=2, base_dirs=[])
+            self.assertEqual(count, 1)
+            self.assertEqual(fake_audio['artist'], ['Test Artist'])
+            self.assertEqual(fake_audio['genre'], ['Rock'])
+            self.assertEqual(fake_audio['language'], ['Deutsch'])
+            self.assertEqual(fake_audio['bpm'], ['128'])
+            self.assertEqual(fake_audio['isrc'], ['DEABC0400001'])
+            self.assertTrue(fake_audio.saved)
+            sidecar = media + '.mmd'
+            self.assertTrue(os.path.exists(sidecar))
+            text = Path(sidecar).read_text(encoding='utf-8')
+            self.assertIn('<Duration>123.456</Duration>', text)
+            self.assertIn('<Marker Type="Ramp1" Position="12.500"/>', text)
+            self.assertIn('<Loudness>-14.200</Loudness>', text)
+            self.assertNotIn('RESTAURIERT', text)
+
+    def test_full_tagger_embeds_only_mairlist_txxx_and_preserves_other_id3(self):
+        from mutagen.id3 import ID3, TXXX
+
+        class MP3:
+            def __init__(self):
+                self.tags = ID3()
+                self.tags.add(TXXX(encoding=3, desc='KeepMe', text=['foreign']))
+                self.saved = False
+            def save(self):
+                self.saved = True
+            def add_tags(self):
+                if self.tags is None:
+                    self.tags = ID3()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            media = os.path.join(tmp, 'song.mp3')
+            Path(media).write_bytes(b'placeholder')
+            db_path = os.path.join(tmp, 'test.mldb')
+            self._create_tagger_db(db_path, media)
+            fake_audio = MP3()
+            with patch('mutagen.File', return_value=fake_audio):
+                count = db.run_maintenance_file_tagger(db_path, metadata_mode='full', base_dirs=[])
+            self.assertEqual(count, 1)
+            self.assertTrue(fake_audio.saved)
+            self.assertEqual(fake_audio.tags['TXXX:KeepMe'].text, ['foreign'])
+            m = fake_audio.tags['TXXX:mAirList']
+            self.assertIn('<Marker Type="CueIn" Position="0.125"/>', m.text[0])
+            self.assertIn('<Amplification>1,25</Amplification>', m.text[0])
+            self.assertEqual(str(fake_audio.tags['TLAN'].text[0]), 'Deutsch')
+            self.assertEqual(str(fake_audio.tags['TBPM'].text[0]), '128')
+            self.assertEqual(str(fake_audio.tags['TSRC'].text[0]), 'DEABC0400001')

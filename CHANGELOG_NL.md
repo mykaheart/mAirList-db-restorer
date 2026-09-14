@@ -2,6 +2,25 @@
 
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
+## [0.65.00 Beta] - 2026-09-14
+### Toegevoegd
+- **Genregeheugen zoals bij talen:** Handmatig ingevoerde genres worden permanent onder `CUSTOM_GENRES` in `Data/config.json` opgeslagen. Numerieke snelkeuzes beginnen bewust met `1=Rock`, `2=Pop`; eigen genres volgen daarna.
+- **Genregeheugen blijft UI-only:** Eigen snelkeuzegenres breiden `ALLOWED_GENRES` of `GENRE_SYNONYMS` niet automatisch uit en veranderen dus geen latere automatische genrebeslissingen.
+- **Uitgebreide bestandstagger:** Draagbare tags bevatten nu ook Taal, BPM en ISRC. FLAC, Ogg Vorbis, MP3 en AIFF blijven ondersteund.
+- **mAirList-metadataback-up:** Tagger-modus 2 bewaart bestaande `Amplification`, alle `item_cuemarkers`, Peak, True Peak, Loudness en nuttige mAirList-/gebruikersattributen.
+- **MP3/AIFF:** Volledige mAirList-metadata wordt ingebed als `TXXX:mAirList`; andere ID3-frames, artwork en overige ingebedde gegevens blijven behouden.
+- **FLAC/Ogg:** Volledige mAirList-metadata wordt als `<audiobestand>.<ext>.mmd` in het door mAirList gelezen `<PlaylistItem>`-XML-formaat geschreven. Sidecars worden atomair bijgewerkt.
+
+### Veiligheid
+- **Geen nieuwe audioanalyse:** 0.65 kopieert uitsluitend cue-/niveau-/normalisatiewaarden die al in de `.mldb` aanwezig zijn. Er worden geen nieuwe loudness-, peak- of cuewaarden berekend.
+- **Duration blijft beschermd:** De duration voor bestandsmetadata wordt alleen uit de database gelezen; `Duration`, `Length` en `TotalDuration` worden nooit gewijzigd.
+- **Interne Restorer-velden en lyrics uitgesloten:** `RESTAURIERT`, `DOPPELUNG`, `FORCE_APPLY` en Lyrics/Songtekst worden niet naar het mAirList-bestandsblok gekopieerd.
+- **Getest met echte mAirList-output:** Het XML-model is vergeleken met een door mAirList geschreven MP3 (`TXXX:mAirList`) en `.mmd`. FLAC + `.mmd` re-import is praktisch bevestigd met alle cues en analysewaarden aanwezig.
+- **Regressietests uitgebreid:** 37 tests dekken nu ook genregeheugen, XML-structuur, FLAC `.mmd`, MP3-inbedding en behoud van andere ID3-frames.
+
+### Gewijzigd
+- **Versie:** `0.65.00 BETA` / Windows-resource `0.65.0.0 Beta`.
+
 ## [0.64.00 Beta] - 2026-09-13
 ### Toegevoegd
 - **BPM maakt nu deel uit van de normale Fetch:** Ontbrekende `BPM`-waarden worden tijdens de gewone Fetch als `BPM_Vorschlag` gevonden en in Review automatisch overgenomen. Bestaande geldige BPM blijft ook bij Full Fetch beschermd.

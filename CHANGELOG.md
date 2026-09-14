@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.65.00 Beta] - 2026-09-14
+### Added
+- **Genre memory like languages:** Manually entered genres are stored persistently under `CUSTOM_GENRES` in `Data/config.json`. Numeric shortcuts deliberately start with `1=Rock`, `2=Pop`; custom genres are appended afterwards.
+- **Genre memory stays UI-only:** Custom shortcut genres do not automatically extend `ALLOWED_GENRES` or `GENRE_SYNONYMS`, so one-off manual choices cannot silently alter future automatic decisions.
+- **Extended file tagger:** Portable tags now also include Language, BPM and ISRC. FLAC, Ogg Vorbis, MP3 and AIFF remain supported.
+- **mAirList metadata backup:** Tagger mode 2 backs up existing `Amplification`, every `item_cuemarkers` entry, Peak, True Peak, Loudness and useful mAirList/user attributes.
+- **MP3/AIFF:** Full mAirList metadata is embedded as `TXXX:mAirList`; unrelated ID3 frames, artwork and other embedded data are preserved.
+- **FLAC/Ogg:** Full mAirList metadata is written as `<audiofile>.<ext>.mmd` using the `<PlaylistItem>` XML format read by mAirList. Sidecars are updated atomically.
+
+### Safety
+- **No new audio analysis:** 0.65 only copies cue/level/normalization values already present in the `.mldb`; it does not calculate new loudness, peak or cue values.
+- **Duration remains protected:** The duration used in file metadata is read from the database only; `Duration`, `Length` and `TotalDuration` are never changed.
+- **Internal Restorer fields and lyrics excluded:** `RESTAURIERT`, `DOPPELUNG`, `FORCE_APPLY` and Lyrics/Songtext are not copied into the mAirList file block.
+- **Verified against real mAirList output:** The XML model was compared with a mAirList-written MP3 (`TXXX:mAirList`) and `.mmd`. FLAC + `.mmd` re-import was practically confirmed in mAirList with all cues and analysis values present.
+- **Regression suite expanded:** 37 tests now also cover genre memory, XML structure, FLAC `.mmd`, MP3 embedding and preservation of unrelated ID3 frames.
+
+### Changed
+- **Version:** `0.65.00 BETA` / Windows resource `0.65.0.0 Beta`.
+
 ## [0.64.00 Beta] - 2026-09-13
 ### Added
 - **BPM is now part of normal Fetch:** Missing `BPM` values are created as `BPM_Vorschlag` during regular Fetch and automatically accepted in Review. Existing valid BPM remains protected even during Full Fetch.

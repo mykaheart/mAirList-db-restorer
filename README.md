@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.64.00 BETA
+# mAirList DB Restorer v0.65.00 BETA
 **Das intelligente Metadaten-Reparatur-Tool für lokale mAirList Datenbanken**
 
 *(Note: English and Dutch documentation / manuals are available in the repository!)*
@@ -25,8 +25,8 @@ Dieses Skript sucht nicht einfach blind drauflos, sondern arbeitet mit mehreren 
 *   **Laufzeit-Matching (Maxi-Erkennung):** Das Skript gleicht die gesuchten API-Treffer mit der *echten lokalen Track-Laufzeit* (+/- Toleranz für Cue-Punkte) ab. So erkennt es zielsicher Extended-Versions oder seltene Radio-Edits.
 *   **Ausreißer-Filter (Lücken-Logik):** Gefundene Release-Jahre werden sortiert und auf unplausible Einzel-Ausreißer geprüft. Liegt das älteste Jahr mehr als acht Jahre vor dem nächsten Treffer und kommt nur einmal vor, wird es verworfen. So werden typische Fehleinträge aus Community-Datenbanken abgefangen.
 *   **OAD-Schutz (Ignore-Lists):** Virtuelle und physische Ordner, die z. B. "OAD" (On Air Design) oder "Jingles" heißen, können konsequent von der Suche ausgeschlossen werden.
-*   **Ergonomischer Review-Prozess:** Alle API-Vorschläge können vor dem Speichern in die Datenbank in einem schnellen Terminal-Workflow geprüft, angepasst oder mit einem Tastendruck (Rückgriff auf den Original-Wert) abgelehnt werden.
-*   **Massenbearbeitung (Wartungs-Modus):** Ein separates Menü erlaubt die nachträgliche Standardisierung von Genres, das Korrigieren von Groß-/Kleinschreibung und Apostrophen sowie das Schreiben geprüfter Metadaten in lokale FLAC-, MP3- und AIFF-Dateien.
+*   **Ergonomischer Review-Prozess:** Alle API-Vorschläge können vor dem Speichern in die Datenbank in einem schnellen Terminal-Workflow geprüft, angepasst oder mit einem Tastendruck (Rückgriff auf den Original-Wert) abgelehnt werden. Eigene Genres werden wie eigene Sprachen in `config.json` gemerkt; die Genre-Schnellwahl beginnt mit `1=Rock`, `2=Pop`.
+*   **Datei-Tagger & Metadaten-Notfallsicherung:** Wartung [3] schreibt portable Tags (inkl. Genre, Sprache, BPM und ISRC) in FLAC/Ogg/MP3/AIFF. Optional sichert sie zusätzlich mAirList-Cues, Peak/True Peak/Loudness und Normalisierung: bei MP3/AIFF als `TXXX:mAirList`, bei FLAC/Ogg als passende `.mmd`-Seitendatei.
 *   **Hardening & Wiederaufnahme:** Einzelne API-Requests werden automatisch wiederholt; bei transienten Netzwerk-/429-/5xx-Fehlern startet zusätzlich der komplette Track bis zu dreimal mit 2/5/10-s-Backoff neu. Erst danach bleibt er als offen markiert. Sitzungs-CSVs werden atomar gespeichert und pro Datenbankpfad getrennt, damit Arbeitsstände weder beschädigt noch zwischen gleichnamigen Datenbanken vermischt werden.
 *   **Sicheres Speichern:** Vor dem finalen Schreiben zeigt der Restorer eine Änderungsübersicht, prüft die SQLite-Integrität, erstellt ein Backup und prüft die Datenbank nach dem Schreiben erneut.
 *   **Dopplungsprüfung:** Die Wartung kann aktuelle Dopplungs-Kandidaten anhand identischer Artist/Titel-Kombinationen, Dateipfade oder gültiger ISRCs mit `DOPPELUNG=JA` markieren. Beim nächsten Lauf werden erledigte Markierungen automatisch wieder entfernt; Elemente werden niemals automatisch gelöscht.

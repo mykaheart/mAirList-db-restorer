@@ -1,4 +1,4 @@
-# 📖 Handbuch: mAirList DB Restorer 0.64.00 BETA
+# 📖 Handbuch: mAirList DB Restorer 0.65.00 BETA
 
 Der **mAirList DB Restorer** unterstützt bei der Pflege lokaler mAirList-Datenbanken (`.mldb`). Er liest vorhandene Metadaten, recherchiert fehlende oder fragliche Angaben über MusicBrainz und Discogs, kann fehlende BPM aus rekordbox, Datei-Tags und AcousticBrainz ergänzen und bietet mehrere Wartungsfunktionen für bestehende Datenbanken.
 
@@ -67,7 +67,7 @@ Bei Apply, Dopplungswartung und BPM-Wartung erstellt der Restorer zusätzlich ei
 
 Der Restorer legt automatisch einen Ordner `Data` neben der Anwendung an. Dort befinden sich unter anderem:
 
-- `config.json` – Sprache, API-Zugangsdaten, Ignore-Listen und der bevorzugte rekordbox-XML-Pfad pro Datenbank.
+- `config.json` – Sprache, API-Zugangsdaten, Ignore-Listen, benutzerdefinierte Sprach-/Genre-Schnellwahlen und der bevorzugte rekordbox-XML-Pfad pro Datenbank.
 - `*_vorschlaege.csv` – laufender Fetch-Arbeitsstand.
 - `*_restauriert.csv` – nach dem Review freigegebener Arbeitsstand für Apply.
 - `*_bpm-review_YYYYMMDD-HHMMSS.csv` – vollständige Review-Liste der BPM-Wartung.
@@ -249,6 +249,12 @@ Wenn Artist, Titel, Jahr oder Album manuell geändert werden, führt der Restore
 
 Wenn ein sicherer Vorschlag vorliegt, werden `STYLE`, `DISCOGS_RELEASE_ID`, `Labelcode`, `ISRC`, `Typ` und `BPM` im Review ohne zusätzliche Einzelabfrage in den Arbeitsstand übernommen. Ein vorhandener BPM ist dabei bereits zuvor geschützt worden und erhält keinen neuen Vorschlag.
 
+### Genre-Schnellwahl und Genre-Gedächtnis
+
+Bei einer manuellen Genre-Abfrage stehen feste Nummern bereit. Die Liste beginnt bewusst mit **`1=Rock`** und **`2=Pop`**, danach folgen die übrigen Restorer-Kernkategorien. Frei eingegebene Genres werden in `Data/config.json` unter `CUSTOM_GENRES` gespeichert und stehen ab dem nächsten Track ebenfalls als Nummer zur Verfügung.
+
+Dieses Gedächtnis ist **nur eine Bedienhilfe**: Ein manuell gespeichertes Genre erweitert weder `ALLOWED_GENRES` noch die automatische Synonym-/Normalisierungslogik. Dadurch verändert eine einmalige freie Eingabe nicht unbemerkt spätere API-Entscheidungen.
+
 ### Sprache
 
 Da MusicBrainz in diesem Workflow keine zuverlässige Recording-Sprache liefert, wird Sprache nicht aus einem beliebigen Release-Sprachfeld abgeleitet. Bereits vorhandene Angaben bleiben erhalten; bei Bedarf kann Sprache im Review manuell gesetzt werden. Häufig verwendete eigene Sprachen merkt sich der Restorer in `config.json`.
@@ -280,7 +286,7 @@ Wenn die Integritätsprüfung **vor** dem Schreiben fehlschlägt, wird nichts ve
 
 Das Wartungsmenü enthält direkte Pflegefunktionen. Es ist vom normalen Fetch/Review/Apply-Workflow getrennt.
 
-> **Achtung:** Die einfachen Wartungsfunktionen [1]–[4] schreiben direkt. Für diese Funktionen solltest du selbst vorher eine Datenbank- bzw. Dateikopie anlegen. Die aufwendigeren Funktionen [5] und [6] besitzen zusätzliche integrierte Integritäts-/Backup-Sicherungen.
+> **Achtung:** Wartung [1], [2] und [4] verändert die Datenbank direkt; Wartung [3] verändert Audiodateien bzw. erzeugt `.mmd`-Seitendateien. Lege dafür vorher passende Kopien/Backups an. Die datenbankseitigen Funktionen [5] und [6] besitzen zusätzliche integrierte Integritäts-/Backup-Sicherungen.
 
 ### Wartung [1] – Genres standardisieren
 
@@ -294,16 +300,16 @@ Sowohl ein natives Genre-Feld als auch ein Genre-Attribut werden berücksichtigt
 
 Artist und Titel werden auf konsistente Apostrophe und eine intelligente Groß-/Kleinschreibung normalisiert. Diese Funktion arbeitet direkt auf den entsprechenden `items`-Feldern.
 
-### Wartung [3] – Datei-Tagger
+### Wartung [3] – Datei-Tagger und mAirList-Metadatensicherung
 
-Schreibt **geprüfte Datenbankwerte in lokale Audiodateien**. Unterstützt werden über Mutagen:
+Der Tagger arbeitet mit **geprüften Werten aus der Datenbank** und bietet zwei Modi:
 
-- FLAC
-- Ogg Vorbis
-- MP3
-- AIFF
+1. **Nur portable Audio-Tags**
+2. **Portable Audio-Tags + vollständige mAirList-Metadatensicherung**
 
-Geschrieben werden:
+Unterstützt werden über Mutagen derzeit FLAC, Ogg Vorbis, MP3 und AIFF.
+
+Portable Tags umfassen:
 
 - Artist
 - Title
@@ -311,10 +317,28 @@ Geschrieben werden:
 - Genre
 - Album
 - Label/Publisher
+- Sprache/Language
+- BPM
+- ISRC
 
-Nicht Teil dieses Datei-Taggers sind unter anderem BPM, ISRC, Labelcode, Sprache oder Lyrics.
+Im zweiten Modus sichert der Restorer zusätzlich die in der `.mldb` bereits vorhandenen mAirList-Daten. Er **analysiert das Audio nicht neu** und berechnet auch keine Cue-Punkte oder Loudnesswerte selbst. Gesichert werden vorhandene Werte wie:
 
-Da mAirList Dateinamen häufig relativ zu Storage Locations speichert, fragt der Tagger nach lokalen Basisordnern. Er verändert die Audiodateien direkt und besitzt dafür keinen Undo-Mechanismus. Vor Nutzung ist daher ein Dateibackup empfehlenswert.
+- `Amplification` / Normalisierungsverstärkung
+- sämtliche Einträge aus `item_cuemarkers` (z. B. CueIn, CueOut, FadeIn/FadeOut, StartNext, Ramp1–Ramp3 und weitere vorhandene Markertypen)
+- Peak
+- True Peak
+- Loudness
+- mAirList-/Benutzerattribute, soweit sie sinnvoll als Dateisicherung sind
+
+**MP3 und AIFF:** Der mAirList-Block wird als `TXXX:mAirList` direkt in den ID3-Daten gespeichert. Nur dieser Restorer-eigene mAirList-Frame wird ersetzt; fremde ID3-Frames, Cover und andere eingebettete Daten bleiben unangetastet.
+
+**FLAC und Ogg Vorbis:** mAirList wertet einen frei erfundenen `MAIRLIST`-Vorbis-Comment nicht als Cue-/Analysequelle aus. Deshalb erzeugt der Restorer die von mAirList unterstützte Seitendatei mit exakt demselben Basisnamen, z. B. `Song.flac.mmd`. Diese XML-Datei enthält den `<PlaylistItem>`-Block mit Cues, Pegelwerten, Normalisierung und Attributen.
+
+Die `.mmd` wird atomar geschrieben und nur aktualisiert, wenn sich ihr Inhalt tatsächlich ändert. `Duration` wird **ausschließlich aus der Datenbank gelesen** und niemals aus der Audiodatei neu berechnet oder in der Datenbank verändert.
+
+Administrative Restorer-Felder (`RESTAURIERT`, `DOPPELUNG`, `FORCE_APPLY`) sowie Lyrics/Songtexte werden nicht in die mAirList-Dateisicherung kopiert.
+
+Da mAirList Dateinamen häufig relativ zu Storage Locations speichert, fragt der Tagger nach lokalen Basisordnern. Er verändert Audiodateien direkt und besitzt dafür keinen Undo-Mechanismus. Vor Nutzung ist daher ein Dateibackup empfehlenswert.
 
 ### Wartung [4] – Sammellauf
 

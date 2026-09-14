@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.64.00 BETA
+# mAirList DB Restorer v0.65.00 BETA
 **The intelligent metadata repair tool for local mAirList databases**
 
 *(Note: German and Dutch documentation / manuals are available in the repository!)*
@@ -25,8 +25,8 @@ This script doesn't just search blindly; it uses multiple safety nets and logic 
 *   **Duration Matching (Maxi Detection):** The script compares the retrieved API hits with the *actual local track duration* (+/- tolerance for cue points). This accurately detects extended versions or rare radio edits.
 *   **Outlier Filter (Gap Logic):** Retrieved release years are sorted and checked for implausible single outliers. If the oldest year is more than eight years earlier than the next result and occurs only once, it is discarded. This catches typical bad entries in community-maintained databases.
 *   **OAD Protection (Ignore Lists):** Virtual and physical folders named, for example, "OAD" (On Air Design) or "Jingles" can be strictly excluded from the search.
-*   **Ergonomic Review Process:** All API suggestions can be reviewed, adjusted, or rejected with a single keystroke (reverting to the original value) in a fast terminal workflow before being saved to the database.
-*   **Mass Editing (Maintenance Mode):** A separate menu can standardize genres, correct capitalization and apostrophes, and write verified metadata into local FLAC, MP3, and AIFF files.
+*   **Ergonomic Review Process:** All API suggestions can be reviewed, adjusted, or rejected with a single keystroke (reverting to the original value) in a fast terminal workflow before being saved to the database. Custom genres are remembered like custom languages in `config.json`; genre shortcuts start with `1=Rock`, `2=Pop`.
+*   **File tagger & metadata disaster backup:** Maintenance [3] writes portable tags (including Genre, Language, BPM and ISRC) to FLAC/Ogg/MP3/AIFF. Optionally it also backs up mAirList cues, Peak/True Peak/Loudness and normalization: `TXXX:mAirList` inside MP3/AIFF, matching `.mmd` sidecars for FLAC/Ogg.
 *   **Hardening & Resume Safety:** Individual API requests are retried automatically; transient network/429/5xx failures additionally restart the complete track lookup up to three times with 2/5/10-second backoff. Only then does the track remain pending. Session CSV files are written atomically and separated per database path so workspaces cannot be corrupted or mixed between identically named databases.
 *   **Safer Apply:** Before final writing, the Restorer shows a change summary, checks SQLite integrity, creates a backup, and checks the database again after writing.
 *   **Duplicate Scan:** Maintenance can mark current duplicate candidates based on matching Artist/Title pairs, file paths, or valid ISRCs with `DOPPELUNG=JA`. A later scan automatically removes resolved flags; the Restorer never deletes items automatically.
