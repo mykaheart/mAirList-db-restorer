@@ -1,0 +1,48 @@
+name: Import 0.65 final payload
+
+on:
+  push:
+    branches:
+      - release-0.65.00-beta-final
+
+permissions:
+  contents: write
+
+jobs:
+  import-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release-0.65.00-beta-final
+          fetch-depth: 0
+      - name: Download verified 0.65 source
+        run: |
+          curl -L --fail --retry 3 --retry-delay 2 \
+            'https://drive.google.com/uc?export=download&id=1g0x5DBfBM3JU9fTFqiNpT1p1QOfQgeK9' \
+            -o /tmp/release.zip
+          echo '8ca62ccd3a94ab8815517e32b539306303f26323e7af19815944db7424af18bf  /tmp/release.zip' | sha256sum -c -
+      - name: Import release files
+        run: |
+          rm -rf /tmp/release065
+          mkdir -p /tmp/release065
+          unzip -q /tmp/release.zip -d /tmp/release065
+          for f in CHANGELOG.md CHANGELOG_DE.md CHANGELOG_NL.md Manual_DE.md Manual_EN.md Manual_NL.md README.md README_EN.md README_NL.md api.py db.py main.py pyproject.toml utils.py version.txt; do
+            cp "/tmp/release065/$f" "$f"
+          done
+          mkdir -p tests
+          cp /tmp/release065/tests/README.md tests/README.md
+          cp /tmp/release065/tests/test_restorer.py tests/test_restorer.py
+          rm -f .github/workflows/release-065-import.yml
+      - name: Verify tests
+        run: |
+          python -m compileall -q .
+          python -m pip install -r requirements.txt
+          python -m unittest discover -s tests -p 'test_*.py'
+      - name: Commit imported release
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Release 0.65.00 BETA' || exit 0
+          git push origin HEAD:release-0.65.00-beta-final
