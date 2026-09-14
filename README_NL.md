@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.64.00 BETA
+# mAirList DB Restorer v0.65.00 BETA
 **De intelligente metadata-reparatietool voor lokale mAirList databases**
 
 *(Note: German and English documentation / manuals are available in the repository!)*
@@ -25,8 +25,8 @@ Dit script zoekt niet zomaar blindelings, maar werkt met meerdere veiligheidsnet
 *   **Looptijd-Matching (Maxi-herkenning):** Het script vergelijkt de gevonden API-resultaten met de *echte lokale tracklengte* (+/- tolerantie voor cue-punten). Zo herkent het feilloos extended versions of zeldzame radio-edits.
 *   **Uitschieter-filter (Gaten-logica):** Gevonden releasejaren worden gesorteerd en gecontroleerd op onwaarschijnlijke losse uitschieters. Ligt het oudste jaar meer dan acht jaar vóór de volgende treffer en komt het slechts één keer voor, dan wordt het genegeerd.
 *   **OAD-bescherming (Ignore-Lists):** Virtuele en fysieke mappen met namen als "OAD" (On Air Design) of "Jingles" kunnen consequent worden uitgesloten van de zoekopdracht.
-*   **Ergonomisch Review-proces:** Alle API-suggesties kunnen voor het opslaan in de database in een snelle terminal-workflow worden gecontroleerd, aangepast of met één druk op de knop (terugvallen op de originele waarde) worden afgewezen.
-*   **Massabewerking (Onderhoudsmodus):** Een apart menu kan genres standaardiseren, hoofdletters/kleine letters en apostrofs corrigeren en gecontroleerde metadata naar lokale FLAC-, MP3- en AIFF-bestanden schrijven.
+*   **Ergonomisch Review-proces:** Alle API-suggesties kunnen voor het opslaan in de database in een snelle terminal-workflow worden gecontroleerd, aangepast of met één druk op de knop (terugvallen op de originele waarde) worden afgewezen. Eigen genres worden net als eigen talen in `config.json` onthouden; genresnelkeuzes beginnen met `1=Rock`, `2=Pop`.
+*   **Bestandstagger & metadata-noodback-up:** Onderhoud [3] schrijft draagbare tags (incl. Genre, Taal, BPM en ISRC) naar FLAC/Ogg/MP3/AIFF. Optioneel worden ook mAirList-cues, Peak/True Peak/Loudness en normalisatie bewaard: als `TXXX:mAirList` in MP3/AIFF en als passende `.mmd`-sidecar bij FLAC/Ogg.
 *   **Hardening & veilig hervatten:** Afzonderlijke API-requests worden automatisch herhaald; bij tijdelijke netwerk-/429-/5xx-fouten wordt daarnaast de volledige trackopzoeking maximaal drie keer opnieuw gestart met 2/5/10-seconden-backoff. Pas daarna blijft de track open. Sessie-CSV's worden atomair opgeslagen en per databasepad gescheiden, zodat werkstanden niet beschadigd raken of tussen gelijknamige databases worden gemengd.
 *   **Veiliger opslaan:** Voor het definitieve schrijven toont de Restorer een wijzigingsoverzicht, controleert de SQLite-integriteit, maakt een back-up en controleert de database na het schrijven opnieuw.
 *   **Controle op dubbelen:** Onderhoud kan actuele dubbele kandidaten op basis van gelijke Artiest/Titel-combinaties, bestandspaden of geldige ISRCs markeren met `DOPPELUNG=JA`. Bij een volgende scan worden afgehandelde markeringen automatisch verwijderd; de Restorer verwijdert nooit automatisch items.

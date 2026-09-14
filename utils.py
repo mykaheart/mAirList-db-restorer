@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.64.00 BETA"
+APP_VERSION = "0.65.00 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -29,6 +29,7 @@ DISCOGS_SECRET = ""
 MB_CONTACT = ""
 HEADERS = {}
 CUSTOM_LANGS = []
+CUSTOM_GENRES = []
 
 MLDB_ATTRIBUTE_FIELDS = [
     'Jahr', 'Genre', 'Album', 'STYLE', 'DISCOGS_RELEASE_ID',
@@ -174,7 +175,7 @@ T = {
         'rev_year_auto': "  [cyan]Jahr[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
         'rev_year': "  [cyan]Jahr[/cyan]   -> Vorschlag: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Jahr][/dim]: ",
         'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
-        'rev_genre': "  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Genre][/dim]: ",
+        'rev_genre': "  [cyan]Genre[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_lang':  "  [cyan]Sprache[/cyan]-> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
@@ -206,15 +207,32 @@ T = {
         'apply_summary_restored': "Tracks werden als RESTAURIERT markiert",
         'conf_hoch': "hoch", 'conf_mittel': "mittel", 'conf_niedrig': "niedrig",
         'maint_title': "\n[bold cyan]=== WARTUNGS-MENÜ ===[/bold cyan]",
-        'maint_warn': "[bold red]ACHTUNG: ALLE AKTIONEN HIER SCHREIBEN DIREKT IN DIE DATENBANK OHNE UNDO![/bold red]\nBitte arbeite IMMER auf einer Datenbank-Kopie.",
+        'maint_warn': "[bold red]ACHTUNG: WARTUNG KANN DATENBANK ODER AUDIODATEIEN DIREKT VERÄNDERN![/bold red]\nBitte arbeite mit einer Datenbank-Kopie und sichere Dateien vor dem Tagger.",
         'maint_opt1': "  [[green]1[/green]] Genres standardisieren",
         'maint_opt2': "  [[green]2[/green]] Groß-/Kleinschreibung & Apostrophe korrigieren (Artist/Title)",
-        'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadaten aus DB in Audio-Dateien schreiben)",
+        'maint_opt3': "  [[green]3[/green]] Datei-Tagger + mAirList-Metadatensicherung",
         'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben (1-2) nacheinander ausführen",
         'maint_opt5': "  [[green]5[/green]] Dopplungs-Kandidaten markieren / Status aktualisieren",
         'maint_opt6': "  [[green]6[/green]] Fehlende BPM ergänzen (rekordbox XML / Datei-Tags / MusicBrainz + AcousticBrainz)",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
         'maint_prompt': "Auswahl [0-6]: ",
+        'tagger_mode_title': "[bold cyan]Datei-Tagger[/bold cyan]",
+        'tagger_mode_desc': "[dim]1 schreibt nur portable Audio-Tags. 2 sichert zusätzlich mAirList-Cues, Pegelanalyse und Normalisierung (MP3/AIFF eingebettet, FLAC/Ogg als .mmd).[/dim]",
+        'tagger_mode_prompt': "Modus [1=Tags / 2=Tags+mAirList / 0=Abbruch]: ",
+        'tagger_mode_invalid': "[red]Bitte 0, 1 oder 2 wählen.[/red]",
+        'tagger_path_intro': "[cyan]=== Lokale Pfad-Zuordnung ===[/cyan]\nDa mAirList Storage Locations nutzt, können in der DB relative Pfade stehen. Füge die lokalen Basisordner hinzu; Enter startet.",
+        'tagger_path_prompt': "Basis-Ordner (optional, Enter = starten): ",
+        'tagger_path_added': "[green]✓ Ordner hinzugefügt:[/green] {path}",
+        'tagger_path_invalid': "[red]Ordner existiert nicht oder ist ungültig.[/red]",
+        'tagger_working': "[magenta]Lese Dateien und schreibe Tags...[/magenta]",
+        'tagger_diag_title': "Tagger-Diagnose",
+        'tagger_diag_total': "Tracks in Datenbank mit Pfad",
+        'tagger_diag_missing': "Pfade/Dateien nicht gefunden",
+        'tagger_diag_unsupported': "Nicht unterstütztes Format",
+        'tagger_diag_perfect': "Tags/Metadaten waren bereits perfekt",
+        'tagger_diag_updated': "Dateien erfolgreich aktualisiert",
+        'tagger_diag_embedded': "mAirList-Blöcke eingebettet",
+        'tagger_diag_sidecar': "mAirList-.mmd geschrieben/aktualisiert",
         'maint_bpm_intro': "[cyan]Suche fehlende BPM-Werte...[/cyan]\n[dim]Vorhandene BPM werden niemals überschrieben. Priorität: rekordbox XML per exaktem Dateipfad, danach Datei-Tag, danach MusicBrainz + AcousticBrainz als Fallback.[/dim]",
         'maint_bpm_rb_prompt': "rekordbox XML (optional, Enter = ohne XML): ",
         'maint_bpm_rb_invalid': "[red]rekordbox XML wurde nicht gefunden oder ist ungültig.[/red]",
@@ -365,7 +383,7 @@ T = {
         'rev_year_auto': "  [cyan]Year[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
         'rev_year': "  [cyan]Year[/cyan]   -> Suggestion: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Year][/dim]: ",
         'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
-        'rev_genre': "  [cyan]Genre[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Genre][/dim]: ",
+        'rev_genre': "  [cyan]Genre[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_lang':  "  [cyan]Lang.[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
@@ -397,15 +415,32 @@ T = {
         'apply_summary_restored': "Tracks will be marked RESTAURIERT",
         'conf_hoch': "high", 'conf_mittel': "medium", 'conf_niedrig': "low",
         'maint_title': "\n[bold cyan]=== MAINTENANCE MENU ===[/bold cyan]",
-        'maint_warn': "[bold red]WARNING: ALL ACTIONS HERE WRITE DIRECTLY TO THE DATABASE WITH NO UNDO![/bold red]\nPlease ensure you are working on a COPY.",
+        'maint_warn': "[bold red]WARNING: MAINTENANCE CAN MODIFY THE DATABASE OR AUDIO FILES DIRECTLY![/bold red]\nUse a database copy and back up files before running the tagger.",
         'maint_opt1': "  [[green]1[/green]] Standardize Genres",
         'maint_opt2': "  [[green]2[/green]] Fix Case & Apostrophes (Artist/Title)",
-        'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Write DB metadata directly into physical audio files)",
+        'maint_opt3': "  [[green]3[/green]] File tagger + mAirList metadata backup",
         'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks (1-2) sequentially",
         'maint_opt5': "  [[green]5[/green]] Mark duplicate candidates / refresh status",
         'maint_opt6': "  [[green]6[/green]] Fill missing BPM (rekordbox XML / file tags / MusicBrainz + AcousticBrainz)",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
         'maint_prompt': "Choice [0-6]: ",
+        'tagger_mode_title': "[bold cyan]File tagger[/bold cyan]",
+        'tagger_mode_desc': "[dim]1 writes portable audio tags only. 2 also backs up mAirList cues, level analysis and normalization (embedded in MP3/AIFF, .mmd sidecar for FLAC/Ogg).[/dim]",
+        'tagger_mode_prompt': "Mode [1=Tags / 2=Tags+mAirList / 0=Cancel]: ",
+        'tagger_mode_invalid': "[red]Please choose 0, 1 or 2.[/red]",
+        'tagger_path_intro': "[cyan]=== Local path mapping ===[/cyan]\nBecause mAirList uses Storage Locations, the DB may contain relative paths. Add local base folders; press Enter to start.",
+        'tagger_path_prompt': "Base folder (optional, Enter = start): ",
+        'tagger_path_added': "[green]✓ Folder added:[/green] {path}",
+        'tagger_path_invalid': "[red]Folder does not exist or is invalid.[/red]",
+        'tagger_working': "[magenta]Reading files and writing tags...[/magenta]",
+        'tagger_diag_title': "Tagger diagnostics",
+        'tagger_diag_total': "Database tracks with a path",
+        'tagger_diag_missing': "Paths/files not found",
+        'tagger_diag_unsupported': "Unsupported format",
+        'tagger_diag_perfect': "Tags/metadata already perfect",
+        'tagger_diag_updated': "Files successfully updated",
+        'tagger_diag_embedded': "mAirList blocks embedded",
+        'tagger_diag_sidecar': "mAirList .mmd written/updated",
         'maint_bpm_intro': "[cyan]Searching for missing BPM values...[/cyan]\n[dim]Existing BPM values are never overwritten. Priority: rekordbox XML by exact file path, then file tag, then MusicBrainz + AcousticBrainz as fallback.[/dim]",
         'maint_bpm_rb_prompt': "rekordbox XML (optional, Enter = no XML): ",
         'maint_bpm_rb_invalid': "[red]rekordbox XML was not found or is invalid.[/red]",
@@ -556,7 +591,7 @@ T = {
         'rev_year_auto': "  [cyan]Jaar[/cyan]    -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
         'rev_year': "  [cyan]Jaar[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Jaar][/dim]: ",
         'rev_genre_auto': "  [cyan]Genre[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
-        'rev_genre': "  [cyan]Genre[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Genre][/dim]: ",
+        'rev_genre': "  [cyan]Genre[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
         'rev_album': "  [cyan]Album[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
         'rev_label': "  [cyan]Label[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
         'rev_lang':  "  [cyan]Taal[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / {hint}][/dim]: ",
@@ -588,15 +623,32 @@ T = {
         'apply_summary_restored': "Tracks worden als RESTAURIERT gemarkeerd",
         'conf_hoch': "hoog", 'conf_mittel': "gemiddeld", 'conf_niedrig': "laag",
         'maint_title': "\n[bold cyan]=== ONDERHOUDSMENU ===[/bold cyan]",
-        'maint_warn': "[bold red]WAARSCHUWING: ALLE ACTIES HIER SCHRIJVEN DIRECT NAAR DE DATABASE ZONDER UNDO![/bold red]\nZorg ervoor dat je op een KOPIE werkt.",
+        'maint_warn': "[bold red]WAARSCHUWING: ONDERHOUD KAN DE DATABASE OF AUDIOBESTANDEN DIRECT WIJZIGEN![/bold red]\nGebruik een databasekopie en maak een bestandsback-up vóór de tagger.",
         'maint_opt1': "  [[green]1[/green]] Genres standaardiseren",
         'maint_opt2': "  [[green]2[/green]] Hoofdletters/kleine letters & apostrofs corrigeren (Artist/Title)",
-        'maint_opt3': "  [[green]3[/green]] FLAC-Tagger (Metadata uit DB direct naar audiobestanden schrijven)",
+        'maint_opt3': "  [[green]3[/green]] Bestandstagger + mAirList-metadataback-up",
         'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken (1-2) achter elkaar uitvoeren",
         'maint_opt5': "  [[green]5[/green]] Dubbele kandidaten markeren / status bijwerken",
         'maint_opt6': "  [[green]6[/green]] Ontbrekende BPM aanvullen (rekordbox XML / bestandstags / MusicBrainz + AcousticBrainz)",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
         'maint_prompt': "Keuze [0-6]: ",
+        'tagger_mode_title': "[bold cyan]Bestandstagger[/bold cyan]",
+        'tagger_mode_desc': "[dim]1 schrijft alleen draagbare audiotags. 2 maakt daarnaast een back-up van mAirList-cues, niveaumeting en normalisatie (ingebed in MP3/AIFF, .mmd naast FLAC/Ogg).[/dim]",
+        'tagger_mode_prompt': "Modus [1=Tags / 2=Tags+mAirList / 0=Annuleren]: ",
+        'tagger_mode_invalid': "[red]Kies 0, 1 of 2.[/red]",
+        'tagger_path_intro': "[cyan]=== Lokale padtoewijzing ===[/cyan]\nOmdat mAirList Storage Locations gebruikt, kan de database relatieve paden bevatten. Voeg lokale basismappen toe; Enter start.",
+        'tagger_path_prompt': "Basismap (optioneel, Enter = starten): ",
+        'tagger_path_added': "[green]✓ Map toegevoegd:[/green] {path}",
+        'tagger_path_invalid': "[red]Map bestaat niet of is ongeldig.[/red]",
+        'tagger_working': "[magenta]Bestanden lezen en tags schrijven...[/magenta]",
+        'tagger_diag_title': "Tagger-diagnose",
+        'tagger_diag_total': "Databasetracks met pad",
+        'tagger_diag_missing': "Paden/bestanden niet gevonden",
+        'tagger_diag_unsupported': "Niet-ondersteund formaat",
+        'tagger_diag_perfect': "Tags/metadata waren al correct",
+        'tagger_diag_updated': "Bestanden succesvol bijgewerkt",
+        'tagger_diag_embedded': "mAirList-blokken ingebed",
+        'tagger_diag_sidecar': "mAirList .mmd geschreven/bijgewerkt",
         'maint_bpm_intro': "[cyan]Zoeken naar ontbrekende BPM-waarden...[/cyan]\n[dim]Bestaande BPM-waarden worden nooit overschreven. Prioriteit: rekordbox XML via exact bestandspad, daarna bestandstag, daarna MusicBrainz + AcousticBrainz als fallback.[/dim]",
         'maint_bpm_rb_prompt': "rekordbox XML (optioneel, Enter = zonder XML): ",
         'maint_bpm_rb_invalid': "[red]rekordbox XML is niet gevonden of ongeldig.[/red]",
@@ -767,7 +819,7 @@ def save_language(lang):
         json.dump(config, f, indent=4)
 
 def init_credentials():
-    global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS, CUSTOM_LANGS
+    global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS, CUSTOM_LANGS, CUSTOM_GENRES
     config = {}
     if os.path.exists(CONFIG_FILE):
         try:
@@ -779,6 +831,7 @@ def init_credentials():
     DISCOGS_SECRET = decode_b64(config.get('DISCOGS_SECRET', '').strip())
     MB_CONTACT = decode_b64(config.get('MB_CONTACT', '').strip())
     CUSTOM_LANGS = config.get('CUSTOM_LANGS', [])
+    CUSTOM_GENRES = config.get('CUSTOM_GENRES', [])
 
     if DISCOGS_KEY and DISCOGS_SECRET and MB_CONTACT:
         HEADERS = {'User-Agent': f'mAirListDBRestorer/{APP_VERSION} ( {MB_CONTACT} )'}
@@ -804,6 +857,7 @@ def init_credentials():
     config_data['MB_CONTACT'] = encode_b64(MB_CONTACT)
     config_data['DB_IGNORES'] = config.get('DB_IGNORES', {})
     config_data['CUSTOM_LANGS'] = CUSTOM_LANGS
+    config_data['CUSTOM_GENRES'] = CUSTOM_GENRES
     if 'LANG' not in config_data: config_data['LANG'] = CURRENT_LANG
     
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -825,6 +879,53 @@ def add_custom_lang(lang):
         config['CUSTOM_LANGS'] = CUSTOM_LANGS
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
+
+def add_custom_genre(genre):
+    """Remember a manually entered genre for numeric Review shortcuts.
+
+    Custom choices deliberately do not extend ALLOWED_GENRES or GENRE_SYNONYMS;
+    they are a user-interface memory only.
+    """
+    global CUSTOM_GENRES
+    value = str(genre or '').strip()
+    if not value:
+        return
+    existing = {str(v).strip().casefold() for v in GENRE_QUICK_CHOICES + CUSTOM_GENRES}
+    if value.casefold() in existing:
+        return
+    CUSTOM_GENRES.append(value)
+    config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception:
+            pass
+    config['CUSTOM_GENRES'] = CUSTOM_GENRES
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=4, ensure_ascii=False)
+
+def get_genre_quick_map():
+    """Return stable numeric shortcuts: 1=Rock, 2=Pop, then core/custom genres."""
+    values = []
+    seen = set()
+    for genre in GENRE_QUICK_CHOICES + CUSTOM_GENRES:
+        value = str(genre or '').strip()
+        if not value or value.casefold() in seen:
+            continue
+        seen.add(value.casefold())
+        values.append(value)
+    return {str(i + 1): value for i, value in enumerate(values)}
+
+def canonical_genre_choice(value):
+    """Reuse the existing capitalization of a standard/custom quick genre when possible."""
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    for genre in GENRE_QUICK_CHOICES + CUSTOM_GENRES:
+        if str(genre).casefold() == text.casefold():
+            return str(genre)
+    return text
 
 def get_saved_ignored_folders(db_path):
     """Return the stored ignore list for a database without prompting the user."""
@@ -918,6 +1019,11 @@ def setup_ignored_folders(db_path):
 
     console.print(t('ign_saved'))
     return ignored
+
+GENRE_QUICK_CHOICES = [
+    "Rock", "Pop", "EDM", "Classic Rock", "Pop-Rock", "Blues",
+    "Hiphop", "Rap", "R and B", "Soul", "Reggae"
+]
 
 ALLOWED_GENRES = [
     "Pop", "EDM", "Blues", "Hiphop", "Rap", "Rock", "Classic Rock", 

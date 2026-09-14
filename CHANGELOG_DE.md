@@ -2,6 +2,25 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.65.00 Beta] - 2026-09-14
+### Hinzugefügt
+- **Genre-Gedächtnis wie bei Sprachen:** Manuell eingegebene Genres werden dauerhaft unter `CUSTOM_GENRES` in `Data/config.json` gespeichert. Die numerische Schnellwahl beginnt bewusst mit `1=Rock`, `2=Pop`; gespeicherte eigene Genres werden danach angehängt.
+- **Genre-Gedächtnis bleibt UI-only:** Eigene Schnellwahlgenres erweitern nicht automatisch `ALLOWED_GENRES` oder `GENRE_SYNONYMS` und verändern damit keine späteren automatischen Genreentscheidungen.
+- **Datei-Tagger erweitert:** Portable Tags umfassen nun zusätzlich Sprache, BPM und ISRC. Unterstützt bleiben FLAC, Ogg Vorbis, MP3 und AIFF.
+- **mAirList-Metadatensicherung:** Tagger-Modus 2 sichert vorhandene Normalisierung (`Amplification`), alle `item_cuemarkers`, Peak, True Peak, Loudness und sinnvolle mAirList-/Benutzerattribute.
+- **MP3/AIFF:** Vollständige mAirList-Metadaten werden als `TXXX:mAirList` eingebettet. Fremde ID3-Frames, Cover und andere Daten werden nicht entfernt.
+- **FLAC/Ogg:** Vollständige mAirList-Metadaten werden als `<Audiodatei>.<ext>.mmd` im von mAirList gelesenen `<PlaylistItem>`-XML-Format geschrieben. Die Seitendatei wird atomar aktualisiert.
+
+### Sicherheit
+- **Keine neue Audioanalyse:** 0.65 kopiert ausschließlich bereits in der `.mldb` vorhandene Cue-/Pegel-/Normalisierungswerte. Es werden keine neuen Loudness-, Peak- oder Cue-Werte berechnet.
+- **Duration bleibt tabu:** Die für die mAirList-Dateisicherung verwendete Duration wird nur aus der Datenbank gelesen; `Duration`, `Length` und `TotalDuration` werden weiterhin niemals verändert.
+- **Interne Restorer-Felder und Lyrics ausgeschlossen:** `RESTAURIERT`, `DOPPELUNG`, `FORCE_APPLY` sowie Lyrics/Songtexte werden nicht in den mAirList-Dateiblock kopiert.
+- **Referenztest mit echten mAirList-Dateien:** Das XML-Format wurde gegen eine von mAirList erzeugte MP3 (`TXXX:mAirList`) und `.mmd` verifiziert. Der FLAC+.mmd-Reimport wurde in mAirList mit vollständigen Cue-/Analysewerten praktisch bestätigt.
+- **Regressionstests erweitert:** 37 Tests decken zusätzlich Genre-Gedächtnis, XML-Struktur, FLAC-.mmd, MP3-Einbettung und Fremdframe-Erhalt ab.
+
+### Geändert
+- **Version:** `0.65.00 BETA` / Windows-Ressource `0.65.0.0 Beta`.
+
 ## [0.64.00 Beta] - 2026-09-13
 ### Hinzugefügt
 - **BPM jetzt auch im normalen Fetch:** Fehlende `BPM`-Werte werden im regulären Fetch als `BPM_Vorschlag` ermittelt und im Review automatisch übernommen. Vorhandene gültige BPM bleiben auch beim Full Fetch geschützt.

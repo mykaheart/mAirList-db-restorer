@@ -847,75 +847,275 @@ def run_maintenance_case(db_path):
     conn.close()
     return len(updates)
 
-def run_maintenance_file_tagger(db_path):
+_MMD_EXCLUDED_ATTRIBUTES = {
+    'restauriert', 'doppelung', 'force_apply',
+    'lyrics', 'songtext', 'songtexte', 'song text'
+}
+
+
+def _finite_float(value):
+    try:
+        if value is None or str(value).strip() == '':
+            return None
+        number = float(value)
+        if number != number or number in (float('inf'), float('-inf')):
+            return None
+        return number
+    except (TypeError, ValueError):
+        return None
+
+
+def _mmd_fixed(value, digits=3):
+    number = _finite_float(value)
+    if number is None:
+        return None
+    return f"{number:.{digits}f}"
+
+
+def _mmd_amplification(value):
+    number = _finite_float(value)
+    if number is None:
+        return None
+    # mAirList's own MP3/MMD writer uses a decimal comma for Amplification,
+    # while Duration/Markers/Levels use decimal points.
+    return format(number, '.15g').replace('.', ',')
+
+
+def _build_mairlist_xml(item, attributes=None, markers=None, declaration=False):
+    """Build the mAirList <PlaylistItem> metadata block used in TXXX/.mmd.
+
+    The structure is based on files written by mAirList itself. Duration is read
+    only from the database; it is never recalculated or modified.
+    """
+    import xml.etree.ElementTree as ET
+
+    attributes = attributes or []
+    markers = markers or []
+    root = ET.Element('PlaylistItem', {'Class': 'File'})
+
+    amp = _mmd_amplification(item.get('amplification'))
+    if amp is not None:
+        ET.SubElement(root, 'Amplification').text = amp
+
+    title = str(item.get('title') or '').strip()
+    artist = str(item.get('artist') or '').strip()
+    item_type = str(item.get('type') or '').strip()
+    duration = _mmd_fixed(item.get('duration'))
+    if title:
+        ET.SubElement(root, 'Title').text = title
+    if artist:
+        ET.SubElement(root, 'Artist').text = artist
+    if item_type:
+        ET.SubElement(root, 'Type').text = item_type
+    if duration is not None:
+        ET.SubElement(root, 'Duration').text = duration
+
+    filtered_attrs = []
+    for name, value in attributes:
+        name = str(name or '').strip()
+        value = str(value or '').strip()
+        if not name or not value:
+            continue
+        if name.casefold() in _MMD_EXCLUDED_ATTRIBUTES:
+            continue
+        filtered_attrs.append((name, value))
+    if filtered_attrs:
+        attrs_node = ET.SubElement(root, 'Attributes')
+        for name, value in sorted(filtered_attrs, key=lambda pair: pair[0].casefold()):
+            entry = ET.SubElement(attrs_node, 'Item')
+            ET.SubElement(entry, 'Name').text = name
+            ET.SubElement(entry, 'Value').text = value
+
+    clean_markers = []
+    for marker_type, marker_value in markers:
+        marker_type = str(marker_type or '').strip()
+        position = _mmd_fixed(marker_value)
+        if marker_type and position is not None:
+            clean_markers.append((marker_type, position))
+    if clean_markers:
+        markers_node = ET.SubElement(root, 'Markers')
+        for marker_type, position in clean_markers:
+            ET.SubElement(markers_node, 'Marker', {'Type': marker_type, 'Position': position})
+
+    level_values = [
+        ('Peak', item.get('level_peak')),
+        ('TruePeak', item.get('level_truepeak')),
+        ('Loudness', item.get('level_loudness')),
+    ]
+    clean_levels = [(name, _mmd_fixed(value)) for name, value in level_values]
+    clean_levels = [(name, value) for name, value in clean_levels if value is not None]
+    if clean_levels:
+        levels = ET.SubElement(root, 'Levels')
+        for name, value in clean_levels:
+            ET.SubElement(levels, name).text = value
+
+    body = ET.tostring(root, encoding='unicode', short_empty_elements=True).replace(' />', '/>')
+    if declaration:
+        return '<?xml version="1.0" encoding="UTF-8"?>' + body
+    return body
+
+
+def _write_text_atomic_if_changed(path, text):
+    """Write UTF-8 text atomically and only when content differs."""
+    try:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8-sig') as handle:
+                if handle.read() == text:
+                    return False
+    except Exception:
+        pass
+    tmp = f"{path}.tmp-{os.getpid()}"
+    with open(tmp, 'w', encoding='utf-8', newline='') as handle:
+        handle.write(text)
+    os.replace(tmp, path)
+    return True
+
+
+def _set_id3_mairlist_block(tags, xml_text):
+    """Replace only TXXX:mAirList; preserve every unrelated ID3 frame."""
+    from mutagen.id3 import TXXX
+
+    matching_keys = []
+    existing_texts = []
+    for key in list(tags.keys()):
+        frame = tags.get(key)
+        if key.startswith('TXXX:') and getattr(frame, 'desc', '').casefold() == 'mairlist':
+            matching_keys.append(key)
+            existing_texts.extend(str(v) for v in getattr(frame, 'text', []) or [])
+    if len(matching_keys) == 1 and existing_texts == [xml_text]:
+        return False
+    for key in matching_keys:
+        del tags[key]
+    tags.add(TXXX(encoding=3, desc='mAirList', text=[xml_text]))
+    return True
+
+
+def _attr_value(attributes, *names):
+    wanted = {str(name).casefold() for name in names}
+    for name, value in attributes:
+        if str(name).casefold() in wanted and str(value or '').strip():
+            return str(value).strip()
+    return ''
+
+
+def _clean_integerish_tag(value):
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    try:
+        number = float(text.replace(',', '.'))
+        if number.is_integer():
+            return str(int(number))
+    except Exception:
+        pass
+    return text
+
+
+def run_maintenance_file_tagger(db_path, metadata_mode=None, base_dirs=None):
+    """Write portable audio tags and optionally mAirList metadata backups.
+
+    metadata_mode:
+      1 / 'tags' -> portable tags only
+      2 / 'full' -> portable tags + mAirList TXXX (MP3/AIFF) or .mmd (FLAC/Ogg)
+      None       -> ask interactively
+    base_dirs can be supplied by tests/CLI integrations; None asks interactively.
+    """
     try:
         import mutagen
-        from mutagen.id3 import ID3, TPE1, TIT2, TDRC, TCON, TALB, TPUB
+        from mutagen.id3 import TPE1, TIT2, TDRC, TCON, TALB, TPUB, TLAN, TBPM, TSRC
     except ImportError:
-        import sys
-        from rich.console import Console
         Console().print("\n[bold red]KRITISCHER FEHLER: Das Python-Modul 'mutagen' ist nicht installiert![/bold red]")
         Console().print("[yellow]Bitte öffne dein Terminal und tippe: pip install mutagen[/yellow]")
         return 0
 
-    import sqlite3
     import logging
-    import os
-    from rich.console import Console
     c = Console(highlight=False)
 
-    c.print("\n[cyan]=== Lokale Pfad-Zuordnung ===[/cyan]")
-    c.print("Da mAirList Speicherorte (Storage Locations) nutzt, stehen in der DB oft nur relative Pfade")
-    c.print("(z.B. 'Filler/Song.mp3'). Ziehe hier nacheinander die Hauptordner rein, in denen das Skript suchen soll.")
-    c.print("[dim](Lass das Feld leer und drücke Enter, wenn du alle Ordner hinzugefügt hast)[/dim]")
-    
-    base_dirs = []
-    while True:
-        d = c.input("Basis-Ordner reinziehen (oder Enter zum Starten): ").strip().strip('"').strip("'")
-        if not d:
-            break
-        if os.path.isdir(d):
-            base_dirs.append(d)
-            c.print(f"[green]✓ Ordner '{d}' zur Suchliste hinzugefügt.[/green]")
-        else:
-            c.print("[red]Ordner existiert nicht oder ist ungültig. Bitte erneut versuchen.[/red]")
+    if metadata_mode is None:
+        c.print("\n" + utils.t('tagger_mode_title'))
+        c.print(utils.t('tagger_mode_desc'))
+        while True:
+            choice = c.input(utils.t('tagger_mode_prompt')).strip()
+            if choice == '0':
+                return 0
+            if choice in ('1', '2'):
+                metadata_mode = int(choice)
+                break
+            c.print(utils.t('tagger_mode_invalid'))
+    elif str(metadata_mode).strip().casefold() in ('2', 'full', 'mairlist', 'tags+mairlist'):
+        metadata_mode = 2
+    else:
+        metadata_mode = 1
 
-    c.print("\n[magenta]Lese Dateien und schreibe Tags... (Das kann je nach Archivgröße dauern)[/magenta]")
+    if base_dirs is None:
+        c.print("\n" + utils.t('tagger_path_intro'))
+        base_dirs = []
+        while True:
+            d = c.input(utils.t('tagger_path_prompt')).strip().strip('"').strip("'")
+            if not d:
+                break
+            if os.path.isdir(d):
+                base_dirs.append(d)
+                c.print(utils.t('tagger_path_added', path=d))
+            else:
+                c.print(utils.t('tagger_path_invalid'))
+    else:
+        base_dirs = [str(d) for d in base_dirs if os.path.isdir(str(d))]
+
+    c.print("\n" + utils.t('tagger_working'))
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
+
     cursor.execute("PRAGMA table_info(items)")
-    items_cols = [row[1].lower() for row in cursor.fetchall()]
-    id_col = next((c_name for c_name in ['idx', 'id', 'itemidx'] if c_name in items_cols), None)
-    
+    items_cols = {row[1].lower() for row in cursor.fetchall()}
+    id_col = next((name for name in ['idx', 'id', 'itemidx'] if name in items_cols), None)
+
     cursor.execute("PRAGMA table_info(item_attributes)")
-    attr_cols = [row[1].lower() for row in cursor.fetchall()]
+    attr_cols = {row[1].lower() for row in cursor.fetchall()}
     if not attr_cols:
         cursor.execute("PRAGMA table_info(attributes)")
-        attr_cols = [row[1].lower() for row in cursor.fetchall()]
-        attr_table = "attributes"
+        attr_cols = {row[1].lower() for row in cursor.fetchall()}
+        attr_table = 'attributes'
     else:
-        attr_table = "item_attributes"
-    attr_id_col = next((c_name for c_name in ['item', 'itemidx', 'itemid', 'idx', 'id'] if c_name in attr_cols), None)
-    
-    if not id_col or not attr_id_col:
+        attr_table = 'item_attributes'
+    attr_id_col = next((name for name in ['item', 'itemidx', 'itemid', 'idx', 'id'] if name in attr_cols), None)
+
+    if not id_col or not attr_id_col or 'filename' not in items_cols:
         conn.close()
         return 0
 
-    query = f"""
-    SELECT i.{id_col}, i.artist, i.title, i.filename,
-           MAX(CASE WHEN a.name IN ('Jahr', 'Year', 'Jaar') THEN a.value END) as year,
-           MAX(CASE WHEN a.name = 'Genre' THEN a.value END) as genre,
-           MAX(CASE WHEN a.name = 'Album' THEN a.value END) as album,
-           MAX(CASE WHEN a.name = 'Label' THEN a.value END) as label
-    FROM items i
-    LEFT JOIN {attr_table} a ON i.{id_col} = a.{attr_id_col}
-    WHERE i.filename IS NOT NULL AND i.filename != ''
-    GROUP BY i.{id_col}
-    """
+    def item_expr(column, alias=None):
+        alias = alias or column
+        return f"i.{column} AS {alias}" if column in items_cols else f"NULL AS {alias}"
+
+    query = "SELECT " + ", ".join([
+        f"i.{id_col} AS item_id",
+        item_expr('artist'), item_expr('title'), item_expr('type'), item_expr('filename'),
+        item_expr('duration'), item_expr('amplification'), item_expr('level_peak'),
+        item_expr('level_truepeak'), item_expr('level_loudness'), item_expr('genre', 'native_genre')
+    ]) + " FROM items i WHERE i.filename IS NOT NULL AND i.filename != ''"
     cursor.execute(query)
     rows = cursor.fetchall()
+    row_names = [desc[0] for desc in cursor.description]
+
+    attrs_by_item = {}
+    cursor.execute(f"SELECT {attr_id_col}, name, value FROM {attr_table}")
+    for item_id, name, value in cursor.fetchall():
+        attrs_by_item.setdefault(item_id, []).append((name, value))
+
+    markers_by_item = {}
+    table_exists = cursor.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='item_cuemarkers'"
+    ).fetchone()
+    if table_exists:
+        try:
+            for item_id, marker_type, marker_value in cursor.execute(
+                "SELECT item, type, value FROM item_cuemarkers ORDER BY item, rowid"
+            ):
+                markers_by_item.setdefault(item_id, []).append((marker_type, marker_value))
+        except sqlite3.Error:
+            pass
     conn.close()
 
     stat_total = len(rows)
@@ -923,18 +1123,23 @@ def run_maintenance_file_tagger(db_path):
     stat_unsupported = 0
     stat_already_perfect = 0
     updated_count = 0
+    embedded_count = 0
+    sidecar_count = 0
 
-    for row in rows:
-        item_id, artist, title, raw_filename, year, genre, album, label = row
+    for raw_row in rows:
+        item = dict(zip(row_names, raw_row))
+        item_id = item['item_id']
+        raw_filename = item.get('filename')
+        attributes = attrs_by_item.get(item_id, [])
+        markers = markers_by_item.get(item_id, [])
 
         filename = str(raw_filename).replace('\\', '/')
         actual_path = None
-        
         if os.path.exists(filename) and os.path.isfile(filename):
             actual_path = filename
         else:
-            for b_dir in base_dirs:
-                test_path = os.path.join(b_dir, filename.lstrip('/'))
+            for base_dir in base_dirs:
+                test_path = os.path.join(base_dir, filename.lstrip('/'))
                 if os.path.exists(test_path) and os.path.isfile(test_path):
                     actual_path = test_path
                     break
@@ -945,87 +1150,119 @@ def run_maintenance_file_tagger(db_path):
                 c.print(f"[dim yellow]DEBUG Info: Suche erfolglos -> {filename}[/dim yellow]")
             continue
 
-        c_artist = str(artist).strip() if artist else ""
-        c_title = str(title).strip() if title else ""
-        c_year = str(year).strip() if year else ""
-        c_genre = str(genre).strip() if genre else ""
-        c_album = str(album).strip() if album else ""
-        c_label = str(label).strip() if label else ""
+        c_artist = str(item.get('artist') or '').strip()
+        c_title = str(item.get('title') or '').strip()
+        c_year = _clean_integerish_tag(_attr_value(attributes, 'Jahr', 'Year', 'Jaar'))
+        native_genre = str(item.get('native_genre') or '').strip()
+        c_genre = native_genre or _attr_value(attributes, 'Genre')
+        mmd_attributes = list(attributes)
+        if c_genre and not _attr_value(attributes, 'Genre'):
+            mmd_attributes.append(('Genre', c_genre))
+        c_album = _attr_value(attributes, 'Album')
+        c_label = _attr_value(attributes, 'Label')
+        c_language = _attr_value(attributes, 'Sprache', 'Language', 'Taal')
+        c_bpm = _clean_integerish_tag(_attr_value(attributes, 'BPM'))
+        c_isrc = _attr_value(attributes, 'ISRC')
 
         try:
-            audio = mutagen.File(actual_path)
-            if audio is None: 
+            audio = mutagen.File(actual_path, easy=False)
+            if audio is None:
                 stat_unsupported += 1
                 continue
-            
-            changed = False
+
+            portable_changed = False
+            metadata_changed = False
             file_type = type(audio).__name__
 
             if file_type in ['FLAC', 'OggVorbis']:
                 def set_vorbis(tag, val):
-                    nonlocal changed
-                    if val:
-                        if audio.get(tag) != [val]:
-                            audio[tag] = [val]
-                            changed = True
-                            
+                    nonlocal portable_changed
+                    if val and audio.get(tag) != [val]:
+                        audio[tag] = [val]
+                        portable_changed = True
+
                 set_vorbis('artist', c_artist)
                 set_vorbis('title', c_title)
                 set_vorbis('date', c_year)
                 set_vorbis('genre', c_genre)
                 set_vorbis('album', c_album)
                 set_vorbis('organization', c_label)
-                
-                if changed:
+                set_vorbis('language', c_language)
+                set_vorbis('bpm', c_bpm)
+                set_vorbis('isrc', c_isrc)
+
+                if portable_changed:
                     audio.save()
-                    updated_count += 1
-                else:
-                    stat_already_perfect += 1
+
+                if metadata_mode == 2:
+                    xml_text = _build_mairlist_xml(item, mmd_attributes, markers, declaration=True)
+                    metadata_changed = _write_text_atomic_if_changed(actual_path + '.mmd', xml_text)
+                    if metadata_changed:
+                        sidecar_count += 1
 
             elif file_type in ['MP3', 'AIFF']:
                 if not getattr(audio, 'tags', None):
                     try:
                         audio.add_tags()
-                    except:
+                    except Exception:
                         stat_unsupported += 1
-                        continue 
+                        continue
 
                 def set_id3(frame_class, val):
-                    nonlocal changed
-                    if val:
-                        frame_id = frame_class.__name__
-                        existing = audio.tags.getall(frame_id)
-                        if not existing or str(existing[0].text[0]) != str(val):
-                            audio.tags.setall(frame_id, [frame_class(encoding=3, text=[val])])
-                            changed = True
+                    nonlocal portable_changed
+                    if not val:
+                        return
+                    frame_id = frame_class.__name__
+                    existing = audio.tags.getall(frame_id)
+                    if not existing or not getattr(existing[0], 'text', None) or str(existing[0].text[0]) != str(val):
+                        audio.tags.setall(frame_id, [frame_class(encoding=3, text=[val])])
+                        portable_changed = True
 
                 set_id3(TPE1, c_artist)
                 set_id3(TIT2, c_title)
                 set_id3(TDRC, c_year)
                 set_id3(TCON, c_genre)
                 set_id3(TALB, c_album)
-                set_id3(TPUB, c_label) 
-                
-                if changed:
+                set_id3(TPUB, c_label)
+                set_id3(TLAN, c_language)
+                set_id3(TBPM, c_bpm)
+                set_id3(TSRC, c_isrc)
+
+                if metadata_mode == 2:
+                    xml_text = _build_mairlist_xml(item, mmd_attributes, markers, declaration=False)
+                    metadata_changed = _set_id3_mairlist_block(audio.tags, xml_text)
+                    if metadata_changed:
+                        embedded_count += 1
+
+                if portable_changed or metadata_changed:
                     audio.save()
-                    updated_count += 1
-                else:
-                    stat_already_perfect += 1
             else:
                 stat_unsupported += 1
+                continue
 
-        except Exception as e:
-            logging.error(f"FILE-TAGGER ERROR bei Datei {actual_path}: {str(e)}")
+            if portable_changed or metadata_changed:
+                updated_count += 1
+            else:
+                stat_already_perfect += 1
+
+        except Exception as exc:
+            logging.error(f"FILE-TAGGER ERROR bei Datei {actual_path}: {exc}")
             stat_unsupported += 1
             continue
 
-    logging.info(f"MAINTENANCE: {updated_count} Dateien getaggt. (Nicht gefunden: {stat_not_found})")
-    
-    c.print(f"\n[cyan]=== Tagger-Diagnose ===[/cyan]")
-    c.print(f"Tracks in Datenbank mit Pfad: [bold]{stat_total}[/bold]")
-    c.print(f"Pfade/Dateien nicht gefunden: [bold yellow]{stat_not_found}[/bold yellow]")
-    c.print(f"Nicht unterstütztes Format  : [bold yellow]{stat_unsupported}[/bold yellow]")
-    c.print(f"Tags waren bereits perfekt  : [bold green]{stat_already_perfect}[/bold green]")
-    c.print(f"Dateien erfolgreich getaggt : [bold green]{updated_count}[/bold green]\n")
+    logging.info(
+        f"MAINTENANCE: {updated_count} Dateien getaggt/gesichert. "
+        f"(Nicht gefunden: {stat_not_found}, mAirList embedded: {embedded_count}, MMD: {sidecar_count})"
+    )
 
+    c.print(f"\n[cyan]=== {utils.t('tagger_diag_title')} ===[/cyan]")
+    c.print(f"{utils.t('tagger_diag_total')}: [bold]{stat_total}[/bold]")
+    c.print(f"{utils.t('tagger_diag_missing')}: [bold yellow]{stat_not_found}[/bold yellow]")
+    c.print(f"{utils.t('tagger_diag_unsupported')}: [bold yellow]{stat_unsupported}[/bold yellow]")
+    c.print(f"{utils.t('tagger_diag_perfect')}: [bold green]{stat_already_perfect}[/bold green]")
+    c.print(f"{utils.t('tagger_diag_updated')}: [bold green]{updated_count}[/bold green]")
+    if metadata_mode == 2:
+        c.print(f"{utils.t('tagger_diag_embedded')}: [bold green]{embedded_count}[/bold green]")
+        c.print(f"{utils.t('tagger_diag_sidecar')}: [bold green]{sidecar_count}[/bold green]")
+    c.print()
     return updated_count

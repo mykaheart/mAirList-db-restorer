@@ -745,15 +745,26 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
 
                 genre_sugg = utils.clean_nan(df.at[idx, 'Genre_Vorschlag'])
                 genre_konf = utils.clean_nan(df.at[idx, 'Genre_Konfidenz']) or 'niedrig'
-                if genre_sugg:
-                    if auto_hoch and genre_konf == 'hoch' and not custom_refetch_needed:
-                        df.at[idx, 'Genre'] = genre_sugg
-                        console.print(utils.t('rev_genre_auto', sugg=genre_sugg, orig=orig_genre))
-                    else:
-                        inp = ask_input(utils.t('rev_genre', sugg=genre_sugg, orig=orig_genre))
-                        if inp.lower() in ['', 'j', 'ja', 'y', 'yes']: df.at[idx, 'Genre'] = genre_sugg
-                        elif inp.lower() == 'o': df.at[idx, 'Genre'] = orig_genre
-                        elif inp and inp.lower() not in ['n', 'nein']: df.at[idx, 'Genre'] = inp
+                genre_map = utils.get_genre_quick_map()
+                genre_hint = "/".join([f"{key}={value}" for key, value in genre_map.items()] + ["Text"])
+                if genre_sugg and auto_hoch and genre_konf == 'hoch' and not custom_refetch_needed:
+                    df.at[idx, 'Genre'] = genre_sugg
+                    console.print(utils.t('rev_genre_auto', sugg=genre_sugg, orig=orig_genre))
+                else:
+                    disp_genre = genre_sugg if genre_sugg else utils.t('no_sugg')
+                    inp = ask_input(utils.t('rev_genre', sugg=disp_genre, orig=orig_genre, hint=genre_hint))
+                    low = inp.lower()
+                    if low in ['', 'j', 'ja', 'y', 'yes']:
+                        if genre_sugg:
+                            df.at[idx, 'Genre'] = genre_sugg
+                    elif low == 'o':
+                        df.at[idx, 'Genre'] = orig_genre
+                    elif inp in genre_map:
+                        df.at[idx, 'Genre'] = genre_map[inp]
+                    elif inp and low not in ['n', 'nein', 'no', 'nee']:
+                        chosen_genre = utils.canonical_genre_choice(inp)
+                        df.at[idx, 'Genre'] = chosen_genre
+                        utils.add_custom_genre(chosen_genre)
 
                 label_sugg = utils.clean_nan(df.at[idx, 'Label_Vorschlag'])
                 disp_label = label_sugg if label_sugg else utils.t('no_sugg')
@@ -1521,7 +1532,6 @@ def phase_maintenance(db_path):
                     else: console.print(utils.t('maint_no_changes'))
                         
                 if do_tags:
-                    console.print("[magenta]Lese Dateien und schreibe Tags... (Das kann je nach Archivgröße dauern)[/magenta]")
                     count = db.run_maintenance_file_tagger(db_path)
                     if count > 0: console.print(utils.t('maint_done_tags', count=count))
                     else: console.print(utils.t('maint_no_changes'))

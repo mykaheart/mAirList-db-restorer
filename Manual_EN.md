@@ -1,4 +1,4 @@
-# 📖 Manual: mAirList DB Restorer 0.64.00 BETA
+# 📖 Manual: mAirList DB Restorer 0.65.00 BETA
 
 The **mAirList DB Restorer** helps maintain local mAirList databases (`.mldb`). It reads existing metadata, researches missing or questionable information through MusicBrainz and Discogs, can fill missing BPM values from rekordbox, file tags and AcousticBrainz, and provides several maintenance functions for existing databases.
 
@@ -67,7 +67,7 @@ Apply, duplicate maintenance and BPM maintenance additionally create a timestamp
 
 The Restorer automatically creates a `Data` directory next to the application. It can contain:
 
-- `config.json` – language, API credentials, ignore lists and the preferred rekordbox XML path per database.
+- `config.json` – language, API credentials, ignore lists, custom language/genre shortcuts and the preferred rekordbox XML path per database.
 - `*_vorschlaege.csv` – current Fetch workspace.
 - `*_restauriert.csv` – reviewed workspace used by Apply.
 - `*_bpm-review_YYYYMMDD-HHMMSS.csv` – complete BPM maintenance review list.
@@ -247,6 +247,12 @@ If Artist, Title, Year or Album is changed manually, the Restorer performs a tar
 
 When a safe proposal exists, `STYLE`, `DISCOGS_RELEASE_ID`, `Labelcode`, `ISRC`, `Type` and `BPM` are copied into the reviewed workspace without another individual prompt. Existing BPM has already been protected earlier and therefore receives no new proposal.
 
+### Genre shortcuts and genre memory
+
+Manual genre review offers numeric shortcuts. The list deliberately starts with **`1=Rock`** and **`2=Pop`**, followed by the other Restorer core genres. Free-text genres are stored under `CUSTOM_GENRES` in `Data/config.json` and become numeric choices for subsequent tracks.
+
+This memory is **UI-only**: a custom genre does not extend `ALLOWED_GENRES` and does not modify automatic synonym/normalization rules. A one-off manual genre therefore cannot silently change future API decisions.
+
 ### Language
 
 MusicBrainz does not provide a reliable recording-language value in this workflow, so the Restorer does not derive language from an arbitrary release-language field. Existing values are preserved and language can be set manually in Review. Frequently used custom languages are stored in `config.json`.
@@ -292,27 +298,28 @@ A native genre field and a genre attribute are both handled when present in the 
 
 Artist and Title are normalised to consistent apostrophes and smart capitalisation. This function writes directly to the corresponding `items` fields.
 
-### Maintenance [3] – File tagger
+### Maintenance [3] – File tagger and mAirList metadata backup
 
-Writes **reviewed database values to local audio files** through Mutagen. Supported formats are:
+The tagger uses **reviewed values from the database** and offers two modes:
 
-- FLAC
-- Ogg Vorbis
-- MP3
-- AIFF
+1. **Portable audio tags only**
+2. **Portable audio tags + full mAirList metadata backup**
 
-Written fields:
+Mutagen support currently covers FLAC, Ogg Vorbis, MP3 and AIFF.
 
-- Artist
-- Title
-- Year/Date
-- Genre
-- Album
-- Label/Publisher
+Portable tags include Artist, Title, Year/Date, Genre, Album, Label/Publisher, Language, BPM and ISRC.
 
-BPM, ISRC, Labelcode, Language and Lyrics are not written by this file tagger.
+In mode 2 the Restorer additionally backs up mAirList data already present in the `.mldb`. It **does not re-analyze audio** and does not calculate new cues or loudness values. Existing `Amplification`, every `item_cuemarkers` entry, Peak, True Peak, Loudness and useful mAirList/user attributes are copied.
 
-Because mAirList often stores paths relative to Storage Locations, the tagger asks for local base directories. It changes audio files directly and has no Undo function, so a file backup is recommended.
+**MP3 and AIFF:** the metadata block is stored directly as `TXXX:mAirList`. Only that mAirList frame is replaced; unrelated ID3 frames, artwork and other embedded data are preserved.
+
+**FLAC and Ogg Vorbis:** mAirList does not interpret an arbitrary `MAIRLIST` Vorbis comment as cue/analysis metadata. The Restorer therefore creates the supported sidecar using the exact audio filename plus `.mmd`, for example `Song.flac.mmd`. It contains the same `<PlaylistItem>` XML model used by mAirList itself.
+
+The `.mmd` file is written atomically and only when its content changes. `Duration` is read **only from the database**; it is never recalculated from audio and is never changed in the database.
+
+Restorer-internal attributes (`RESTAURIERT`, `DOPPELUNG`, `FORCE_APPLY`) and Lyrics/Songtext fields are excluded from this file backup.
+
+Because mAirList often stores filenames relative to Storage Locations, the tagger asks for local base folders. Audio files are modified directly and there is no undo mechanism, so a file backup is recommended.
 
 ### Maintenance [4] – Combined run
 
