@@ -1,4 +1,4 @@
-# 📖 Handleiding: mAirList DB Restorer 0.65.00 BETA
+# 📖 Handleiding: mAirList DB Restorer 0.66.00 BETA
 
 De **mAirList DB Restorer** helpt bij het onderhouden van lokale mAirList-databases (`.mldb`). Het programma leest bestaande metadata, onderzoekt ontbrekende of twijfelachtige gegevens via MusicBrainz en Discogs, kan ontbrekende BPM-waarden aanvullen vanuit rekordbox, bestandstags en AcousticBrainz en biedt verschillende onderhoudsfuncties voor bestaande databases.
 
@@ -522,3 +522,17 @@ GitHub Actions voert bovendien een compile-check en de regressietests onder Wind
 mAirList DB Restorer is **source-available freeware**. De exacte gebruiks- en verspreidingsvoorwaarden staan in `LICENSE`.
 
 Gebruik voor bugreports en featurewensen de officiële projectkanalen: GitHub Issues of de officiële release-thread in het mAirList-forum.
+
+### Onderhoud [7] – Ontbrekende snelheidsgroepen aanvullen
+
+Deze functie gebruikt het bestaande mAirList-standaardattribuut **`Geschwindigkeit`** met de waarden `Langsam`, `Medium` en `Schnell`. Alleen items **zonder bestaande indeling** worden aangevuld. Bestaande waarden gelden als autoritatieve/handmatige keuze en worden nooit gewijzigd.
+
+- t/m **100 BPM** → `Langsam`
+- **boven 100 en onder 130 BPM** → `Medium`
+- vanaf **130 BPM** → `Schnell`
+
+Voor het schrijven toont de Restorer het aantal kandidaten per groep, controleert de database-integriteit, maakt een back-up en controleert daarna opnieuw. Direct voor elke write wordt nogmaals gecontroleerd of er inmiddels een indeling bestaat.
+
+### Laatste database en bronmappen onthouden
+
+Na een geldige databasekeuze bewaart de Restorer het pad als `LAST_DATABASE` in `Data/config.json`. Bij de volgende interactieve start kan deze direct opnieuw worden gebruikt. Lokale basis-/bronmappen voor relatieve mAirList Storage-paden worden per database onder `DB_SOURCE_FOLDERS` opgeslagen en automatisch opnieuw gebruikt door zowel de bestandstagger als BPM-onderhoud.

@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.65.00 BETA
+# mAirList DB Restorer v0.66.00 BETA
 **De intelligente metadata-reparatietool voor lokale mAirList databases**
 
 *(Note: German and English documentation / manuals are available in the repository!)*
@@ -30,6 +30,8 @@ Dit script zoekt niet zomaar blindelings, maar werkt met meerdere veiligheidsnet
 *   **Hardening & veilig hervatten:** Afzonderlijke API-requests worden automatisch herhaald; bij tijdelijke netwerk-/429-/5xx-fouten wordt daarnaast de volledige trackopzoeking maximaal drie keer opnieuw gestart met 2/5/10-seconden-backoff. Pas daarna blijft de track open. Sessie-CSV's worden atomair opgeslagen en per databasepad gescheiden, zodat werkstanden niet beschadigd raken of tussen gelijknamige databases worden gemengd.
 *   **Veiliger opslaan:** Voor het definitieve schrijven toont de Restorer een wijzigingsoverzicht, controleert de SQLite-integriteit, maakt een back-up en controleert de database na het schrijven opnieuw.
 *   **Controle op dubbelen:** Onderhoud kan actuele dubbele kandidaten op basis van gelijke Artiest/Titel-combinaties, bestandspaden of geldige ISRCs markeren met `DOPPELUNG=JA`. Bij een volgende scan worden afgehandelde markeringen automatisch verwijderd; de Restorer verwijdert nooit automatisch items.
+*   **Snelheidsgroepen uit BPM:** Onderhoud [7] vult uitsluitend ontbrekende mAirList-standaardattributen `Geschwindigkeit` aan: t/m 100 BPM = `Langsam`, 101–129 = `Medium`, vanaf 130 = `Schnell`. Bestaande indelingen blijven altijd onaangetast.
+*   **Comfort bij starten & bronmappen:** De laatst gebruikte database wordt in `Data/config.json` onthouden en bij de volgende start opnieuw aangeboden. Lokale bron-/basismappen worden per database opgeslagen en automatisch opnieuw gebruikt door de tagger en BPM-onderhoud.
 *   **BPM-restauratie in normale Fetch + onderhoud:** Sinds 0.64 draait de BPM-keten ook mee in de normale Fetch. De primaire bron is een optionele rekordbox-XML-export die per database wordt onthouden: `AverageBpm` wordt alleen via exact bestandspad gekoppeld. Daarna volgen BPM-tags uit audiobestanden en als laatste fallback MusicBrainz + AcousticBrainz. Bestaande geldige BPM blijft ook bij Full Fetch beschermd. Onderhoudsoptie [6] blijft beschikbaar voor snelle BPM-only-nazorg met review-CSV, diagnose per oorzaak en half/double-time-conflicten.
 
 ---

@@ -2,6 +2,18 @@
 
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [0.66.00 Beta] - 2026-09-16
+### Hinzugefügt
+- **Geschwindigkeitsgruppen aus BPM:** Wartung [7] ergänzt ausschließlich fehlende mAirList-Standardattribute `Geschwindigkeit`: bis 100 BPM = `Langsam`, 101–129 = `Medium`, ab 130 BPM = `Schnell`. Bereits vorhandene Einteilungen werden weder vorgeschlagen noch überschrieben.
+- **Letzte Datenbank merken:** `LAST_DATABASE` wird in `Data/config.json` gespeichert und beim nächsten interaktiven Start zur Wiederverwendung angeboten.
+- **Quellordner pro Datenbank merken:** `DB_SOURCE_FOLDERS` speichert lokale Basisordner. Tagger und BPM-Wartung verwenden sie beim nächsten Lauf automatisch und können weitere Ordner ergänzen.
+
+### Sicherheit
+- **Doppelte Schutzprüfung für Geschwindigkeit:** Vorhandene Werte werden schon beim Scan ausgeschlossen und unmittelbar vor dem Schreiben innerhalb einer `BEGIN IMMEDIATE`-Transaktion erneut geprüft. Eine zwischenzeitlich manuell gesetzte Einteilung gewinnt immer.
+- **Integrität + Backup:** Wartung [7] prüft die SQLite-Integrität vor und nach dem Schreiben und legt vorher ein Zeitstempel-Backup an.
+- **Echter DB-Test:** Auf einer Kopie der aktuellen `Automation.mldb` wurden 11 fehlende Gruppen ergänzt (1 Langsam, 9 Medium, 1 Schnell); alle 1.234 bereits vorhandenen Einteilungen blieben byte-/wertseitig unverändert, Integritätsprüfung OK.
+- **Regressionstests erweitert:** 44 Tests.
+
 ## [0.65.00 Beta] - 2026-09-14
 ### Hinzugefügt
 - **Genre-Gedächtnis wie bei Sprachen:** Manuell eingegebene Genres werden dauerhaft unter `CUSTOM_GENRES` in `Data/config.json` gespeichert. Die numerische Schnellwahl beginnt bewusst mit `1=Rock`, `2=Pop`; gespeicherte eigene Genres werden danach angehängt.

@@ -1,4 +1,4 @@
-# mAirList DB Restorer v0.65.00 BETA
+# mAirList DB Restorer v0.66.00 BETA
 **The intelligent metadata repair tool for local mAirList databases**
 
 *(Note: German and Dutch documentation / manuals are available in the repository!)*
@@ -30,6 +30,8 @@ This script doesn't just search blindly; it uses multiple safety nets and logic 
 *   **Hardening & Resume Safety:** Individual API requests are retried automatically; transient network/429/5xx failures additionally restart the complete track lookup up to three times with 2/5/10-second backoff. Only then does the track remain pending. Session CSV files are written atomically and separated per database path so workspaces cannot be corrupted or mixed between identically named databases.
 *   **Safer Apply:** Before final writing, the Restorer shows a change summary, checks SQLite integrity, creates a backup, and checks the database again after writing.
 *   **Duplicate Scan:** Maintenance can mark current duplicate candidates based on matching Artist/Title pairs, file paths, or valid ISRCs with `DOPPELUNG=JA`. A later scan automatically removes resolved flags; the Restorer never deletes items automatically.
+*   **Speed groups from BPM:** Maintenance [7] fills only missing mAirList standard `Geschwindigkeit` attributes: up to 100 BPM = `Langsam`, 101–129 = `Medium`, 130+ = `Schnell`. Existing classifications are always preserved.
+*   **Startup & source-folder convenience:** The last used database is remembered in `Data/config.json` and offered again on the next start. Local source/base folders are stored per database and automatically reused by the tagger and BPM maintenance.
 *   **BPM restoration in normal Fetch + maintenance:** Since 0.64, the BPM chain also runs as part of normal Fetch. The primary source is an optional rekordbox XML export remembered per database: `AverageBpm` is matched only by exact file path. Audio-file BPM tags are next, with MusicBrainz + AcousticBrainz as the final fallback. Existing valid BPM is protected even during Full Fetch. Maintenance option [6] remains available for fast BPM-only follow-up with a review CSV, cause-specific diagnostics and half/double-time conflict reporting.
 
 ---

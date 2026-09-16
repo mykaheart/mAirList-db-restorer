@@ -1,4 +1,4 @@
-# 📖 Manual: mAirList DB Restorer 0.65.00 BETA
+# 📖 Manual: mAirList DB Restorer 0.66.00 BETA
 
 The **mAirList DB Restorer** helps maintain local mAirList databases (`.mldb`). It reads existing metadata, researches missing or questionable information through MusicBrainz and Discogs, can fill missing BPM values from rekordbox, file tags and AcousticBrainz, and provides several maintenance functions for existing databases.
 
@@ -522,3 +522,17 @@ GitHub Actions additionally runs a compile check and the regression suite on Win
 mAirList DB Restorer is **source-available freeware**. Exact usage and redistribution terms are defined in `LICENSE`.
 
 Please use the official project channels for bug reports and feature requests: GitHub Issues or the official release thread in the mAirList forum.
+
+### Maintenance [7] – Fill missing speed groups
+
+This function uses mAirList's existing standard **`Geschwindigkeit`** attribute with the values `Langsam`, `Medium` and `Schnell`. It fills **only items without an existing classification**. Existing values are treated as authoritative/manual decisions and are never changed.
+
+- up to and including **100 BPM** → `Langsam`
+- **above 100 and below 130 BPM** → `Medium`
+- **130 BPM and above** → `Schnell`
+
+Before writing, the Restorer shows candidate counts per group, checks database integrity, creates a backup and checks integrity again afterwards. Immediately before each write it re-checks whether a classification has appeared in the meantime.
+
+### Remember last database and source folders
+
+After a valid database selection the Restorer stores the path as `LAST_DATABASE` in `Data/config.json`. On the next interactive start it can be reused directly. Local base/source folders for relative mAirList Storage paths are stored per database under `DB_SOURCE_FOLDERS` and are automatically reused by both the file tagger and BPM maintenance.

@@ -759,6 +759,152 @@ def apply_bpm_values(db_path, bpm_values):
     }
 
 
+def _parse_bpm_float(value):
+    """Parse a BPM value without rounding so speed-zone boundaries stay exact."""
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            parsed = _parse_bpm_float(item)
+            if parsed is not None:
+                return parsed
+        return None
+    if hasattr(value, 'text'):
+        return _parse_bpm_float(getattr(value, 'text'))
+    match = re.search(r'(\d+(?:[\.,]\d+)?)', str(value))
+    if not match:
+        return None
+    try:
+        bpm = float(match.group(1).replace(',', '.'))
+    except ValueError:
+        return None
+    if not 30.0 <= bpm <= 300.0:
+        return None
+    return bpm
+
+
+def speed_group_for_bpm(value):
+    """Map valid BPM to mAirList's standard Geschwindigkeit dropdown values."""
+    bpm = _parse_bpm_float(value)
+    if bpm is None:
+        return None
+    if bpm <= 100.0:
+        return 'Langsam'
+    if bpm < 130.0:
+        return 'Medium'
+    return 'Schnell'
+
+
+def scan_speed_group_candidates(db_path):
+    """Return missing Geschwindigkeit assignments without touching existing values."""
+    uri = f"file:{os.path.abspath(db_path)}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    try:
+        bpm_rows = conn.execute(
+            "SELECT item, value FROM item_attributes WHERE LOWER(name) = 'bpm'"
+        ).fetchall()
+        speed_rows = conn.execute(
+            "SELECT item, value FROM item_attributes WHERE LOWER(name) = 'geschwindigkeit'"
+        ).fetchall()
+        valid_items = {int(row[0]) for row in conn.execute('SELECT idx FROM items').fetchall()}
+    finally:
+        conn.close()
+
+    bpm_by_item = {}
+    for item_id, value in bpm_rows:
+        bpm = _parse_bpm_float(value)
+        if bpm is not None:
+            bpm_by_item.setdefault(int(item_id), []).append(bpm)
+
+    speed_by_item = {}
+    for item_id, value in speed_rows:
+        speed_by_item.setdefault(int(item_id), []).append('' if value is None else str(value).strip())
+
+    candidates = {}
+    stats = {
+        'with_bpm': 0, 'existing': 0, 'candidates': 0,
+        'slow': 0, 'medium': 0, 'fast': 0, 'ambiguous': 0,
+    }
+    for item_id in sorted(bpm_by_item):
+        if item_id not in valid_items:
+            continue
+        stats['with_bpm'] += 1
+        if any(value for value in speed_by_item.get(item_id, [])):
+            stats['existing'] += 1
+            continue
+        groups = {speed_group_for_bpm(bpm) for bpm in bpm_by_item[item_id]}
+        groups.discard(None)
+        if len(groups) != 1:
+            stats['ambiguous'] += 1
+            continue
+        group = groups.pop()
+        candidates[str(item_id)] = group
+        stats['candidates'] += 1
+        if group == 'Langsam':
+            stats['slow'] += 1
+        elif group == 'Medium':
+            stats['medium'] += 1
+        else:
+            stats['fast'] += 1
+    return candidates, stats
+
+
+def apply_speed_groups(db_path, assignments):
+    """Atomically fill Geschwindigkeit only if it is still missing/blank."""
+    allowed = {'Langsam', 'Medium', 'Schnell'}
+    clean = {
+        int(item_id): str(value)
+        for item_id, value in (assignments or {}).items()
+        if str(item_id).isdigit() and str(value) in allowed
+    }
+    if not clean:
+        return {'written': 0, 'skipped_existing': 0, 'skipped_missing_item': 0}
+
+    conn = sqlite3.connect(db_path)
+    written = skipped_existing = skipped_missing_item = 0
+    try:
+        cur = conn.cursor()
+        cur.execute('BEGIN IMMEDIATE')
+        for item_id in sorted(clean):
+            if cur.execute('SELECT 1 FROM items WHERE idx = ?', (item_id,)).fetchone() is None:
+                skipped_missing_item += 1
+                continue
+            existing = cur.execute(
+                "SELECT value FROM item_attributes WHERE item = ? AND LOWER(name) = 'geschwindigkeit'",
+                (item_id,),
+            ).fetchall()
+            if any(str(row[0] or '').strip() for row in existing):
+                skipped_existing += 1
+                continue
+            cur.execute(
+                "DELETE FROM item_attributes WHERE item = ? AND LOWER(name) = 'geschwindigkeit'",
+                (item_id,),
+            )
+            cur.execute(
+                "INSERT OR REPLACE INTO item_attributes (item, name, value) VALUES (?, 'Geschwindigkeit', ?)",
+                (item_id, clean[item_id]),
+            )
+            written += 1
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    utils.log_change(
+        'MAINTENANCE',
+        f"Geschwindigkeitsgruppen ergänzt: {written} geschrieben, "
+        f"{skipped_existing} vorhandene Einteilungen geschützt, "
+        f"{skipped_missing_item} nicht mehr vorhandene Elemente übersprungen."
+    )
+    return {
+        'written': written,
+        'skipped_existing': skipped_existing,
+        'skipped_missing_item': skipped_missing_item,
+    }
+
+
 def run_maintenance_genres(db_path):
     import sqlite3
     import utils
@@ -1049,16 +1195,27 @@ def run_maintenance_file_tagger(db_path, metadata_mode=None, base_dirs=None):
 
     if base_dirs is None:
         c.print("\n" + utils.t('tagger_path_intro'))
-        base_dirs = []
+        saved_dirs = utils.get_saved_source_folders(db_path)
+        if saved_dirs:
+            c.print(utils.t('source_dirs_saved', paths=', '.join(saved_dirs)))
+        else:
+            c.print(utils.t('source_dirs_none'))
+        base_dirs = [d for d in saved_dirs if os.path.isdir(d)]
+        added_dirs = []
         while True:
             d = c.input(utils.t('tagger_path_prompt')).strip().strip('"').strip("'")
             if not d:
                 break
             if os.path.isdir(d):
-                base_dirs.append(d)
+                d = os.path.abspath(d)
+                if os.path.normcase(d) not in {os.path.normcase(x) for x in base_dirs}:
+                    base_dirs.append(d)
+                    added_dirs.append(d)
                 c.print(utils.t('tagger_path_added', path=d))
             else:
                 c.print(utils.t('tagger_path_invalid'))
+        if added_dirs:
+            utils.save_source_folders(db_path, saved_dirs + added_dirs)
     else:
         base_dirs = [str(d) for d in base_dirs if os.path.isdir(str(d))]
 
