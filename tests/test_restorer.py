@@ -908,3 +908,155 @@ class Version065GenreAndFileBackupTests(unittest.TestCase):
             self.assertEqual(str(fake_audio.tags['TLAN'].text[0]), 'Deutsch')
             self.assertEqual(str(fake_audio.tags['TBPM'].text[0]), '128')
             self.assertEqual(str(fake_audio.tags['TSRC'].text[0]), 'DEABC0400001')
+
+class Version066SpeedAndStartupTests(unittest.TestCase):
+    def test_speed_group_boundaries_are_exact(self):
+        self.assertEqual(db.speed_group_for_bpm('100'), 'Langsam')
+        self.assertEqual(db.speed_group_for_bpm('100.1'), 'Medium')
+        self.assertEqual(db.speed_group_for_bpm('129.9'), 'Medium')
+        self.assertEqual(db.speed_group_for_bpm('130'), 'Schnell')
+        self.assertEqual(db.speed_group_for_bpm('181'), 'Schnell')
+        self.assertIsNone(db.speed_group_for_bpm('n/a'))
+
+    def test_speed_scan_only_proposes_missing_classifications(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'speed.mldb')
+            rows = [
+                (1, 'Slow', 'A', 'Music', '1.flac', 100.0, 100.0),
+                (2, 'Manual', 'B', 'Music', '2.flac', 100.0, 100.0),
+                (3, 'Medium', 'C', 'Music', '3.flac', 100.0, 100.0),
+                (4, 'Fast', 'D', 'Music', '4.flac', 100.0, 100.0),
+            ]
+            create_test_db(path, rows=rows)
+            conn = sqlite3.connect(path)
+            conn.executemany(
+                'INSERT OR REPLACE INTO item_attributes(item, name, value) VALUES (?, ?, ?)',
+                [(1, 'BPM', '100'), (2, 'BPM', '181'), (3, 'BPM', '129'), (4, 'BPM', '130')]
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO item_attributes(item, name, value) VALUES (2, 'Geschwindigkeit', 'Medium')"
+            )
+            conn.commit()
+            conn.close()
+
+            proposals, stats = db.scan_speed_group_candidates(path)
+            self.assertEqual(proposals, {'1': 'Langsam', '3': 'Medium', '4': 'Schnell'})
+            self.assertEqual(stats['with_bpm'], 4)
+            self.assertEqual(stats['existing'], 1)
+            self.assertEqual(stats['candidates'], 3)
+            self.assertEqual((stats['slow'], stats['medium'], stats['fast']), (1, 1, 1))
+
+    def test_speed_apply_rechecks_and_never_overwrites_existing_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'speed.mldb')
+            create_test_db(path)
+            conn = sqlite3.connect(path)
+            conn.executemany(
+                'INSERT OR REPLACE INTO item_attributes(item, name, value) VALUES (?, ?, ?)',
+                [(1, 'BPM', '95'), (2, 'BPM', '140')]
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO item_attributes(item, name, value) VALUES (2, 'Geschwindigkeit', 'Medium')"
+            )
+            conn.commit()
+            conn.close()
+
+            result = db.apply_speed_groups(path, {'1': 'Langsam', '2': 'Schnell'})
+            self.assertEqual(result['written'], 1)
+            self.assertEqual(result['skipped_existing'], 1)
+            conn = sqlite3.connect(path)
+            values = dict(conn.execute(
+                "SELECT item, value FROM item_attributes WHERE LOWER(name) = 'geschwindigkeit' ORDER BY item"
+            ).fetchall())
+            conn.close()
+            self.assertEqual(values[1], 'Langsam')
+            self.assertEqual(values[2], 'Medium')
+
+    def test_database_and_source_folders_persist_without_losing_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = os.path.join(tmp, 'config.json')
+            db_path = os.path.join(tmp, 'Automation.mldb')
+            source_a = os.path.join(tmp, 'Music')
+            source_b = os.path.join(tmp, 'More Music')
+            os.makedirs(source_a)
+            os.makedirs(source_b)
+            old_config = utils.CONFIG_FILE
+            try:
+                utils.CONFIG_FILE = config_path
+                Path(config_path).write_text('{"LANG":"de","CUSTOM_GENRES":["Funk"]}', encoding='utf-8')
+                utils.save_database_context(db_path)
+                saved = utils.save_source_folders(db_path, [source_a, source_a, source_b])
+                self.assertEqual(saved, [os.path.abspath(source_a), os.path.abspath(source_b)])
+                self.assertEqual(utils.get_last_database(), os.path.abspath(db_path))
+                self.assertEqual(utils.get_saved_source_folders(db_path), saved)
+                import json
+                config = json.loads(Path(config_path).read_text(encoding='utf-8'))
+                self.assertEqual(config['LANG'], 'de')
+                self.assertEqual(config['CUSTOM_GENRES'], ['Funk'])
+            finally:
+                utils.CONFIG_FILE = old_config
+
+    def test_activate_database_saves_last_database_and_prepares_session_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, 'Automation.mldb')
+            Path(db_path).write_bytes(b'dummy')
+            with patch.object(main.db, 'verify_db_compatibility', return_value=25), \
+                 patch.object(main.utils, 'save_database_context') as save_context, \
+                 patch.object(main, 'setup_logging', return_value=('Automation_deadbeef', tmp)):
+                active = main._activate_database(db_path)
+            self.assertEqual(active[0], os.path.abspath(db_path))
+            self.assertTrue(active[1].endswith('Automation_deadbeef_vorschlaege.csv'))
+            self.assertTrue(active[2].endswith('Automation_deadbeef_restauriert.csv'))
+            save_context.assert_called_once_with(os.path.abspath(db_path))
+
+class Version066SpeedMaintenanceIntegrationTests(unittest.TestCase):
+    def test_speed_maintenance_creates_backup_and_only_fills_missing_values(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'speed-maintenance.mldb')
+            rows = [
+                (1, 'Slow', 'A', 'Music', '1.flac', 100.0, 100.0),
+                (2, 'Protected', 'B', 'Music', '2.flac', 100.0, 100.0),
+                (3, 'Fast', 'C', 'Music', '3.flac', 100.0, 100.0),
+            ]
+            create_test_db(path, rows=rows)
+            conn = sqlite3.connect(path)
+            conn.executemany(
+                'INSERT OR REPLACE INTO item_attributes(item, name, value) VALUES (?, ?, ?)',
+                [(1, 'BPM', '100'), (2, 'BPM', '145'), (3, 'BPM', '130')]
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO item_attributes(item, name, value) VALUES (2, 'Geschwindigkeit', 'Medium')"
+            )
+            conn.commit()
+            conn.close()
+
+            with patch.object(main.console, 'input', side_effect=['7', 'j']):
+                main.phase_maintenance(path)
+
+            conn = sqlite3.connect(path)
+            values = dict(conn.execute(
+                "SELECT item, value FROM item_attributes WHERE LOWER(name) = 'geschwindigkeit' ORDER BY item"
+            ).fetchall())
+            conn.close()
+            self.assertEqual(values, {1: 'Langsam', 2: 'Medium', 3: 'Schnell'})
+            backups = [name for name in os.listdir(tmp) if name.startswith('speed-maintenance.mldb.backup-')]
+            self.assertEqual(len(backups), 1)
+            ok, details = db.check_integrity(path)
+            self.assertTrue(ok, details)
+
+class Version066ConfigMigrationTests(unittest.TestCase):
+    def test_last_database_can_be_inferred_from_single_legacy_database_mapping(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = os.path.join(tmp, 'config.json')
+            db_path = os.path.join(tmp, 'Automation.mldb')
+            old_config = utils.CONFIG_FILE
+            try:
+                utils.CONFIG_FILE = config_path
+                import json
+                Path(config_path).write_text(json.dumps({
+                    'DB_REKORDBOX_XML': {db_path: os.path.join(tmp, 'rekordbox.xml')},
+                    'DB_IGNORES': {db_path: ['OAD']},
+                }), encoding='utf-8')
+                self.assertEqual(utils.get_last_database(), db_path)
+            finally:
+                utils.CONFIG_FILE = old_config

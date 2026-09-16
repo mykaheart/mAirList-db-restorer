@@ -1,4 +1,4 @@
-# 📖 Handbuch: mAirList DB Restorer 0.65.00 BETA
+# 📖 Handbuch: mAirList DB Restorer 0.66.00 BETA
 
 Der **mAirList DB Restorer** unterstützt bei der Pflege lokaler mAirList-Datenbanken (`.mldb`). Er liest vorhandene Metadaten, recherchiert fehlende oder fragliche Angaben über MusicBrainz und Discogs, kann fehlende BPM aus rekordbox, Datei-Tags und AcousticBrainz ergänzen und bietet mehrere Wartungsfunktionen für bestehende Datenbanken.
 
@@ -541,3 +541,17 @@ GitHub Actions führt zusätzlich einen Compile-Check und die Regressionstests u
 Der mAirList DB Restorer ist **source-available Freeware**. Die genauen Nutzungs- und Weitergabebedingungen stehen in der Datei `LICENSE`.
 
 Bug-Reports und Feature-Wünsche bitte über die offiziellen Projektkanäle einreichen: GitHub Issues bzw. den offiziellen Release-Thread im mAirList-Forum.
+
+### Wartung [7] – Fehlende Geschwindigkeitsgruppen
+
+Die Funktion verwendet das bereits von mAirList angelegte Standardattribut **`Geschwindigkeit`** mit den Werten `Langsam`, `Medium` und `Schnell`. Sie ergänzt **nur Elemente ohne vorhandene Einteilung**. Vorhandene Werte gelten als manuelle/autoritative Entscheidung und werden niemals verändert.
+
+- bis einschließlich **100 BPM** → `Langsam`
+- **über 100 bis unter 130 BPM** → `Medium`
+- ab **130 BPM** → `Schnell`
+
+Vor dem Schreiben zeigt der Restorer die Anzahl der Kandidaten je Gruppe, prüft die Datenbankintegrität, legt ein Backup an und prüft die Integrität danach erneut. Direkt vor jedem Schreibvorgang wird nochmals geprüft, ob inzwischen eine Einteilung existiert.
+
+### Letzte Datenbank und Quellordner merken
+
+Nach einer gültigen Datenbankauswahl speichert der Restorer den Pfad als `LAST_DATABASE` in `Data/config.json`. Beim nächsten interaktiven Start kann diese Datenbank direkt weiterverwendet werden. Lokale Basis-/Quellordner für relative mAirList-Storage-Pfade werden pro Datenbank unter `DB_SOURCE_FOLDERS` gespeichert und sowohl vom Datei-Tagger als auch von der BPM-Wartung automatisch wiederverwendet.

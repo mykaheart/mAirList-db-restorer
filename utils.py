@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.65.00 BETA"
+APP_VERSION = "0.66.00 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -89,6 +89,12 @@ T = {
         'menu_title': "mAirList Datenbank-Assistent",
         'menu_db_none': "Keine Datenbank ausgewählt – beginne mit Option 0.",
         'menu_db_act': "Aktive Datenbank:",
+        'startup_last_db': "Zuletzt verwendete Datenbank:",
+        'startup_keep_db': "Diese Datenbank weiterverwenden? [J/n]: ",
+        'startup_change_db': "Andere Datenbank wählen.",
+        'startup_last_db_missing': "[yellow]Die zuletzt verwendete Datenbank ist nicht mehr erreichbar. Bitte neu auswählen.[/yellow]",
+        'source_dirs_saved': "[green]Gespeicherte Quellordner:[/green] {paths}",
+        'source_dirs_none': "[dim]Noch keine Quellordner für diese Datenbank gespeichert.[/dim]",
         'menu_opt0': "Datenbank-Kopie auswählen oder wechseln",
         'menu_desc0': "Wähle die .mldb-Kopie, mit der der Restorer arbeiten soll.",
         'menu_h1': "--- SCHRITT 1: METADATEN SUCHEN ---",
@@ -214,13 +220,27 @@ T = {
         'maint_opt4': "  [[green]4[/green]] ALLE Wartungsaufgaben (1-2) nacheinander ausführen",
         'maint_opt5': "  [[green]5[/green]] Dopplungs-Kandidaten markieren / Status aktualisieren",
         'maint_opt6': "  [[green]6[/green]] Fehlende BPM ergänzen (rekordbox XML / Datei-Tags / MusicBrainz + AcousticBrainz)",
+        'maint_opt7': "  [[green]7[/green]] Fehlende Geschwindigkeitsgruppen aus BPM ergänzen",
         'maint_opt0': "  [[green]0[/green]] Zurück ins Hauptmenü",
-        'maint_prompt': "Auswahl [0-6]: ",
+        'maint_prompt': "Auswahl [0-7]: ",
+        'maint_speed_intro': "[cyan]Geschwindigkeitsgruppen prüfen...[/cyan]\n[dim]Vorhandene Werte in 'Geschwindigkeit' bleiben immer unangetastet. Neu eingeteilt wird nur bei gültigem BPM: bis 100 = Langsam, 101-129 = Medium, ab 130 = Schnell.[/dim]",
+        'maint_speed_summary_title': "Geschwindigkeitsgruppen",
+        'maint_speed_with_bpm': "Tracks mit gültigem BPM",
+        'maint_speed_existing': "Bereits eingeteilt",
+        'maint_speed_candidates': "Noch ohne Geschwindigkeit",
+        'maint_speed_slow': "Davon Langsam",
+        'maint_speed_medium': "Davon Medium",
+        'maint_speed_fast': "Davon Schnell",
+        'maint_speed_ambiguous': "Mehrdeutige BPM (übersprungen)",
+        'maint_speed_confirm': "{count} fehlende Geschwindigkeitsgruppen schreiben? [j/N]: ",
+        'maint_speed_cancel': "[yellow]Geschwindigkeits-Zuordnung abgebrochen.[/yellow]",
+        'maint_speed_nochange': "[green]Keine fehlenden Geschwindigkeitsgruppen gefunden.[/green]",
+        'maint_speed_done': "[green]✓ Geschwindigkeitsgruppen ergänzt: {written} geschrieben, {skipped} wegen inzwischen vorhandener Einteilung übersprungen.[/green]",
         'tagger_mode_title': "[bold cyan]Datei-Tagger[/bold cyan]",
         'tagger_mode_desc': "[dim]1 schreibt nur portable Audio-Tags. 2 sichert zusätzlich mAirList-Cues, Pegelanalyse und Normalisierung (MP3/AIFF eingebettet, FLAC/Ogg als .mmd).[/dim]",
         'tagger_mode_prompt': "Modus [1=Tags / 2=Tags+mAirList / 0=Abbruch]: ",
         'tagger_mode_invalid': "[red]Bitte 0, 1 oder 2 wählen.[/red]",
-        'tagger_path_intro': "[cyan]=== Lokale Pfad-Zuordnung ===[/cyan]\nDa mAirList Storage Locations nutzt, können in der DB relative Pfade stehen. Füge die lokalen Basisordner hinzu; Enter startet.",
+        'tagger_path_intro': "[cyan]=== Lokale Pfad-Zuordnung ===[/cyan]\nDa mAirList Storage Locations nutzt, können in der DB relative Pfade stehen. Gespeicherte Quellordner werden automatisch verwendet; weitere Ordner kannst du ergänzen. Enter startet.",
         'tagger_path_prompt': "Basis-Ordner (optional, Enter = starten): ",
         'tagger_path_added': "[green]✓ Ordner hinzugefügt:[/green] {path}",
         'tagger_path_invalid': "[red]Ordner existiert nicht oder ist ungültig.[/red]",
@@ -241,7 +261,7 @@ T = {
         'maint_bpm_rb_unmatched': "Nicht aus rekordbox übernommen (Fallback)",
         'maint_bpm_rb_conflicts': "Vorhandene BPM mit deutlicher rekordbox-Abweichung",
         'maint_bpm_source_rb': "rekordbox XML",
-        'maint_bpm_path_intro': "[cyan]Optionale lokale Pfad-Zuordnung[/cyan]\nFalls mAirList relative Speicherort-Pfade nutzt, kannst du hier Basisordner hinzufügen. Enter ohne Eingabe startet die Prüfung.",
+        'maint_bpm_path_intro': "[cyan]Optionale lokale Pfad-Zuordnung[/cyan]\nGespeicherte Quellordner werden automatisch verwendet. Falls mAirList relative Speicherort-Pfade nutzt, kannst du weitere Basisordner ergänzen. Enter startet die Prüfung.",
         'maint_bpm_path_prompt': "Basis-Ordner (optional, Enter = weiter): ",
         'maint_bpm_path_added': "[green]✓ Ordner hinzugefügt:[/green] {path}",
         'maint_bpm_path_invalid': "[red]Ordner existiert nicht oder ist ungültig.[/red]",
@@ -297,6 +317,12 @@ T = {
         'menu_title': "mAirList Database Assistant",
         'menu_db_none': "No database selected – start with option 0.",
         'menu_db_act': "Active Database:",
+        'startup_last_db': "Last used database:",
+        'startup_keep_db': "Keep using this database? [Y/n]: ",
+        'startup_change_db': "Select another database.",
+        'startup_last_db_missing': "[yellow]The last used database is no longer reachable. Please select it again.[/yellow]",
+        'source_dirs_saved': "[green]Saved source folders:[/green] {paths}",
+        'source_dirs_none': "[dim]No source folders stored for this database yet.[/dim]",
         'menu_opt0': "Select or change the database copy",
         'menu_desc0': "Choose the .mldb copy the Restorer should work with.",
         'menu_h1': "--- STEP 1: SEARCH FOR METADATA ---",
@@ -422,13 +448,27 @@ T = {
         'maint_opt4': "  [[green]4[/green]] Execute ALL maintenance tasks (1-2) sequentially",
         'maint_opt5': "  [[green]5[/green]] Mark duplicate candidates / refresh status",
         'maint_opt6': "  [[green]6[/green]] Fill missing BPM (rekordbox XML / file tags / MusicBrainz + AcousticBrainz)",
+        'maint_opt7': "  [[green]7[/green]] Fill missing speed groups from BPM",
         'maint_opt0': "  [[green]0[/green]] Back / Cancel",
-        'maint_prompt': "Choice [0-6]: ",
+        'maint_prompt': "Choice [0-7]: ",
+        'maint_speed_intro': "[cyan]Checking speed groups...[/cyan]\n[dim]Existing 'Geschwindigkeit' values are never changed. Only tracks with valid BPM and no speed group are filled: up to 100 = Langsam, 101-129 = Medium, 130+ = Schnell.[/dim]",
+        'maint_speed_summary_title': "Speed groups",
+        'maint_speed_with_bpm': "Tracks with valid BPM",
+        'maint_speed_existing': "Already classified",
+        'maint_speed_candidates': "Still without speed group",
+        'maint_speed_slow': "Of which Langsam",
+        'maint_speed_medium': "Of which Medium",
+        'maint_speed_fast': "Of which Schnell",
+        'maint_speed_ambiguous': "Ambiguous BPM (skipped)",
+        'maint_speed_confirm': "Write {count} missing speed groups? [y/N]: ",
+        'maint_speed_cancel': "[yellow]Speed-group assignment cancelled.[/yellow]",
+        'maint_speed_nochange': "[green]No missing speed groups found.[/green]",
+        'maint_speed_done': "[green]✓ Speed groups filled: {written} written, {skipped} skipped because a classification appeared in the meantime.[/green]",
         'tagger_mode_title': "[bold cyan]File tagger[/bold cyan]",
         'tagger_mode_desc': "[dim]1 writes portable audio tags only. 2 also backs up mAirList cues, level analysis and normalization (embedded in MP3/AIFF, .mmd sidecar for FLAC/Ogg).[/dim]",
         'tagger_mode_prompt': "Mode [1=Tags / 2=Tags+mAirList / 0=Cancel]: ",
         'tagger_mode_invalid': "[red]Please choose 0, 1 or 2.[/red]",
-        'tagger_path_intro': "[cyan]=== Local path mapping ===[/cyan]\nBecause mAirList uses Storage Locations, the DB may contain relative paths. Add local base folders; press Enter to start.",
+        'tagger_path_intro': "[cyan]=== Local path mapping ===[/cyan]\nBecause mAirList uses Storage Locations, the DB may contain relative paths. Saved source folders are used automatically; you can add more folders. Press Enter to start.",
         'tagger_path_prompt': "Base folder (optional, Enter = start): ",
         'tagger_path_added': "[green]✓ Folder added:[/green] {path}",
         'tagger_path_invalid': "[red]Folder does not exist or is invalid.[/red]",
@@ -505,6 +545,12 @@ T = {
         'menu_title': "mAirList Database Assistent",
         'menu_db_none': "Geen database geselecteerd – begin met optie 0.",
         'menu_db_act': "Actieve database:",
+        'startup_last_db': "Laatst gebruikte database:",
+        'startup_keep_db': "Deze database blijven gebruiken? [J/n]: ",
+        'startup_change_db': "Andere database kiezen.",
+        'startup_last_db_missing': "[yellow]De laatst gebruikte database is niet meer bereikbaar. Kies deze opnieuw.[/yellow]",
+        'source_dirs_saved': "[green]Opgeslagen bronmappen:[/green] {paths}",
+        'source_dirs_none': "[dim]Nog geen bronmappen voor deze database opgeslagen.[/dim]",
         'menu_opt0': "Databasekopie selecteren of wijzigen",
         'menu_desc0': "Kies de .mldb-kopie waarmee de Restorer moet werken.",
         'menu_h1': "--- STAP 1: METADATA ZOEKEN ---",
@@ -630,13 +676,27 @@ T = {
         'maint_opt4': "  [[green]4[/green]] ALLE onderhoudstaken (1-2) achter elkaar uitvoeren",
         'maint_opt5': "  [[green]5[/green]] Dubbele kandidaten markeren / status bijwerken",
         'maint_opt6': "  [[green]6[/green]] Ontbrekende BPM aanvullen (rekordbox XML / bestandstags / MusicBrainz + AcousticBrainz)",
+        'maint_opt7': "  [[green]7[/green]] Ontbrekende snelheidsgroepen uit BPM aanvullen",
         'maint_opt0': "  [[green]0[/green]] Terug / Annuleren",
-        'maint_prompt': "Keuze [0-6]: ",
+        'maint_prompt': "Keuze [0-7]: ",
+        'maint_speed_intro': "[cyan]Snelheidsgroepen controleren...[/cyan]\n[dim]Bestaande waarden in 'Geschwindigkeit' worden nooit gewijzigd. Alleen tracks met geldige BPM en zonder groep worden ingevuld: t/m 100 = Langsam, 101-129 = Medium, vanaf 130 = Schnell.[/dim]",
+        'maint_speed_summary_title': "Snelheidsgroepen",
+        'maint_speed_with_bpm': "Tracks met geldige BPM",
+        'maint_speed_existing': "Al ingedeeld",
+        'maint_speed_candidates': "Nog zonder snelheidsgroep",
+        'maint_speed_slow': "Daarvan Langsam",
+        'maint_speed_medium': "Daarvan Medium",
+        'maint_speed_fast': "Daarvan Schnell",
+        'maint_speed_ambiguous': "Dubbelzinnige BPM (overgeslagen)",
+        'maint_speed_confirm': "{count} ontbrekende snelheidsgroepen schrijven? [j/N]: ",
+        'maint_speed_cancel': "[yellow]Indeling in snelheidsgroepen geannuleerd.[/yellow]",
+        'maint_speed_nochange': "[green]Geen ontbrekende snelheidsgroepen gevonden.[/green]",
+        'maint_speed_done': "[green]✓ Snelheidsgroepen aangevuld: {written} geschreven, {skipped} overgeslagen omdat inmiddels een indeling bestond.[/green]",
         'tagger_mode_title': "[bold cyan]Bestandstagger[/bold cyan]",
         'tagger_mode_desc': "[dim]1 schrijft alleen draagbare audiotags. 2 maakt daarnaast een back-up van mAirList-cues, niveaumeting en normalisatie (ingebed in MP3/AIFF, .mmd naast FLAC/Ogg).[/dim]",
         'tagger_mode_prompt': "Modus [1=Tags / 2=Tags+mAirList / 0=Annuleren]: ",
         'tagger_mode_invalid': "[red]Kies 0, 1 of 2.[/red]",
-        'tagger_path_intro': "[cyan]=== Lokale padtoewijzing ===[/cyan]\nOmdat mAirList Storage Locations gebruikt, kan de database relatieve paden bevatten. Voeg lokale basismappen toe; Enter start.",
+        'tagger_path_intro': "[cyan]=== Lokale padtoewijzing ===[/cyan]\nOmdat mAirList Storage Locations gebruikt, kan de database relatieve paden bevatten. Opgeslagen bronmappen worden automatisch gebruikt; je kunt extra mappen toevoegen. Enter start.",
         'tagger_path_prompt': "Basismap (optioneel, Enter = starten): ",
         'tagger_path_added': "[green]✓ Map toegevoegd:[/green] {path}",
         'tagger_path_invalid': "[red]Map bestaat niet of is ongeldig.[/red]",
@@ -817,6 +877,106 @@ def save_language(lang):
     config['LANG'] = lang
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=4)
+
+def _load_config_data():
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_config_data(config):
+    os.makedirs(os.path.dirname(CONFIG_FILE) or '.', exist_ok=True)
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(config if isinstance(config, dict) else {}, f, indent=4, ensure_ascii=False)
+
+
+def get_last_database():
+    config = _load_config_data()
+    value = str(config.get('LAST_DATABASE', '') or '').strip()
+    if value:
+        return value
+    # Upgrade convenience: older releases already stored per-database maps.
+    # If exactly one database is known there, offer it on the first 0.66 start.
+    candidates = []
+    for key in ('DB_REKORDBOX_XML', 'DB_IGNORES'):
+        mapping = config.get(key, {})
+        if isinstance(mapping, dict):
+            candidates.extend(str(db_path or '').strip() for db_path in mapping if str(db_path or '').strip())
+    unique = []
+    seen = set()
+    for candidate in candidates:
+        norm = os.path.normcase(candidate)
+        if norm not in seen:
+            seen.add(norm)
+            unique.append(candidate)
+    return unique[0] if len(unique) == 1 else ''
+
+
+def get_saved_source_folders(db_path):
+    """Return per-database audio source/base folders stored in config.json."""
+    db_abs = os.path.abspath(str(db_path or ''))
+    mapping = _load_config_data().get('DB_SOURCE_FOLDERS', {})
+    if not isinstance(mapping, dict):
+        return []
+    values = mapping.get(db_abs, [])
+    if isinstance(values, str):
+        values = [values]
+    result = []
+    seen = set()
+    for value in values if isinstance(values, list) else []:
+        clean = os.path.abspath(str(value or '').strip()) if str(value or '').strip() else ''
+        key = os.path.normcase(clean) if clean else ''
+        if clean and key not in seen:
+            seen.add(key)
+            result.append(clean)
+    return result
+
+
+def save_database_context(db_path):
+    """Remember the last valid database without changing per-database settings."""
+    clean = os.path.abspath(str(db_path or '').strip())
+    if not clean:
+        return
+    config = _load_config_data()
+    config['LAST_DATABASE'] = clean
+    _save_config_data(config)
+
+
+def save_source_folders(db_path, folders):
+    """Persist valid source/base folders per database, de-duplicated and ordered."""
+    db_abs = os.path.abspath(str(db_path or ''))
+    if not db_abs:
+        return []
+    clean_values = []
+    seen = set()
+    for folder in folders or []:
+        text = str(folder or '').strip()
+        if not text:
+            continue
+        clean = os.path.abspath(text)
+        key = os.path.normcase(clean)
+        if key in seen:
+            continue
+        seen.add(key)
+        clean_values.append(clean)
+    config = _load_config_data()
+    mapping = config.get('DB_SOURCE_FOLDERS', {})
+    if not isinstance(mapping, dict):
+        mapping = {}
+    if clean_values:
+        mapping[db_abs] = clean_values
+    else:
+        mapping.pop(db_abs, None)
+    config['DB_SOURCE_FOLDERS'] = mapping
+    config['LAST_DATABASE'] = db_abs
+    _save_config_data(config)
+    return clean_values
+
 
 def init_credentials():
     global DISCOGS_KEY, DISCOGS_SECRET, MB_CONTACT, HEADERS, CUSTOM_LANGS, CUSTOM_GENRES

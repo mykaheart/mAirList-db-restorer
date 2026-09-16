@@ -1507,18 +1507,20 @@ def phase_maintenance(db_path):
         console.print(utils.t('maint_opt4'))
         console.print(utils.t('maint_opt5'))
         console.print(utils.t('maint_opt6'))
+        console.print(utils.t('maint_opt7'))
         console.print(utils.t('maint_opt0'))
         
         choice = console.input(f"\n[cyan]{utils.t('maint_prompt')}[/cyan]").strip()
         
         if choice == '0':
             break
-        elif choice in ['1', '2', '3', '4', '5', '6']:
+        elif choice in ['1', '2', '3', '4', '5', '6', '7']:
             do_genres = choice in ['1', '4']
             do_case   = choice in ['2', '4']
             do_tags   = choice == '3'
             do_duplicates = choice == '5'
             do_bpm = choice == '6'
+            do_speed = choice == '7'
             
             try:
                 if do_genres:
@@ -1619,16 +1621,27 @@ def phase_maintenance(db_path):
                     console.print(utils.t('maint_bpm_intro'))
                     rekordbox_xml = _select_fetch_rekordbox_xml(db_path)
                     console.print(Panel(utils.t('maint_bpm_path_intro'), box=box.ROUNDED))
-                    base_dirs = []
+                    saved_dirs = utils.get_saved_source_folders(db_path)
+                    if saved_dirs:
+                        console.print(utils.t('source_dirs_saved', paths=', '.join(saved_dirs)))
+                    else:
+                        console.print(utils.t('source_dirs_none'))
+                    base_dirs = [d for d in saved_dirs if os.path.isdir(d)]
+                    added_dirs = []
                     while True:
                         raw_dir = console.input(utils.t('maint_bpm_path_prompt')).strip().strip('\"').strip("'")
                         if not raw_dir:
                             break
                         if os.path.isdir(raw_dir):
-                            base_dirs.append(raw_dir)
+                            raw_dir = os.path.abspath(raw_dir)
+                            if os.path.normcase(raw_dir) not in {os.path.normcase(x) for x in base_dirs}:
+                                base_dirs.append(raw_dir)
+                                added_dirs.append(raw_dir)
                             console.print(utils.t('maint_bpm_path_added', path=raw_dir))
                         else:
                             console.print(utils.t('maint_bpm_path_invalid'))
+                    if added_dirs:
+                        utils.save_source_folders(db_path, saved_dirs + added_dirs)
 
                     proposals, preview, stats = _scan_bpm_candidates(db_path, base_dirs, rekordbox_xml=rekordbox_xml)
                     _print_bpm_preview(preview)
@@ -1713,6 +1726,65 @@ def phase_maintenance(db_path):
                                 'maint_bpm_done',
                                 written=result['written'], skipped=result['skipped_existing']
                             ))
+
+                if do_speed:
+                    console.print(utils.t('maint_speed_intro'))
+                    assignments, stats = db.scan_speed_group_candidates(db_path)
+                    table = Table(title=utils.t('maint_speed_summary_title'), box=box.ROUNDED)
+                    table.add_column(utils.t('apply_summary_field'))
+                    table.add_column(utils.t('apply_summary_count'), justify='right')
+                    table.add_row(utils.t('maint_speed_with_bpm'), str(stats['with_bpm']))
+                    table.add_row(utils.t('maint_speed_existing'), str(stats['existing']))
+                    table.add_row(utils.t('maint_speed_candidates'), str(stats['candidates']))
+                    table.add_row(utils.t('maint_speed_slow'), str(stats['slow']))
+                    table.add_row(utils.t('maint_speed_medium'), str(stats['medium']))
+                    table.add_row(utils.t('maint_speed_fast'), str(stats['fast']))
+                    if stats.get('ambiguous'):
+                        table.add_row(utils.t('maint_speed_ambiguous'), str(stats['ambiguous']))
+                    console.print(table)
+
+                    if not assignments:
+                        console.print(utils.t('maint_speed_nochange'))
+                    else:
+                        answer = console.input(
+                            f"[yellow]{utils.t('maint_speed_confirm', count=len(assignments))}[/yellow]"
+                        ).strip().lower()
+                        if answer not in ['j', 'ja', 'y', 'yes']:
+                            console.print(utils.t('maint_speed_cancel'))
+                        else:
+                            console.print(utils.t('apply_integrity_check'))
+                            integrity_ok, integrity_details = db.check_integrity(db_path)
+                            if not integrity_ok:
+                                console.print(Panel(
+                                    utils.t('apply_integrity_fail', details=integrity_details),
+                                    box=box.HEAVY, style='red'
+                                ))
+                                break
+                            console.print(utils.t('apply_integrity_ok'))
+
+                            backup_path = f"{db_path}.backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                            shutil.copy2(db_path, backup_path)
+                            console.print(utils.t('apply_backup', path=backup_path))
+
+                            result = db.apply_speed_groups(db_path, assignments)
+
+                            console.print(utils.t('apply_integrity_check'))
+                            post_ok, post_details = db.check_integrity(db_path)
+                            if not post_ok:
+                                console.print(Panel(
+                                    utils.t('apply_integrity_after_fail', backup=backup_path, details=post_details),
+                                    box=box.HEAVY, style='red'
+                                ))
+                                utils.log_change(
+                                    'CRITICAL',
+                                    f"Integrität nach Geschwindigkeits-Wartung fehlgeschlagen: {post_details}; Backup: {backup_path}"
+                                )
+                                break
+                            console.print(utils.t('apply_integrity_ok'))
+                            console.print(utils.t(
+                                'maint_speed_done',
+                                written=result['written'], skipped=result['skipped_existing']
+                            ))
                         
             except sqlite3.OperationalError as e:
                 console.print(utils.t('apply_err_lock', err=str(e)))
@@ -1742,6 +1814,19 @@ def select_language():
             utils.save_language('nl')
             break
 
+def _activate_database(db_path):
+    """Validate a database and prepare its session files; return a tuple or None."""
+    clean = str(db_path or '').strip().strip('"').strip("'")
+    if not clean or db.verify_db_compatibility(clean) is None:
+        return None
+    clean = os.path.abspath(clean)
+    utils.save_database_context(clean)
+    db_base_name, data_dir = setup_logging(clean)
+    fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
+    final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
+    return clean, fetch_csv, final_csv
+
+
 def run_interactive_menu():
     if not utils.load_language():
         select_language()
@@ -1752,6 +1837,21 @@ def run_interactive_menu():
     utils.init_credentials()
 
     mldbpfad = ""
+    fetch_csv = ""
+    final_csv = ""
+    saved_db = utils.get_last_database()
+    if saved_db:
+        if os.path.isfile(saved_db):
+            clear_screen()
+            console.print(f"[cyan]{utils.t('startup_last_db')}[/cyan] {saved_db}")
+            answer = console.input(utils.t('startup_keep_db')).strip().lower()
+            if answer not in ['n', 'nein', 'no', 'nee']:
+                active = _activate_database(saved_db)
+                if active:
+                    mldbpfad, fetch_csv, final_csv = active
+        else:
+            console.print(utils.t('startup_last_db_missing'))
+
     while True:
         clear_screen()
         console.print(f"[cyan]==================================================[/cyan]")
@@ -1803,15 +1903,14 @@ def run_interactive_menu():
         elif wahl == '0':
             console.print(f"\n[cyan]{utils.t('menu_path_hint1')}[/cyan]")
             console.print(f"[yellow]{utils.t('menu_path_hint2')}[/yellow]")
-            mldbpfad = console.input(f"{utils.t('menu_path_prompt')}").strip().strip('"').strip("'")
-            if mldbpfad:
-                if db.verify_db_compatibility(mldbpfad) is None:
+            selected = console.input(f"{utils.t('menu_path_prompt')}").strip().strip('"').strip("'")
+            if selected:
+                active = _activate_database(selected)
+                if not active:
                     mldbpfad = ""
                     console.input(f"\n[cyan]{utils.t('menu_continue')}[/cyan]")
                     continue
-                db_base_name, data_dir = setup_logging(mldbpfad)
-                fetch_csv = os.path.join(data_dir, f"{db_base_name}_vorschlaege.csv")
-                final_csv = os.path.join(data_dir, f"{db_base_name}_restauriert.csv")
+                mldbpfad, fetch_csv, final_csv = active
             continue
 
         if not mldbpfad:

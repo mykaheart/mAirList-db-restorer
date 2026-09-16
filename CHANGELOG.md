@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.66.00 Beta] - 2026-09-16
+### Added
+- **Speed groups from BPM:** Maintenance [7] fills only missing mAirList standard `Geschwindigkeit` attributes: up to 100 BPM = `Langsam`, 101–129 = `Medium`, 130+ = `Schnell`. Existing classifications are never proposed or overwritten.
+- **Remember last database:** `LAST_DATABASE` is stored in `Data/config.json` and offered again on the next interactive start.
+- **Remember source folders per database:** `DB_SOURCE_FOLDERS` stores local base folders. Tagger and BPM maintenance automatically reuse them and can add more folders.
+
+### Safety
+- **Double protection for speed classifications:** Existing values are excluded during scan and re-checked inside a `BEGIN IMMEDIATE` write transaction. A manual mAirList classification made after preview always wins.
+- **Integrity + backup:** Maintenance [7] checks SQLite integrity before and after writing and creates a timestamped backup first.
+- **Real database smoke test:** On a copy of the current `Automation.mldb`, 11 missing groups were added (1 Langsam, 9 Medium, 1 Schnell); all 1,234 existing classifications stayed unchanged and integrity remained OK.
+- **Regression suite expanded:** 44 tests.
+
 ## [0.65.00 Beta] - 2026-09-14
 ### Added
 - **Genre memory like languages:** Manually entered genres are stored persistently under `CUSTOM_GENRES` in `Data/config.json`. Numeric shortcuts deliberately start with `1=Rock`, `2=Pop`; custom genres are appended afterwards.
