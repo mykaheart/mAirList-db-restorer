@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.66.01 Beta] - 2026-09-20
+### Bedienung
+- Nach einem interaktiven Wartungsschritt führt Enter direkt zurück ins Wartungsmenü; [0] führt zum Hauptmenü, ohne zusätzliche Enter-Abfrage.
+- Bestätigungen, die abgebrochen wurden, bleiben im Wartungsmenü. Fehler bei Integritätsprüfungen oder unerwartete Wartungsfehler beenden die Wartung weiterhin sicher.
+- Nicht-interaktive Kommandozeilenaufrufe und Datenbankverarbeitung bleiben unverändert.
+
 Alle wichtigen Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
 ## [0.66.00 Beta] - 2026-09-16

@@ -1,10 +1,12 @@
-# 📖 Handbuch: mAirList DB Restorer 0.66.00 BETA
+# 📖 Handbuch: mAirList DB Restorer 0.66.01 BETA
 
 Der **mAirList DB Restorer** unterstützt bei der Pflege lokaler mAirList-Datenbanken (`.mldb`). Er liest vorhandene Metadaten, recherchiert fehlende oder fragliche Angaben über MusicBrainz und Discogs, kann fehlende BPM aus rekordbox, Datei-Tags und AcousticBrainz ergänzen und bietet mehrere Wartungsfunktionen für bestehende Datenbanken.
 
 Der Restorer arbeitet bewusst konservativ: Er erzeugt zunächst Vorschläge, trennt Lesen, Review und Schreiben voneinander und führt vor sicherheitskritischen Datenbankänderungen Integritätsprüfungen und Backups durch.
 
 > **Wichtig:** Dieses Programm ist für **lokale SQLite-Datenbanken (`.mldb`)** gedacht. Netzwerkdatenbanken werden derzeit nicht unterstützt.
+
+Nach einer Wartungsaufgabe bleibt das Ergebnis bis Enter sichtbar. Danach wird das Wartungsmenü erneut angezeigt. Mit [0] geht es ohne weitere Enter-Abfrage zurück zum Hauptmenü; bei Integritäts- oder unerwarteten Wartungsfehlern wird die Wartung aus Sicherheitsgründen beendet.
 
 ---
 

@@ -1486,18 +1486,27 @@ def _print_bpm_diagnostics(stats):
             table.add_row(utils.t(label_key), str(count))
     console.print(table)
 
-def phase_maintenance(db_path):
+def phase_maintenance(db_path, *, return_to_menu=False):
+    """Run maintenance; the interactive UI stays here until option 0 is selected."""
     if db.verify_db_compatibility(db_path) is None:
+        if return_to_menu:
+            console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
         return
     if not os.path.exists(db_path):
         console.print(utils.t('err_file_not_found', file=db_path))
+        if return_to_menu:
+            console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
         return
 
     if db.is_db_locked(db_path):
         console.print(Panel(utils.t('apply_locked'), box=box.HEAVY, style="red"))
+        if return_to_menu:
+            console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
         return
         
     while True:
+        if return_to_menu:
+            clear_screen()
         utils.clear_input_buffer()
         console.print(utils.t('maint_title'))
         console.print(Panel(utils.t('maint_warn'), box=box.HEAVY))
@@ -1685,6 +1694,9 @@ def phase_maintenance(db_path):
                                     utils.t('apply_integrity_fail', details=integrity_details),
                                     box=box.HEAVY, style='red'
                                 ))
+                                if return_to_menu:
+                                    console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
+                                    return
                                 break
                             console.print(utils.t('apply_integrity_ok'))
 
@@ -1720,6 +1732,9 @@ def phase_maintenance(db_path):
                                     'CRITICAL',
                                     f"Integrität nach BPM-Wartung fehlgeschlagen: {post_details}; Backup: {backup_path}"
                                 )
+                                if return_to_menu:
+                                    console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
+                                    return
                                 break
                             console.print(utils.t('apply_integrity_ok'))
                             console.print(utils.t(
@@ -1759,6 +1774,9 @@ def phase_maintenance(db_path):
                                     utils.t('apply_integrity_fail', details=integrity_details),
                                     box=box.HEAVY, style='red'
                                 ))
+                                if return_to_menu:
+                                    console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
+                                    return
                                 break
                             console.print(utils.t('apply_integrity_ok'))
 
@@ -1779,6 +1797,9 @@ def phase_maintenance(db_path):
                                     'CRITICAL',
                                     f"Integrität nach Geschwindigkeits-Wartung fehlgeschlagen: {post_details}; Backup: {backup_path}"
                                 )
+                                if return_to_menu:
+                                    console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
+                                    return
                                 break
                             console.print(utils.t('apply_integrity_ok'))
                             console.print(utils.t(
@@ -1788,9 +1809,18 @@ def phase_maintenance(db_path):
                         
             except sqlite3.OperationalError as e:
                 console.print(utils.t('apply_err_lock', err=str(e)))
+                if return_to_menu:
+                    console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
+                    return
             except Exception as e:
                 utils.log_change('ERROR', f"Wartungsfunktion fehlgeschlagen: {e}")
                 console.print(Panel(str(e), box=box.HEAVY, style='red'))
+                if return_to_menu:
+                    console.input(f"\n[cyan]{utils.t('maint_abort')}[/cyan]")
+                    return
+            if return_to_menu:
+                console.input(f"\n[cyan]{utils.t('maint_continue')}[/cyan]")
+                continue
             break
         else:
             continue
@@ -1935,7 +1965,8 @@ def run_interactive_menu():
         elif wahl == '5':
             phase_review(fetch_csv, final_csv, auto_hoch=True)
         elif wahl == '6':
-            phase_maintenance(mldbpfad)
+            phase_maintenance(mldbpfad, return_to_menu=True)
+            continue  # option 0 in maintenance returns here without a second Enter prompt
         elif wahl == '7':
             console.print(f"\n[bold yellow]{utils.t('menu_warn_apply1')}\n{utils.t('menu_warn_apply2')}[/bold yellow]\n")
             phase_apply(mldbpfad, final_csv)

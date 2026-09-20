@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.66.01 Beta] - 2026-09-20
+### Bediening
+- Na een interactieve onderhoudstaak keert Enter terug naar het onderhoudsmenu; [0] keert zonder extra Enter-vraag terug naar het hoofdmenu.
+- Na afbreken van een bevestiging blijft het onderhoudsmenu open. Integriteitsfouten en onverwachte onderhoudsfouten beëindigen het onderhoud nog steeds veilig.
+- Opdrachten via de commandoregel en databaseverwerking blijven ongewijzigd.
+
 Alle belangrijke wijzigingen aan dit project worden in dit bestand gedocumenteerd.
 
 ## [0.66.00 Beta] - 2026-09-16

@@ -1060,3 +1060,96 @@ class Version066ConfigMigrationTests(unittest.TestCase):
                 self.assertEqual(utils.get_last_database(), db_path)
             finally:
                 utils.CONFIG_FILE = old_config
+
+
+class MaintenanceMenuNavigationTests(unittest.TestCase):
+    """Menus must stay nested; CLI maintenance keeps its previous single-step behavior."""
+
+    def test_interactive_maintenance_runs_two_actions_before_option_zero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, 'maintenance-nav.mldb')
+            create_test_db(db_path)
+            responses = iter(['1', '', '2', '', '0'])
+            seen = []
+
+            def answer(prompt):
+                seen.append(str(prompt))
+                return next(responses)
+
+            with patch.object(main.console, 'input', side_effect=answer), \
+                 patch.object(main, 'clear_screen'), \
+                 patch.object(main.utils, 'clear_input_buffer'), \
+                 patch.object(main.db, 'run_maintenance_genres', return_value=0) as genres, \
+                 patch.object(main.db, 'run_maintenance_case', return_value=0) as spelling:
+                main.phase_maintenance(db_path, return_to_menu=True)
+
+            genres.assert_called_once_with(db_path)
+            spelling.assert_called_once_with(db_path)
+            self.assertEqual(len(seen), 5)
+            self.assertIn(utils.t('maint_continue'), seen[1])
+            self.assertIn(utils.t('maint_continue'), seen[3])
+            self.assertNotIn(utils.t('menu_continue'), seen[1])
+            self.assertNotIn(utils.t('menu_continue'), seen[3])
+
+    def test_interactive_maintenance_cancelled_action_stays_in_maintenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, 'maintenance-nav-cancel.mldb')
+            create_test_db(db_path)
+            # Abort writing a proposed speed group, then choose another maintenance action.
+            stats = {'with_bpm': 1, 'existing': 0, 'candidates': 1,
+                     'slow': 1, 'medium': 0, 'fast': 0}
+            with patch.object(main.console, 'input', side_effect=['7', 'n', '', '1', '', '0']) as inputs, \
+                 patch.object(main, 'clear_screen'), \
+                 patch.object(main.utils, 'clear_input_buffer'), \
+                 patch.object(main.db, 'scan_speed_group_candidates', return_value=({'1': 'Langsam'}, stats)), \
+                 patch.object(main.db, 'apply_speed_groups') as write, \
+                 patch.object(main.db, 'run_maintenance_genres', return_value=0) as genres:
+                main.phase_maintenance(db_path, return_to_menu=True)
+            self.assertEqual(inputs.call_count, 6)
+            write.assert_not_called()
+            genres.assert_called_once_with(db_path)
+
+    def test_maintenance_integrity_failure_aborts_without_follow_up_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, 'maintenance-nav-integrity.mldb')
+            create_test_db(db_path)
+            stats = {'with_bpm': 1, 'existing': 0, 'candidates': 1,
+                     'slow': 1, 'medium': 0, 'fast': 0}
+            with patch.object(main.console, 'input', side_effect=['7', 'j', '']) as inputs, \
+                 patch.object(main, 'clear_screen'), \
+                 patch.object(main.utils, 'clear_input_buffer'), \
+                 patch.object(main.db, 'scan_speed_group_candidates', return_value=({'1': 'Langsam'}, stats)), \
+                 patch.object(main.db, 'check_integrity', return_value=(False, 'test-failure')), \
+                 patch.object(main.db, 'apply_speed_groups') as write:
+                main.phase_maintenance(db_path, return_to_menu=True)
+            self.assertEqual(inputs.call_count, 3)
+            self.assertIn(utils.t('maint_abort'), inputs.call_args.args[0])
+            write.assert_not_called()
+            self.assertFalse(any(name.startswith('maintenance-nav-integrity.mldb.backup-') for name in os.listdir(tmp)))
+
+    def test_cli_maintenance_keeps_one_action_then_returns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, 'maintenance-nav-cli.mldb')
+            create_test_db(db_path)
+            with patch.object(main.console, 'input', side_effect=['1']) as inputs, \
+                 patch.object(main.db, 'run_maintenance_genres', return_value=0) as genres:
+                main.phase_maintenance(db_path)
+            self.assertEqual(inputs.call_count, 1)
+            genres.assert_called_once_with(db_path)
+
+    def test_main_menu_does_not_show_second_enter_after_maintenance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = os.path.join(tmp, 'maintenance-main-menu.mldb')
+            create_test_db(db_path)
+            with patch.object(main.utils, 'load_language', return_value=True), \
+                 patch.object(main, 'clear_screen'), \
+                 patch.object(main, 'check_for_updates'), \
+                 patch.object(main, 'perform_migration'), \
+                 patch.object(main.utils, 'init_credentials'), \
+                 patch.object(main.utils, 'get_last_database', return_value=db_path), \
+                 patch.object(main, '_activate_database', return_value=(db_path, 'fetch.csv', 'final.csv')), \
+                 patch.object(main.console, 'input', side_effect=['', '6', '9']) as inputs, \
+                 patch.object(main, 'phase_maintenance') as maintenance:
+                main.run_interactive_menu()
+            maintenance.assert_called_once_with(db_path, return_to_menu=True)
+            self.assertEqual(inputs.call_count, 3)
