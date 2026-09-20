@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.66.01 Beta] - 2026-09-20
+### Navigation
+- After an interactive maintenance task, Enter returns to the maintenance menu; [0] returns to the main menu without a second Enter prompt.
+- Declining a confirmation stays in maintenance. Integrity failures or unexpected maintenance errors still abort maintenance safely.
+- Command-line behavior and database processing remain unchanged.
+
 All notable changes to this project will be documented in this file.
 
 ## [0.66.00 Beta] - 2026-09-16

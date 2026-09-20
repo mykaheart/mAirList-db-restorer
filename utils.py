@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.66.00 BETA"
+APP_VERSION = "0.66.01 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -132,6 +132,8 @@ T = {
         'menu_warn_apply1': "ACHTUNG: Dieser Vorgang schreibt alle geprüften Werte in die oben",
         'menu_warn_apply2': "ausgewählte .mldb-Datei. Nutze hierfür IMMER EINE KOPIE!",
         'menu_continue': "Drücke Enter, um ins Hauptmenü zurückzukehren...",
+        'maint_continue': "Drücke Enter, um zum Wartungsmenü zurückzukehren...",
+        'maint_abort': "Wartung aus Sicherheitsgründen beendet. Drücke Enter für das Hauptmenü...",
         'setup_title': "[bold cyan]Ersteinrichtung: API-Zugangsdaten[/bold cyan]\nAngaben werden lokal im 'Data'-Ordner gespeichert.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
@@ -360,6 +362,8 @@ T = {
         'menu_warn_apply1': "WARNING: This operation writes all verified values to the",
         'menu_warn_apply2': "selected .mldb file. ALWAYS USE A COPY for this!",
         'menu_continue': "Press Enter to return to the main menu...",
+        'maint_continue': "Press Enter to return to the maintenance menu...",
+        'maint_abort': "Maintenance stopped for safety. Press Enter to return to the main menu...",
         'setup_title': "[bold cyan]Initial Setup: API Credentials[/bold cyan]\nDetails are stored locally in the 'Data' folder (Base64-obfuscated, not encrypted).",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
@@ -588,6 +592,8 @@ T = {
         'menu_warn_apply1': "WAARSCHUWING: Dit proces schrijft alle gecontroleerde waarden naar het",
         'menu_warn_apply2': "bovenstaande .mldb bestand. Gebruik hiervoor ALTIJD EEN KOPIE!",
         'menu_continue': "Druk op Enter om terug te keren naar het hoofdmenu...",
+        'maint_continue': "Druk op Enter om terug te keren naar het onderhoudsmenu...",
+        'maint_abort': "Onderhoud om veiligheidsredenen gestopt. Druk op Enter om terug te keren naar het hoofdmenu...",
         'setup_title': "[bold cyan]Eerste installatie: API-gegevens[/bold cyan]\nGegevens worden lokaal opgeslagen in de map 'Data'.",
         'setup_discogs': "[bold yellow]-- Discogs API --[/bold yellow]",
         'setup_mb': "\n[bold yellow]-- MusicBrainz Contact --[/bold yellow]",
