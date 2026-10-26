@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.66.02 BETA] - 2026-10-26
+### Live-Re-Fetch-Hotfix
+- API-Fehler von MusicBrainz und Discogs werden beim Live-Re-Fetch in der Review getrennt abgefangen. Erfolgreiche Teilergebnisse werden weiterverwendet; Vorschläge eines ausgefallenen Dienstes bleiben erhalten. Fallen beide Dienste aus, bleiben alle bisherigen Vorschläge erhalten. Eine Warnung nennt den betroffenen Dienst; manuelle Eingaben bleiben erhalten und die Review läuft weiter. Der Hinweis lautet jetzt „Manuelle Änderung erkannt“. Datenbank- und Apply-Logik sind unverändert.
+- Regressionstests für MusicBrainz-Ausfall, Discogs-Ausfall und beidseitigen Ausfall; alle 52 Tests erfolgreich.
+
 ## [0.66.01 Beta] - 2026-09-20
 ### Bedienung
 - Nach einem interaktiven Wartungsschritt führt Enter direkt zurück ins Wartungsmenü; [0] führt zum Hauptmenü, ohne zusätzliche Enter-Abfrage.

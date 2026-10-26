@@ -1,4 +1,8 @@
-# 📖 Handbuch: mAirList DB Restorer 0.66.01 BETA
+# 📖 Handbuch: mAirList DB Restorer 0.66.02 BETA
+
+## 0.66.02 BETA — Live-Re-Fetch-Hotfix
+
+API-Fehler von MusicBrainz und Discogs werden beim Live-Re-Fetch in der Review getrennt abgefangen. Erfolgreiche Teilergebnisse werden weiterverwendet; Vorschläge eines ausgefallenen Dienstes bleiben erhalten. Fallen beide Dienste aus, bleiben alle bisherigen Vorschläge erhalten. Eine Warnung nennt den betroffenen Dienst; manuelle Eingaben bleiben erhalten und die Review läuft weiter. Der Hinweis lautet jetzt „Manuelle Änderung erkannt“. Datenbank- und Apply-Logik sind unverändert.
 
 Der **mAirList DB Restorer** unterstützt bei der Pflege lokaler mAirList-Datenbanken (`.mldb`). Er liest vorhandene Metadaten, recherchiert fehlende oder fragliche Angaben über MusicBrainz und Discogs, kann fehlende BPM aus rekordbox, Datei-Tags und AcousticBrainz ergänzen und bietet mehrere Wartungsfunktionen für bestehende Datenbanken.
 

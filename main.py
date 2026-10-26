@@ -722,24 +722,38 @@ def phase_review(fetch_csv, final_csv, auto_hoch=False):
                         future_mb = executor.submit(api.fetch_musicbrainz_details, c_art, c_tit, target_y, target_a, local_dur)
                         future_discogs = executor.submit(api.fetch_discogs_details, c_art, c_tit, target_y, target_a)
                         
-                        mb_year, mb_conf, isrc, mb_album, mb_lang = future_mb.result()
-                        discogs_res = future_discogs.result()
+                        mb_result = discogs_res = None
+                        for service, future in [('MusicBrainz', future_mb), ('Discogs', future_discogs)]:
+                            try:
+                                result = future.result()
+                            except (api.APIRequestError, requests.RequestException, TimeoutError, ConnectionError):
+                                console.print(utils.t('rev_refetch_failed', service=service))
+                            else:
+                                if service == 'MusicBrainz':
+                                    mb_result = result
+                                else:
+                                    discogs_res = result
 
-                    df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
-                    df.at[idx, 'Genre_Konfidenz'] = discogs_res['confidence']
-                    df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
-                    df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
-                    df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
-                    df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style'] or ''
-                    df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
-                    if mb_lang: df.at[idx, 'Sprache_Vorschlag'] = mb_lang
+                    if discogs_res is not None:
+                        df.at[idx, 'Genre_Vorschlag'] = discogs_res['genre'] or ''
+                        df.at[idx, 'Genre_Konfidenz'] = discogs_res['confidence']
+                        df.at[idx, 'Label_Vorschlag'] = discogs_res['label'] or ''
+                        df.at[idx, 'Labelcode_Vorschlag'] = discogs_res['label_code'] or ''
+                        df.at[idx, 'STYLE_Vorschlag'] = discogs_res['style'] or ''
+                        df.at[idx, 'DISCOGS_RELEASE_ID_Vorschlag'] = discogs_res['discogs_id'] or ''
+                    if mb_result is not None:
+                        mb_year, mb_conf, isrc, mb_album, mb_lang = mb_result
+                        df.at[idx, 'ISRC_Vorschlag'] = isrc or ''
+                        if mb_lang: df.at[idx, 'Sprache_Vorschlag'] = mb_lang
 
                     # An AcousticBrainz proposal depends on the previous recording
                     # identity. If Artist/Title/Year/Album was manually corrected,
                     # discard that BPM proposal instead of carrying a stale match
-                    # into Apply. Path-/file-tag based BPM remains tied to the file.
+                    # into Apply after a successful re-fetch. If both services fail,
+                    # preserve all previous proposals. Path-/file-tag based BPM
+                    # remains tied to the file.
                     bpm_source = utils.clean_nan(df.at[idx, 'BPM_Quelle'] if 'BPM_Quelle' in df.columns else '')
-                    if bpm_source.casefold().startswith('acousticbrainz'):
+                    if (mb_result is not None or discogs_res is not None) and bpm_source.casefold().startswith('acousticbrainz'):
                         df.at[idx, 'BPM_Vorschlag'] = ''
                         df.at[idx, 'BPM_Quelle'] = ''
 

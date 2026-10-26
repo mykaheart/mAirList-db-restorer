@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.66.02 BETA] - 2026-10-26
+### Live re-fetch hotfix
+- MusicBrainz and Discogs API failures during review live re-fetch are handled separately. Successful partial results are used; proposals from a failed service are preserved. If both services fail, all existing proposals are preserved. A warning identifies the affected service; manual input is retained and review continues. The prompt now says “Manual change detected”. Database and Apply logic are unchanged.
+- Regression tests for MusicBrainz failure, Discogs failure, and simultaneous failure; all 52 tests pass.
+
 ## [0.66.01 Beta] - 2026-09-20
 ### Navigation
 - After an interactive maintenance task, Enter returns to the maintenance menu; [0] returns to the main menu without a second Enter prompt.

@@ -15,7 +15,7 @@ from rich import box
 
 console = Console(highlight=False)
 
-APP_VERSION = "0.66.01 BETA"
+APP_VERSION = "0.66.02 BETA"
 
 # --- CONFIG.JSON IN DEN DATA-ORDNER VERSCHIEBEN ---
 DATA_DIR = "Data"
@@ -179,7 +179,8 @@ T = {
         'rev_row': "[bold white on blue] Zeile {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
         'rev_artist': "  [cyan]Artist[/cyan] -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_title': "  [cyan]Title[/cyan]  -> Vorschlag: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Text][/dim]: ",
-        'rev_refetch': "  [magenta]⚡ Freitext erkannt! Live Re-Fetch für '{art} - {tit}'...[/magenta]",
+        'rev_refetch': "  [magenta]⚡ Manuelle Änderung erkannt! Live Re-Fetch für '{art} - {tit}'...[/magenta]",
+        'rev_refetch_failed': '  [yellow]⚠ {service}: Live-Re-Fetch fehlgeschlagen. Bisherige Vorschläge dieses Dienstes und deine Eingaben bleiben erhalten; die Review wird fortgesetzt.[/yellow]',
         'rev_year_auto': "  [cyan]Jahr[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
         'rev_year': "  [cyan]Jahr[/cyan]   -> Vorschlag: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Vorschlag / [yellow]o[/yellow]=Orig / Jahr][/dim]: ",
         'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
@@ -409,7 +410,8 @@ T = {
         'rev_row': "[bold white on blue] Row {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
         'rev_artist': "  [cyan]Artist[/cyan] -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
         'rev_title': "  [cyan]Title[/cyan]  -> Suggestion: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Text][/dim]: ",
-        'rev_refetch': "  [magenta]⚡ Custom text detected! Live re-fetch for '{art} - {tit}'...[/magenta]",
+        'rev_refetch': "  [magenta]⚡ Manual change detected! Live re-fetch for '{art} - {tit}'...[/magenta]",
+        'rev_refetch_failed': '  [yellow]⚠ {service}: Live re-fetch failed. Existing proposals from this service and your input are preserved; review continues.[/yellow]',
         'rev_year_auto': "  [cyan]Year[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
         'rev_year': "  [cyan]Year[/cyan]   -> Suggestion: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Suggest / [yellow]o[/yellow]=Orig / Year][/dim]: ",
         'rev_genre_auto': "  [cyan]Genre[/cyan]  -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
@@ -639,7 +641,8 @@ T = {
         'rev_row': "[bold white on blue] Rij {row} (ID: {id}) [/bold white on blue] [bold]{art} - {tit}[/bold]",
         'rev_artist': "  [cyan]Artiest[/cyan] -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
         'rev_title': "  [cyan]Titel[/cyan]   -> Suggestie: '[bold green]{sugg}[/bold green]' [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Tekst][/dim]: ",
-        'rev_refetch': "  [magenta]⚡ Eigen tekst gedetecteerd! Live Re-Fetch voor '{art} - {tit}'...[/magenta]",
+        'rev_refetch': "  [magenta]⚡ Handmatige wijziging gedetecteerd! Live Re-Fetch voor '{art} - {tit}'...[/magenta]",
+        'rev_refetch_failed': '  [yellow]⚠ {service}: Live Re-Fetch mislukt. Bestaande voorstellen van deze dienst en je invoer blijven behouden; de review gaat verder.[/yellow]',
         'rev_year_auto': "  [cyan]Jaar[/cyan]    -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",
         'rev_year': "  [cyan]Jaar[/cyan]    -> Suggestie: '[bold green]{sugg}[/bold green]' ({badge}) [dim](Orig: '{orig}') \\[[green]Enter[/green]=Sugg / [yellow]o[/yellow]=Orig / Jaar][/dim]: ",
         'rev_genre_auto': "  [cyan]Genre[/cyan]   -> [bold green]{sugg}[/bold green] [dim](auto, Orig: '{orig}')[/dim]",

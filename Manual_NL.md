@@ -1,4 +1,8 @@
-# 📖 Handleiding: mAirList DB Restorer 0.66.01 BETA
+# 📖 Handleiding: mAirList DB Restorer 0.66.02 BETA
+
+## 0.66.02 BETA — Live-Re-Fetch-hotfix
+
+API-fouten van MusicBrainz en Discogs tijdens de Live-Re-Fetch in de review worden afzonderlijk afgehandeld. Succesvolle deelresultaten worden gebruikt; voorstellen van een uitgevallen dienst blijven behouden. Als beide diensten uitvallen, blijven alle bestaande voorstellen behouden. Een waarschuwing noemt de betreffende dienst; handmatige invoer blijft behouden en de review gaat verder. De melding luidt nu “Handmatige wijziging gedetecteerd”. Database- en Apply-logica zijn ongewijzigd.
 
 De **mAirList DB Restorer** helpt bij het onderhouden van lokale mAirList-databases (`.mldb`). Het programma leest bestaande metadata, onderzoekt ontbrekende of twijfelachtige gegevens via MusicBrainz en Discogs, kan ontbrekende BPM-waarden aanvullen vanuit rekordbox, bestandstags en AcousticBrainz en biedt verschillende onderhoudsfuncties voor bestaande databases.
 

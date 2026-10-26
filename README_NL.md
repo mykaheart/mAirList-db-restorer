@@ -1,4 +1,8 @@
-# mAirList DB Restorer v0.66.01 BETA
+# mAirList DB Restorer v0.66.02 BETA
+
+## 0.66.02 BETA — Live-Re-Fetch-hotfix
+
+API-fouten van MusicBrainz en Discogs tijdens de Live-Re-Fetch in de review worden afzonderlijk afgehandeld. Succesvolle deelresultaten worden gebruikt; voorstellen van een uitgevallen dienst blijven behouden. Als beide diensten uitvallen, blijven alle bestaande voorstellen behouden. Een waarschuwing noemt de betreffende dienst; handmatige invoer blijft behouden en de review gaat verder. De melding luidt nu “Handmatige wijziging gedetecteerd”. Database- en Apply-logica zijn ongewijzigd.
 **De intelligente metadata-reparatietool voor lokale mAirList databases**
 
 *(Note: German and English documentation / manuals are available in the repository!)*
